@@ -2012,8 +2012,15 @@ async function renderPerf(){
     const opexM = M ? M.monthly.act : Array(12).fill(0), closed = M?.closed||0;
     const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
     const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
-    const salesY = ytd('sales_actual'), prodY = ytd('production_output'), volY = ytd('volume_sold'), opexY = sum(opexM.slice(0,closed)), perB = prodY || volY, perLbl = prodY ? 'produced' : 'sold';
-    const years = [...new Set([...S.cycles.map(c=>c.year), Y, new Date().getFullYear()])].sort((a,b)=>b-a);
+    // sales and volume: every month entered; OPEX ratios: only months that have both OPEX actuals and the figure
+    const avail = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)!=null); return ms.length ? { sum:sum(ms.map(mo=>g(m,mo))), last:Math.max(...ms), n:ms.length, ms } : null; };
+    const pair = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>mo<=closed && g(m,mo)>0); return ms.length ? { k:sum(ms.map(mo=>g(m,mo))), opex:sum(ms.map(mo=>opexM[mo-1])), n:ms.length, last:Math.max(...ms) } : null; };
+    const sA = avail('sales_actual'), vA = avail('volume_sold'), pA = avail('production_output');
+    const tgtSame = (m, a) => a ? (()=>{ const v = a.ms.map(mo=>g(m,mo)).filter(x=>x!=null); return v.length===a.ms.length ? sum(v) : null; })() : null;
+    const sT = tgtSame('sales_target', sA), vT = tgtSame('volume_target', vA);
+    const pP = pair('production_output'), pV = pair('volume_sold'), pB = pP || pV, perLbl = pP ? 'produced' : 'sold', pS = pair('sales_actual');
+    const salesY = sA?.sum ?? null, opexY = sum(opexM.slice(0,closed)), perB = pB?.k, prodY = pA?.sum;
+    const years = [...new Set([...S.cycles.map(c=>c.year), Y, ...Array.from({length:new Date().getFullYear()-2018},(_,i)=>2019+i)])].sort((a,b)=>b-a);
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · Pasig Plant</div><h1>Sales and plant performance</h1>
       <div class="sub">Sales targets and results, production volume and plant measures, set against plant OPEX. Fill in what is available — every figure helps size volume-driven costs.</div></div>
@@ -2021,17 +2028,18 @@ async function renderPerf(){
     <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pfYear">Year</label><select class="inp" id="pfYear" onchange="S.pf.year=Number(this.value);renderPerf()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       <span class="grow"></span><span class="hint">${ed?'Type values directly in the table, then Save. Use the Year column for annual targets.':'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
     <div class="stats">
-      <div class="stat"><div class="eyebrow">Sales ${thru(closed)}</div><div class="v">${salesY!=null?short(salesY):'—'}</div><div class="s">${tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>
-      <div class="stat"><div class="eyebrow">Production ${thru(closed)}</div><div class="v">${prodY!=null?Number(prodY).toLocaleString('en-PH'):'—'}</div><div class="s">boards${tot('production_target')!=null?` · target ${Number(tot('production_target')).toLocaleString('en-PH')}`:''}</div></div>
-      <div class="stat opex"><div class="eyebrow">Plant OPEX per board ${perB?perLbl:''}</div><div class="v">${perB?peso(opexY/perB,2):'—'}</div><div class="s">${perB?`${short(opexY)} OPEX ÷ ${Number(perB).toLocaleString('en-PH')} boards ${perLbl}`:'Needs boards sold or produced'}</div></div>
-      <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${salesY?(100*opexY/salesY).toFixed(1)+'%':'—'}</div><div class="s">${salesY?`${thru(closed)}`:'Needs sales actual'}</div></div>
+      <div class="stat"><div class="eyebrow">Sales ${sA?thru(sA.last):''}</div><div class="v">${sA?short(sA.sum):'—'}</div><div class="s">${sT?`Target same months ${short(sT)} · ${Math.round(100*sA.sum/sT)}% reached`:tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>
+      <div class="stat"><div class="eyebrow">Boards sold ${vA?thru(vA.last):''}</div><div class="v">${vA?Math.round(vA.sum).toLocaleString('en-PH'):'—'}</div><div class="s">${vT?`Target same months ${Math.round(vT).toLocaleString('en-PH')} · ${Math.round(100*vA.sum/vT)}% reached`:sA&&vA?`Average ${peso(sA.sum/vA.sum)} per board`:''}${pA?` · produced ${Math.round(pA.sum).toLocaleString('en-PH')}`:''}</div></div>
+      <div class="stat opex"><div class="eyebrow">Plant OPEX per board ${perLbl}</div><div class="v">${pB?peso(pB.opex/pB.k,2):'—'}</div><div class="s">${pB?`${short(pB.opex)} OPEX ÷ ${Math.round(pB.k).toLocaleString('en-PH')} boards, ${thru(pB.last)}`:closed?'Needs boards sold or produced':`No ${Y} OPEX actuals loaded yet`}</div></div>
+      <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':'—'}</div><div class="s">${pS?thru(pS.last):closed?'Needs sales actual':`No ${Y} OPEX actuals loaded yet`}</div></div>
     </div>
+    ${!closed && (sA||vA) ? `<div class="banner blue">Sales and volume for ${Y} are recorded. Plant OPEX per board and OPEX as % of sales need ${Y} expense actuals${canManageData()?' — upload them on the Actuals page':''}.</div>` : ''}
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
       ${KPI_DEFS.map(([k,l,u,t])=>`<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
         return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
-      <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${short(opexY)}</td></tr>
-      <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(prodY?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${perB?peso(opexY/perB,2):''}</td></tr>
-      <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${salesY?(100*opexY/salesY).toFixed(1)+'%':''}</td></tr>
+      <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
+      <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
+      <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
     <p class="hint" style="margin-top:10px">Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;

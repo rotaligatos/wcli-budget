@@ -1027,7 +1027,7 @@ async function deleteLine(kind, id){
 }
 async function duplicateLine(kind, id){
   const list = kind==='opex' ? S.opex : S.capex, src = list.find(x=>x.id===id);
-  const { id:_, annual:__, created_at, updated_at, created_by, updated_by, impl_status:_s, impl_note:_n, impl_amount:_a, impl_date:_d, target_year:_ty, target_month:_tm, carried_from:_cf, status_by:_sb, status_at:_sa, ...copy } = src;
+  const { id:_, annual:__, created_at, updated_at, created_by, updated_by, impl_status:_s, impl_note:_n, impl_amount:_a, impl_date:_d, target_year:_ty, target_month:_tm, carried_from:_cf, status_by:_sb, status_at:_sa, quote_amount:_qa, quote_supplier:_qs, quote_ref:_qr, quote_date:_qd, ...copy } = src;
   copy.sort = Math.max(...list.map(x=>x.sort||0)) + 1;
   if (kind==='opex') copy.activity = (copy.activity||'') + ' (copy)'; else copy.asset = (copy.asset||'') + ' (copy)';
   const { data, error } = await sb.from(kind==='opex'?'bgt_opex_lines':'bgt_capex_lines').insert(copy).select().single();
@@ -1946,7 +1946,7 @@ async function renderTrend(Y, o){
 }
 async function histSources(k){
   const H = (await loadHist()).filter(h=>h.key===k), d = indDef(k);
-  modal(`<h3>${esc(d[1])} — basis and sources</h3><table class="ledger"><tbody>${H.map(h=>`<tr><td class="num" style="white-space:nowrap"><b>${h.year}</b></td><td class="num" style="white-space:nowrap">${fmtInd(d,h.value)}</td>
+  modal(`<h3>${esc(d[1])} — basis and sources</h3><table class="ledger" style="min-width:0"><tbody>${H.map(h=>`<tr><td class="num" style="white-space:nowrap"><b>${h.year}</b></td><td class="num" style="white-space:nowrap">${fmtInd(d,h.value)}</td>
     <td style="font-size:12.5px">${esc(BASIS_TXT[h.basis]||'')}${h.period?' · '+esc(h.period):''}${h.approx?' · approximate':''}${h.note?'<br>'+esc(h.note):''}<br>${h.source_url?`<a href="${esc(h.source_url)}" target="_blank" rel="noopener">${esc(h.source_title||'Source')}</a>`:esc(h.source_title||'')}</td></tr>`).join('')}</tbody></table>
     <div class="actions" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="closeModal()">Close</button></div>`);
 }
@@ -2337,12 +2337,13 @@ function capexEvents(l, all){
   if (st==='cancelled') return [];
   if (st==='deferred') { // counts in the later year only while it has not been carried into that year's budget yet
     if (!l.target_year || all.some(x=>x.carried_from===l.id)) return [];
-    return [{ y:l.target_year, m:l.target_month||firstMonth(l), amt:Number(l.impl_amount)||annual(l), pending:true }];
+    return [{ y:l.target_year, m:l.target_month||firstMonth(l), amt:Number(l.quote_amount)||Number(l.impl_amount)||annual(l), pending:true }];
   }
   if (st==='done') { const d = l.impl_date ? new Date(l.impl_date) : null;
     return [{ y:d ? d.getFullYear() : l.year, m:d ? d.getMonth()+1 : firstMonth(l), amt:l.impl_amount!=null ? Number(l.impl_amount) : annual(l) }]; }
-  if (st==='rescheduled' && l.target_month) return [{ y:l.target_year||l.year, m:l.target_month, amt:annual(l) }];
-  const ev = []; for (let i=1;i<=12;i++){ const v = Number(l['m'+i])||0; if (v) ev.push({ y:l.year, m:i, amt:v }); } return ev;
+  const scale = l.quote_amount!=null && annual(l) ? Number(l.quote_amount)/annual(l) : 1;  // latest quotation replaces the budget amount
+  if (st==='rescheduled' && l.target_month) return [{ y:l.target_year||l.year, m:l.target_month, amt:annual(l)*scale }];
+  const ev = []; for (let i=1;i<=12;i++){ const v = Number(l['m'+i])||0; if (v) ev.push({ y:l.year, m:i, amt:v*scale }); } return ev;
 }
 // monthly depreciation of one spend: starts the month after it is spent / put in use
 function deprInYear(ev, life, salvage, Y){
@@ -2407,17 +2408,17 @@ async function renderCapexTracker(){
       <div class="stat"><div class="eyebrow">Cancelled</div><div class="v">${short(by('cancelled'))}</div><div class="s">${short(by('planned'))} still marked planned</div></div>
     </div>
     ${waiting.length ? `<div class="card" style="margin-bottom:16px;border-left:4px solid #D9A441"><h3>Deferred to ${open.year} — not yet in the ${open.year} budget</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>From</th><th>Department</th><th>Asset</th><th class="r">Amount</th><th>Month</th><th>Reason</th><th></th></tr></thead><tbody>
-      ${waiting.map(l=>`<tr><td class="num">${l.year}</td><td>${esc(deptById(l.department_id)?.name)}</td><td><div class="item">${esc(l.category||'')}</div><div class="act">${esc(l.asset||'')}</div></td><td class="r num">${peso(l.impl_amount??annual(l))}</td><td>${l.target_month?MONTHS[l.target_month-1]:'—'}</td><td style="font-size:12.5px;max-width:280px">${esc(l.impl_note||'')}</td>
+      ${waiting.map(l=>`<tr><td class="num">${l.year}</td><td>${esc(deptById(l.department_id)?.name)}</td><td><div class="item">${esc(l.category||'')}</div><div class="act">${esc(l.asset||'')}</div></td><td class="r num">${peso(l.quote_amount??l.impl_amount??annual(l))}</td><td>${l.target_month?MONTHS[l.target_month-1]:'—'}</td><td style="font-size:12.5px;max-width:280px">${esc(l.impl_note||'')}</td>
         <td>${canCarry(l, open)?`<button class="btn" onclick="carryCapex('${l.id}')">Add to ${open.year} budget</button>`:'<span class="hint">Department adds it</span>'}</td></tr>`).join('')}
       </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Until they are added, these items are still counted in the ${open.year} depreciation outlook (flagged as pending).</p></div>` : ''}
-    <div class="card"><h3>CAPEX items</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1050px"><thead><tr><th>Year</th><th>Department</th><th>Category / asset</th><th class="r">Budget</th><th>Planned</th><th>Status</th><th>Actual / new timing</th><th class="r">Depreciation / yr</th><th></th></tr></thead><tbody>
+    <div class="card"><h3>CAPEX items</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1200px"><thead><tr><th>Year</th><th>Department</th><th style="min-width:220px">Category / asset</th><th class="r">Budget</th><th class="r" style="min-width:130px">Quotation</th><th>Planned</th><th>Status</th><th>Actual / new timing</th><th class="r">Depreciation / yr</th><th></th></tr></thead><tbody>
       ${list.map(l=>{ const st = l.impl_status||'planned', dp = lineDepr(l, AC), carried = L.find(x=>x.carried_from===l.id), src = l.carried_from ? L.find(x=>x.id===l.carried_from) : null;
         const timing = st==='done' ? `${l.impl_amount!=null?peso(l.impl_amount):peso(annual(l))}${l.impl_date?' · in use '+fmtDay(l.impl_date):''}` : st==='deferred' ? `To ${l.target_year||'?'}${l.target_month?' '+MONTHS[l.target_month-1]:''}${carried?' · <span class="chip pri-ok" style="font-size:11px">in '+carried.year+' budget</span>':''}` : st==='rescheduled' ? `Moved to ${l.target_month?MONTHS[l.target_month-1]:'?'} ${l.target_year||l.year}` : '';
         return `<tr><td class="num">${l.year}</td><td style="font-size:13px">${esc(deptById(l.department_id)?.name)}</td>
           <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled')}</div>${src?`<div class="hint" style="font-size:11.5px">Carried over from ${src.year}</div>`:''}${l.impl_note?`<div class="hint" style="font-size:12px">${esc(l.impl_note)}</div>`:''}</td>
-          <td class="r num">${peso(annual(l))}</td><td style="font-size:12.5px">${plannedMonths(l)}</td><td>${capexChip(st)}</td><td style="font-size:12.5px">${timing}</td>
+          <td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${l.quote_amount!=null?`${peso(l.quote_amount)}<div class="item" style="text-transform:none;color:${Number(l.quote_amount)>annual(l)?'var(--red)':'var(--green)'}">${Number(l.quote_amount)>=annual(l)?'+':''}${annual(l)?Math.round(100*(l.quote_amount-annual(l))/annual(l)):0}% vs budget</div>${l.quote_supplier?`<div class="hint" style="font-size:11.5px">${esc(l.quote_supplier)}${l.quote_ref?' · '+esc(l.quote_ref):''}</div>`:''}`:'<span class="hint">—</span>'}</td><td style="font-size:12.5px">${plannedMonths(l)}</td><td>${capexChip(st)}</td><td style="font-size:12.5px">${timing}</td>
           <td class="r num">${dp.life?peso(dp.yr):'<span class="hint">none</span>'}<div class="item" style="text-transform:none">${dp.life?Math.round(dp.life/12*10)/10+' yrs':'not depreciated'}</div></td>
-          <td>${canSetCapexStatus(l.department_id)?`<button class="btn" onclick="capexStatusDialog('${l.id}')">Update</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="9" class="hint" style="padding:16px">No CAPEX items for this selection.</td></tr>`}
+          <td>${canSetCapexStatus(l.department_id)?`<button class="btn" onclick="capexStatusDialog('${l.id}')">Update</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="10" class="hint" style="padding:16px">No CAPEX items for this selection.</td></tr>`}
       </tbody></table></div></div>
     ${D ? deprCard(D, open.year, AC) : ''}`;
   } catch(e){ fail(e); }
@@ -2433,15 +2434,15 @@ function deprCard(D, Y, AC){
       <div class="stat capex"><div class="eyebrow">New ${Y} CAPEX</div><div class="v">${short(sum(D.current))}</div><div class="s">from the month after purchase${D.pending?` · incl. ${short(D.pending)} pending carry-overs`:''}</div></div>
       <div class="stat opex"><div class="eyebrow">Total depreciation ${Y}</div><div class="v">${short(D.total)}</div><div class="s">${peso(D.total/12)} a month on average</div></div>
     </div>
-    <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start;min-width:0">
-      <div style="min-width:0"><b style="font-size:13px">Useful life by asset class</b> <span class="hint" style="font-size:12px">— straight line, starts the month after purchase. Confirm with Accounting's policy.</span>
-        <table class="ledger" style="margin-top:6px"><thead><tr><th>Asset class</th><th class="r">Years</th><th class="r">Salvage %</th></tr></thead><tbody>
+    <div style="padding:14px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+      <div style="flex:1 1 380px;max-width:560px;min-width:0"><b style="font-size:13px">Useful life by asset class</b> <span class="hint" style="font-size:12px">— straight line, starts the month after purchase. Confirm with Accounting's policy.</span>
+        <div class="tbl-wrap"><table class="ledger" style="margin-top:6px;min-width:0"><thead><tr><th>Asset class</th><th class="r">Years</th><th class="r">Salvage %</th></tr></thead><tbody>
         ${AC.sort((a,b)=>a.category.localeCompare(b.category)).map(a=>`<tr><td style="font-size:13px">${esc(a.category)}</td><td class="r">${ed?`<input class="inp num acl" data-c="${esc(a.category)}" data-k="y" type="number" step="0.5" min="0" value="${a.useful_life_months/12}" style="max-width:70px;margin-left:auto">`:a.useful_life_months/12}</td><td class="r">${ed?`<input class="inp num acl" data-c="${esc(a.category)}" data-k="s" type="number" step="1" min="0" max="100" value="${Number(a.salvage_pct)}" style="max-width:70px;margin-left:auto">`:Number(a.salvage_pct)}</td></tr>`).join('')}
-        </tbody></table>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveAssetClasses()">Save useful lives</button></div>':''}</div>
-      <div style="min-width:0"><b style="font-size:13px">Depreciation of assets already on the books</b> <span class="hint" style="font-size:12px">— yearly amount from Accounting's fixed-asset register (plant total).</span>
-        <table class="ledger" style="margin-top:6px"><thead><tr><th>Year</th><th class="r">Amount</th></tr></thead><tbody>
+        </tbody></table></div>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveAssetClasses()">Save useful lives</button></div>':''}</div>
+      <div style="flex:1 1 320px;max-width:460px;min-width:0"><b style="font-size:13px">Depreciation of assets already on the books</b> <span class="hint" style="font-size:12px">— yearly amount from Accounting's fixed-asset register (plant total).</span>
+        <div class="tbl-wrap"><table class="ledger" style="margin-top:6px;min-width:0"><thead><tr><th>Year</th><th class="r">Amount (₱ per year)</th></tr></thead><tbody>
         ${[Y-1, Y, Y+1].map(y=>{ const e = (S.cx.cache.de||[]).find(x=>x.year===y && !x.department_id); return `<tr><td class="num">${y}</td><td class="r">${ed?`<input class="inp num dex" data-y="${y}" type="number" step="any" value="${e?Number(e.amount):''}" placeholder="0" style="max-width:150px;margin-left:auto">`:peso(e?.amount||0)}</td></tr>`; }).join('')}
-        </tbody></table>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveDeprExisting()">Save</button></div>':''}
+        </tbody></table></div>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveDeprExisting()">Save</button></div>':''}
         <p class="hint" style="font-size:12px">The 2023 general ledger has depreciation accounts — Accounting can give the yearly total so the plant's full cost is complete.</p></div>
     </div></div>`;
 }
@@ -2463,8 +2464,14 @@ async function capexStatusDialog(id){
   const st = l.impl_status||'planned', yNext = l.year+1;
   modal(`<h3>${esc(l.asset||'CAPEX item')} <span class="hint" style="font-weight:400">· ${l.year} · ${esc(deptById(l.department_id)?.name)}</span></h3>
     <p style="margin-top:0">${esc(l.category||'')} · budget ${peso(annual(l))} · planned ${plannedMonths(l)}</p>
+    <div class="box" style="margin:0 0 12px;padding:10px 12px"><b style="font-size:13px">Quotation</b> <span class="hint" style="font-size:12px">— the latest supplier price for this item</span>
+      <div class="g2" style="margin-top:6px"><div class="field"><label for="csQAmt">Quoted cost (₱, total)</label><input class="inp num" id="csQAmt" type="number" step="any" value="${l.quote_amount??''}" placeholder="budget ${annual(l)}"></div>
+        <div class="field"><label for="csQSup">Supplier</label><input class="inp" id="csQSup" value="${esc(l.quote_supplier||'')}"></div></div>
+      <div class="g2"><div class="field"><label for="csQRef">Quotation no.</label><input class="inp" id="csQRef" value="${esc(l.quote_ref||'')}"></div>
+        <div class="field"><label for="csQDate">Quotation date</label><input class="inp" id="csQDate" type="date" value="${l.quote_date||''}"></div></div>
+      <p class="hint" id="csQVar" style="margin:0"></p></div>
     <div class="field"><label for="csSt">What happened</label><select class="inp" id="csSt">${Object.entries(CAPEX_ST).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v[0]}</option>`).join('')}</select></div>
-    <div id="csDone" class="g2"><div class="field"><label for="csAmt">Actual cost (₱)</label><input class="inp num" id="csAmt" type="number" step="any" value="${l.impl_amount??''}" placeholder="${annual(l)}"></div>
+    <div id="csDone" class="g2"><div class="field"><label for="csAmt">Actual cost (₱)</label><input class="inp num" id="csAmt" type="number" step="any" value="${l.impl_amount??''}" placeholder="${l.quote_amount??annual(l)}"></div>
       <div class="field"><label for="csDate">In use from</label><input class="inp" id="csDate" type="date" value="${l.impl_date||''}"></div></div>
     <div id="csMove" class="g2"><div class="field"><label for="csTy">Year</label><input class="inp num" id="csTy" type="number" value="${l.target_year||(st==='rescheduled'?l.year:yNext)}"></div>
       <div class="field"><label for="csTm">Month</label><select class="inp" id="csTm"><option value="">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${l.target_month===i+1?'selected':''}>${m}</option>`).join('')}</select></div></div>
@@ -2477,11 +2484,13 @@ async function capexStatusDialog(id){
     $('#csNoteL').textContent = v==='cancelled' ? 'Reason for cancelling (required)' : v==='deferred' ? 'Reason for deferring (required)' : 'Note';
     $('#csHint').textContent = v==='deferred' ? `The item will be listed for the department to add to the ${$('#csTy').value} budget, and its depreciation moves to that year.` : v==='rescheduled' ? 'Same project, new timing within the year — depreciation starts after the new month.' : v==='cancelled' ? 'Abandoned — no spending and no depreciation.' : v==='done' ? 'Depreciation starts the month after it is put in use, using the actual cost.' : ''; };
   $('#csSt').onchange = sync; $('#csTy').oninput = sync; sync();
+  const qv = () => { const q = Number($('#csQAmt').value), b = annual(l); $('#csQVar').textContent = q && b ? `${q>=b?'+':''}${peso(q-b)} (${q>=b?'+':''}${Math.round(100*(q-b)/b)}%) vs the ${l.year} budget of ${peso(b)}` : ''; };
+  $('#csQAmt').oninput = qv; qv();
   $('#csGo').onclick = async () => {
     const v = $('#csSt').value, note = $('#csNote').value.trim();
     if (['cancelled','deferred'].includes(v) && !note) { toast('Please give the reason.', true); return; }
     if (v==='deferred' && Number($('#csTy').value) <= l.year) { toast('Deferred items move to a later year.', true); return; }
-    const p = { impl_status:v, impl_note:note, useful_life_months: $('#csLife').value==='' ? '' : String(Math.round(Number($('#csLife').value)*12)) };
+    const p = { impl_status:v, impl_note:note, quote_amount:$('#csQAmt').value, quote_supplier:$('#csQSup').value.trim(), quote_ref:$('#csQRef').value.trim(), quote_date:$('#csQDate').value, useful_life_months: $('#csLife').value==='' ? '' : String(Math.round(Number($('#csLife').value)*12)) };
     if (v==='done') { p.impl_amount = $('#csAmt').value; p.impl_date = $('#csDate').value; }
     if (['deferred','rescheduled'].includes(v)) { p.target_year = $('#csTy').value; p.target_month = $('#csTm').value; }
     const r = await sb.rpc('bgt_capex_set_status', { p_line:id, p }); if (r.error) return fail(r.error);
@@ -2493,18 +2502,18 @@ async function carryCapex(id){
   if (!l || !open) { toast('The target budget year is not open.', true); return; }
   const { data:b } = await sb.from('bgt_dept_budgets').select('id,status').eq('cycle_id', open.id).eq('department_id', l.department_id).maybeSingle();
   if (!b) { toast('This department has no budget for '+open.year+' yet.', true); return; }
-  const amt = Number(l.impl_amount)||annual(l), m = l.target_month || firstMonth(l), row = { budget_id:b.id, category:l.category, asset:l.asset, description:l.description, justification:l.justification,
-    qty:l.qty, unit_cost:l.qty ? Math.round(amt/l.qty*100)/100 : l.unit_cost, priority:l.priority, remarks:`Carried over from the ${l.year} budget (deferred${l.impl_note?': '+l.impl_note:''}).`, carried_from:l.id, sort:999 };
+  const amt = Number(l.quote_amount)||Number(l.impl_amount)||annual(l), m = l.target_month || firstMonth(l), row = { budget_id:b.id, category:l.category, asset:l.asset, description:l.description, justification:l.justification,
+    qty:l.qty, unit_cost:l.qty ? Math.round(amt/l.qty*100)/100 : l.unit_cost, priority:l.priority, remarks:`Carried over from the ${l.year} budget (deferred${l.impl_note?': '+l.impl_note:''}).${l.quote_amount!=null?` Latest quotation ${peso(l.quote_amount)}${l.quote_supplier?' from '+l.quote_supplier:''}${l.quote_ref?' ('+l.quote_ref+')':''}${l.quote_date?', '+l.quote_date:''}.`:''}`, carried_from:l.id, quote_amount:l.quote_amount, quote_supplier:l.quote_supplier, quote_ref:l.quote_ref, quote_date:l.quote_date, sort:999 };
   for (let i=1;i<=12;i++) row['m'+i] = i===m ? amt : 0;
   const r = await sb.from('bgt_capex_lines').insert(row); if (r.error) return fail(r.error);
   S.cx.cache = {}; toast(`Added to the ${open.year} budget of ${deptById(l.department_id)?.name}`); route();
 }
 async function exportCapexTracker(){
   const [L, AC] = await Promise.all([loadCapexAll(), loadAssetClasses()]), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('CAPEX tracker');
-  const h = ws.addRow(['Year','Department','Category','Asset','Budget','Planned months','Status','Actual cost','In use from','Target year','Target month','Note','Useful life (yrs)','Depreciation / yr','Carried from']); h.font = { bold:true };
+  const h = ws.addRow(['Year','Department','Category','Asset','Budget','Planned months','Quotation','Quote supplier','Quote no.','Status','Actual cost','In use from','Target year','Target month','Note','Useful life (yrs)','Depreciation / yr','Carried from']); h.font = { bold:true };
   L.filter(l=>(S.cx.year==='all'||l.year===S.cx.year) && (!S.cx.dept||l.department_id===S.cx.dept)).forEach(l => { const dp = lineDepr(l, AC);
-    ws.addRow([l.year, deptById(l.department_id)?.name, l.category, l.asset, annual(l), plannedMonths(l), CAPEX_ST[l.impl_status||'planned'][0], l.impl_amount!=null?Number(l.impl_amount):null, l.impl_date||null, l.target_year||null, l.target_month?MONTHS[l.target_month-1]:null, l.impl_note||null, dp.life/12, Math.round(dp.yr), l.carried_from?L.find(x=>x.id===l.carried_from)?.year:null]); });
-  [8,18,24,36,14,14,20,14,12,10,10,40,12,14,10].forEach((w,i)=>ws.getColumn(i+1).width=w); [5,8,14].forEach(c=>ws.getColumn(c).numFmt='#,##0');
+    ws.addRow([l.year, deptById(l.department_id)?.name, l.category, l.asset, annual(l), plannedMonths(l), l.quote_amount!=null?Number(l.quote_amount):null, l.quote_supplier||null, l.quote_ref||null, CAPEX_ST[l.impl_status||'planned'][0], l.impl_amount!=null?Number(l.impl_amount):null, l.impl_date||null, l.target_year||null, l.target_month?MONTHS[l.target_month-1]:null, l.impl_note||null, dp.life/12, Math.round(dp.yr), l.carried_from?L.find(x=>x.id===l.carried_from)?.year:null]); });
+  [8,18,24,36,14,14,14,22,14,20,14,12,10,10,40,12,14,10].forEach((w,i)=>ws.getColumn(i+1).width=w); [5,7,11,17].forEach(c=>ws.getColumn(c).numFmt='#,##0');
   download(await wb.xlsx.writeBuffer(), `CAPEX tracker ${S.cx.year} - ${S.company.code}.xlsx`); toast('Downloaded');
 }
 

@@ -202,7 +202,16 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
 
 /* modal + toast */
 .modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(22,32,29,.4);padding:16px}
-.modal .card{width:min(480px,100%);padding:20px}
+.modal .card{width:min(480px,100%);padding:20px;max-height:92vh;overflow:auto}.modal .card.wide{width:min(860px,100%)}
+.ai-box{border-color:#C9DAD7;background:linear-gradient(180deg,#F2F7F6,#F7F8F6)}
+.ai-busy{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px;padding:10px 0}
+.spin{width:16px;height:16px;border:2px solid var(--teal-wash);border-top-color:var(--teal);border-radius:50%;animation:sp 1s linear infinite;flex:none}@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+.ai-res{font-size:13.5px;margin-top:8px}.ai-res p{margin:6px 0}.ai-res .check{padding:9px 0}.ai-res .check a{font-size:12.5px}
+.ai-sec{margin-top:10px}.ai-sec ul{margin:4px 0 0;padding-left:18px}.ai-sec li{margin:3px 0}
+.memo h4{font-family:var(--display);font-stretch:85%;font-size:20px;margin:4px 0 8px}
+.memo .kn{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:6px}.memo .kn div{background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+.memo .kn span{display:block;font-size:11.5px;color:var(--muted)}.memo .kn b{font-family:var(--mono)}
 .modal h3{font-size:22px;font-stretch:78%;margin-bottom:8px}
 .modal p{color:var(--muted);margin:0 0 12px}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;z-index:80;box-shadow:var(--shadow);max-width:90vw}
@@ -694,6 +703,7 @@ function renderBudget(){
       <div class="sub">${S.cycle.status==='locked' ? basisChip() : `<span class="chip st-${b.status}">${STATUS_LABEL[b.status]}</span>`}<span>Version ${b.version}</span>${d?.notes?`<span>· ${esc(d.notes)}</span>`:''}${!ed?'<span>· Read only</span>':''}</div></div>
     <div class="actions">
       ${actionsFor(b).map(([a,l,cls])=>`<button class="btn ${cls}" onclick="doAction('${a}')">${l}</button>`).join('')}
+      <button class="btn" onclick="aiReview()">Review with assistant</button>
       <button class="btn" onclick="exportDept()">Export for Finance</button>
       ${ed?'<button class="btn ghost" onclick="importDialog()">Import Excel</button>':''}
     </div>
@@ -844,7 +854,7 @@ function doAction(action){
     Object.assign(budgetById(S.budgetId), data); closeModal(); toast(ACTION_LABEL[action]); renderNav(); openBudget(S.budgetId);
   };
 }
-function modal(html){ $('#overlay').innerHTML = `<div class="modal" onclick="if(event.target===this)closeModal()"><div class="card">${html}</div></div>`; }
+function modal(html, cls=''){ $('#overlay').innerHTML = `<div class="modal" onclick="if(event.target===this)closeModal()"><div class="card ${cls}">${html}</div></div>`; }
 function closeModal(){ $('#overlay').innerHTML = ''; }
 
 /* ================= LINE EDITOR (drawer) ================= */
@@ -911,6 +921,7 @@ function editLine(kind, id){
   <div class="drawer" role="dialog" aria-label="${isO?'OPEX line':'CAPEX item'}">
     <header><div><div class="eyebrow">${isO?'OPEX line':'CAPEX item'} · ${esc(deptById(b.department_id)?.name)}</div><h2>${id?esc(isO?(l.activity||'Untitled activity'):(l.asset||'Untitled asset')):(isO?'New OPEX line':'New CAPEX item')}</h2></div><button class="btn ghost" onclick="closeDrawer()" aria-label="Close">Close</button></header>
     <div class="body">
+      ${ed ? aiBoxHtml(kind, id) : ''}
       ${fields}
       <h3 style="font-size:16px;font-stretch:85%;margin:4px 0 8px">${isO?'When will it be incurred?':'When will it be paid?'}</h3>
       <div id="plyLive"></div><div class="ply-lbl">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
@@ -1087,7 +1098,7 @@ async function renderOverview(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
-      <div class="actions"><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
+      <div class="actions"><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
     ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
@@ -1488,7 +1499,7 @@ async function renderPrices(){
   $('#main').innerHTML = `
   <div class="ph"><div><div class="eyebrow">${esc(S.company.name)}</div><h1>Price list</h1>
     <div class="sub">Item prices and supplier quotations. Everyone can pick from this list when estimating a budget line, so the same price is used across departments.</div></div>
-    <div class="actions"><button class="btn primary" onclick="editPrice()">Add item price</button><button class="btn" onclick="importPricesDialog()">Import Excel</button><button class="btn ghost" onclick="exportPrices()">Download list / template</button></div></div>
+    <div class="actions"><button class="btn primary" onclick="editPrice()">Add item price</button><button class="btn" onclick="aiPriceDialog()">Look up price online</button><button class="btn" onclick="importPricesDialog()">Import Excel</button><button class="btn ghost" onclick="exportPrices()">Download list / template</button></div></div>
   <div class="card"><div class="toolbar"><input class="inp" placeholder="Search item, supplier, quote" aria-label="Search prices" value="${esc(S.pr.q)}" oninput="S.pr.q=this.value;$('#prTable').innerHTML=priceTableHtml()">
     <select class="inp" style="max-width:260px" aria-label="Category" onchange="S.pr.cat=this.value;$('#prTable').innerHTML=priceTableHtml()"><option value="">All categories</option>${cats.map(c=>`<option ${c===S.pr.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
     <span class="grow"></span><span class="hint">${S.prices.length} items</span></div>
@@ -1846,6 +1857,134 @@ function importKpiDialog(){
       delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
     } catch(e){ fail(e); }
   };
+}
+
+/* ================= BUDGET ASSISTANT ================= */
+async function ai(body){
+  const { data, error } = await sb.functions.invoke('bgt-ai', { body });
+  if (error) { let msg = error.message, st = error.context?.status; try { const j = await error.context.json(); msg = j.error || msg; } catch(e){}
+    if (st === 404 || /Failed to send|NOT_FOUND|fetch/i.test(msg)) msg = 'The assistant is not switched on yet — it is being set up. Please try again later.';
+    throw new Error(msg); }
+  if (data?.error) throw new Error(data.error);
+  return data.result;
+}
+const AI_BUSY = t => `<div class="ai-busy"><span class="spin"></span>${t}</div>`;
+const SEV = { high:['pri-crit','High'], medium:['pri-high','Medium'], low:['pri-med','Low'] };
+const OVERALL = { ready:['pri-ok','Ready to submit'], minor_changes:['pri-high','Minor changes'], needs_changes:['pri-crit','Needs changes'] };
+const listHtml = (title, arr) => arr && arr.length ? `<div class="ai-sec"><b>${title}</b><ul>${arr.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+
+/* --- draft a line from plain words (inside the drawer) --- */
+function aiBoxHtml(kind, id){
+  return `<div class="box ai-box"><h3>Describe it and let the assistant fill the form</h3>
+    <textarea class="inp" id="aiText" rows="2" placeholder="${kind==='opex' ? 'e.g. Diesel for 3 forklifts, about 400 liters a month each, all year' : 'e.g. Replace the 15-year-old 3-ton forklift with a new diesel unit in Q2'}"></textarea>
+    <div class="row-flex" style="margin-top:6px"><button type="button" class="btn primary" id="aiGo" onclick="aiDraft('${kind}')">${id?'Improve with assistant':'Draft with assistant'}</button><span class="hint">Uses your price list, last year's spending and the cost outlook. Nothing is saved until you click Save line.</span></div>
+    <div id="aiOut"></div></div>`;
+}
+function formSnapshot(kind){
+  const v = x => $('#'+x)?.value || undefined;
+  return kind==='opex' ? { line_item:v('f_line_item'), expense_type:v('f_expense_type'), activity:v('f_activity'), description:v('f_description'), purpose:v('f_purpose'), basis:v('f_basis'), priority:v('f_priority'), qty:v('c_qty'), unit:v('c_unit'), rate:v('c_rate'), times:v('c_times'), annual:sum(Object.values(readMonths())) }
+    : { category:v('f_category'), asset:v('f_asset'), description:v('f_description'), justification:v('f_justification'), qty:v('f_qty'), unit_cost:v('f_unit_cost'), priority:v('f_priority'), annual:sum(Object.values(readMonths())) };
+}
+async function aiDraft(kind){
+  const text = $('#aiText').value.trim(), cur = formSnapshot(kind), has = Object.values(cur).some(x=>x && x!==0);
+  if (!text && !has) { toast('Describe what you need first.', true); $('#aiText').focus(); return; }
+  const btn = $('#aiGo'); btn.disabled = true; $('#aiOut').innerHTML = AI_BUSY('Drafting — checking prices, history and the cost outlook…');
+  try {
+    const r = await ai({ mode:'draft_line', kind, budget_id:S.budgetId, text:text || 'Improve this line: complete missing fields, check the amount and timing.', current:has?cur:undefined });
+    const set = (id, v) => { const e = $('#'+id); if (e && v != null && v !== '') { if (e.tagName==='SELECT' && ![...e.options].some(o=>o.value===v)) e.insertAdjacentHTML('beforeend', `<option>${esc(v)}</option>`); e.value = v; } };
+    if (kind==='opex') { ['line_item','expense_type','activity','description','purpose','basis','priority'].forEach(k=>set('f_'+k, r[k])); set('c_qty', r.qty); set('c_unit', r.unit); set('c_rate', r.rate); set('c_times', r.times); }
+    else { ['category','asset','description','justification','priority'].forEach(k=>set('f_'+k, r[k])); set('f_qty', r.qty); set('f_unit_cost', r.unit_cost); }
+    (r.months||[]).slice(0,12).forEach((v,i)=> $('#m'+(i+1)).value = Number(v) ? Math.round(Number(v)*100)/100 : '');
+    if (r.remarks) { const rem = $('#f_remarks'); rem.value = rem.value && !rem.value.includes(r.remarks) ? rem.value.trim() + ' ' + r.remarks : r.remarks; }
+    $('#f_priority')?.dispatchEvent(new Event('change'));
+    liveTotals(kind); if (kind==='opex') refreshRef();
+    $('#aiOut').innerHTML = `<div class="ai-res"><div><span class="pri ${r.confidence==='high'?'pri-ok':r.confidence==='low'?'pri-crit':'pri-high'}">${esc(r.confidence||'medium')} confidence</span></div>
+      <p>${esc(r.rationale||'')}</p>${listHtml('Assumptions', r.assumptions)}${listHtml('Please confirm', r.questions)}
+      <p class="hint">The form below is filled in. Check it, change anything, then Save line.</p></div>`;
+  } catch(e){ $('#aiOut').innerHTML = `<div class="banner red" style="margin:8px 0 0">${esc(e.message)}</div>`; }
+  finally { btn.disabled = false; }
+}
+
+/* --- review a department budget --- */
+async function aiReview(){
+  const b = budgetById(S.budgetId), d = deptById(b.department_id);
+  modal(`<h3>Assistant review — ${esc(d?.name)} ${S.cycle.year}</h3><div id="arBody">${AI_BUSY('Reading the budget, last year\'s spending and the cost outlook… this takes about 30 seconds.')}</div>`, 'wide');
+  try {
+    const r = await ai({ mode:'review_budget', budget_id:S.budgetId }); S._review = { id:S.budgetId, r };
+    const ov = OVERALL[r.overall] || OVERALL.minor_changes;
+    const lineLink = f => { if (!f.line) return ''; const o = S.opex.find(l=>(l.activity||'').trim().toLowerCase()===f.line.trim().toLowerCase()), c = S.capex.find(l=>(l.asset||'').trim().toLowerCase()===f.line.trim().toLowerCase());
+      return o ? `<a onclick="closeModal();editLine('opex','${o.id}')">Open line</a>` : c ? `<a onclick="closeModal();editLine('capex','${c.id}')">Open line</a>` : `<span class="hint">${esc(f.line)}</span>`; };
+    $('#arBody').innerHTML = `<div class="ai-res">
+      <div><span class="pri ${ov[0]}">${ov[1]}</span></div><p>${esc(r.summary)}</p>
+      ${(r.findings||[]).map(f=>`<div class="check"><span class="pri ${SEV[f.severity]?.[0]||'pri-med'}">${SEV[f.severity]?.[1]||f.severity}</span><div><b>${esc(f.title)}</b>${f.line_item?` <span class="hint">· ${esc(f.line_item)}</span>`:''}<div>${esc(f.detail)}</div><div style="color:var(--teal-ink)"><b>Suggestion:</b> ${esc(f.suggestion)}${Number(f.amount_impact)?` <span class="num">(${f.amount_impact>0?'+':'−'}${peso(Math.abs(f.amount_impact))})</span>`:''}</div>${lineLink(f)}</div></div>`).join('')}
+      ${r.defer_candidates?.length ? `<div class="ai-sec"><b>Could be deferred if the budget must be cut</b><ul>${r.defer_candidates.map(x=>`<li>${esc(x.line)} — ${peso(x.amount)}: ${esc(x.reason)}</li>`).join('')}</ul></div>` : ''}
+      ${listHtml('Questions to ask the department', r.questions)}</div>
+      <div class="actions" style="justify-content:flex-end;margin-top:12px"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn primary" onclick="postReview()">Post as comment on this budget</button></div>`;
+  } catch(e){ $('#arBody').innerHTML = `<div class="banner red">${esc(e.message)}</div><div class="actions" style="justify-content:flex-end"><button class="btn" onclick="closeModal()">Close</button></div>`; }
+}
+async function postReview(){
+  const r = S._review?.r; if (!r) return;
+  const body = `Assistant review (${(OVERALL[r.overall]||[])[1]||''}): ${r.summary}\n` + (r.findings||[]).map((f,i)=>`${i+1}. [${f.severity}] ${f.title}${f.line?` — ${f.line}`:''}: ${f.suggestion}`).join('\n');
+  const { data, error } = await sb.from('bgt_comments').insert({ budget_id:S.budgetId, author_id:S.me.id, body }).select().single();
+  if (error) return fail(error);
+  S.comments.push(data); closeModal(); toast('Review posted to Comments'); S.tab='activity'; renderBudget();
+}
+
+/* --- plant summary for the MD --- */
+async function aiPlant(){
+  modal(`<h3>Plant summary for the Managing Director — ${S.cycle.year}</h3><div id="apBody">${AI_BUSY('Summarising all departments against last year and the cost outlook… about 30–40 seconds.')}</div>`, 'wide');
+  try {
+    const r = await ai({ mode:'review_plant', cycle_id:S.cycle.id }); S._memo = r;
+    $('#apBody').innerHTML = `<div class="ai-res memo"><h4>${esc(r.headline)}</h4>
+      <div class="kn">${(r.key_numbers||[]).map(k=>`<div><span>${esc(k.label)}</span><b>${esc(k.value)}</b></div>`).join('')}</div>
+      ${listHtml('Highlights', r.highlights)}${listHtml('Risks and gaps', r.risks)}${listHtml('Recommendations', r.recommendations)}
+      ${r.department_notes?.length ? `<div class="ai-sec"><b>By department</b><ul>${r.department_notes.map(x=>`<li><b>${esc(x.department)}:</b> ${esc(x.note)}</li>`).join('')}</ul></div>` : ''}</div>
+      <p class="hint">Drafted by the assistant from the figures in the app — check before sending.</p>
+      <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn" onclick="copyMemo()">Copy text</button><button class="btn primary" onclick="downloadMemo()">Download Word file</button></div>`;
+  } catch(e){ $('#apBody').innerHTML = `<div class="banner red">${esc(e.message)}</div><div class="actions" style="justify-content:flex-end"><button class="btn" onclick="closeModal()">Close</button></div>`; }
+}
+function memoText(r){ const L = (t,a) => a?.length ? `\n${t}\n` + a.map(x=>'• '+x).join('\n') + '\n' : '';
+  return `${S.company.name} — ${S.site?.name||''}\n${S.cycle.year} Budget — Summary for the Managing Director\n\n${r.headline}\n\n` + (r.key_numbers||[]).map(k=>`${k.label}: ${k.value}`).join('\n') + '\n'
+    + L('Highlights', r.highlights) + L('Risks and gaps', r.risks) + L('Recommendations', r.recommendations) + L('By department', (r.department_notes||[]).map(x=>`${x.department}: ${x.note}`)); }
+function copyMemo(){ navigator.clipboard.writeText(memoText(S._memo)).then(()=>toast('Copied'), ()=>toast('Copy not allowed by the browser', true)); }
+function downloadMemo(){
+  const r = S._memo, li = a => (a||[]).map(x=>`<li>${esc(x)}</li>`).join('');
+  const html = `<html><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial;font-size:11pt}h1{font-size:16pt}h2{font-size:12pt;margin-top:14pt}td{padding:2pt 10pt 2pt 0}</style></head><body>
+    <p>${esc(S.company.name)} — ${esc(S.site?.name||'')}</p><h1>${S.cycle.year} Budget — Summary for the Managing Director</h1><p><b>${esc(r.headline)}</b></p>
+    <table>${(r.key_numbers||[]).map(k=>`<tr><td>${esc(k.label)}</td><td><b>${esc(k.value)}</b></td></tr>`).join('')}</table>
+    <h2>Highlights</h2><ul>${li(r.highlights)}</ul><h2>Risks and gaps</h2><ul>${li(r.risks)}</ul><h2>Recommendations</h2><ul>${li(r.recommendations)}</ul>
+    ${r.department_notes?.length?`<h2>By department</h2><ul>${r.department_notes.map(x=>`<li><b>${esc(x.department)}:</b> ${esc(x.note)}</li>`).join('')}</ul>`:''}
+    <p style="color:#777;font-size:9pt">Prepared ${new Date().toLocaleDateString('en-PH')} from the WCLI budget app.</p></body></html>`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+html], { type:'application/msword' })); a.download = `${S.cycle.year} Budget - MD summary - ${S.company.code}.doc`; a.click();
+}
+
+/* --- price lookup on the web --- */
+function aiPriceDialog(){
+  modal(`<h3>Look up a price online</h3><p>The assistant searches Philippine websites and lists the prices it actually finds, with links. Pick the ones to keep — they are saved as market references, not quotations.</p>
+    <div class="row-flex"><input class="inp" id="plQ" placeholder="e.g. forklift battery 48V, stretch film 500mm, LED high bay 150W" style="flex:1" onkeydown="if(event.key==='Enter')aiPriceGo()"><button class="btn primary" id="plGo" onclick="aiPriceGo()">Search</button></div>
+    <div id="plOut" style="margin-top:10px"></div>`, 'wide');
+  setTimeout(()=>$('#plQ')?.focus(), 50);
+}
+async function aiPriceGo(){
+  const q = $('#plQ').value.trim(); if (!q) return;
+  $('#plGo').disabled = true; $('#plOut').innerHTML = AI_BUSY('Searching and reading pages… about 20–30 seconds.');
+  try {
+    const r = await ai({ mode:'price_lookup', query:q }); S._pl = r;
+    const cats = [...S.items.opex, ...S.items.capex];
+    $('#plOut').innerHTML = `<p>${esc(r.summary||'')}</p>${r.caveat?`<p class="hint">${esc(r.caveat)}</p>`:''}
+      ${(r.prices||[]).length ? `<div class="tbl-wrap"><table class="ledger" style="min-width:0"><thead><tr><th></th><th>Item</th><th class="r">Price</th><th>Seller</th><th>Source</th></tr></thead><tbody>
+      ${r.prices.map((p,i)=>`<tr><td><input type="checkbox" class="plPick" value="${i}" aria-label="Keep"></td><td><div class="act" style="font-size:13px">${esc(p.item)}</div>${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td class="r num">${peso(p.price,2)}<div class="item" style="text-transform:none">per ${esc(p.unit||'unit')}</div></td><td style="font-size:12.5px">${esc(p.seller||'')}</td><td style="font-size:12px"><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--teal)">Open</a>${p.date_text?` · ${esc(p.date_text)}`:''}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="row-flex" style="margin-top:10px"><div class="field" style="flex:1"><label for="plCat">Budget line item for the ones you keep</label><select class="inp" id="plCat">${opts(cats,'','Any')}</select></div><button class="btn primary" onclick="aiPriceSave()">Add to price list</button></div>` : '<div class="empty">No usable prices found. Try different words or a more specific item.</div>'}`;
+  } catch(e){ $('#plOut').innerHTML = `<div class="banner red">${esc(e.message)}</div>`; }
+  finally { $('#plGo').disabled = false; }
+}
+async function aiPriceSave(){
+  const picks = [...document.querySelectorAll('.plPick:checked')].map(x=>S._pl.prices[Number(x.value)]);
+  if (!picks.length) { toast('Tick the prices to keep.', true); return; }
+  const rows = picks.map(p => ({ company_id:S.company.id, item:p.item, category:$('#plCat').value||null, unit:p.unit||null, unit_price:Number(p.price)||0, supplier:p.seller||null, notes:[p.notes, p.date_text?('Seen '+p.date_text):''].filter(Boolean).join(' · ')||null, source_type:'market', source_url:p.url||null, as_of:today(), active:true, updated_by:S.me.id }));
+  const { error } = await sb.from('bgt_price_items').insert(rows); if (error) return fail(error);
+  closeModal(); toast(`${rows.length} price${rows.length>1?'s':''} added`); renderPrices();
 }
 
 boot();

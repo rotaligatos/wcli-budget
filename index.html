@@ -1178,6 +1178,7 @@ async function renderAdmin(){
     <div class="field"><label for="cyTh">CAPEX threshold per unit (₱)</label><input class="inp num" type="number" id="cyTh" value="${S.cycle.capex_threshold}"></div>
     <div class="field"><label for="cyBa">Budget standing</label><select class="inp" id="cyBa">${Object.entries(BASIS_LABEL).map(([k,v])=>`<option value="${k}" ${(S.cycle.basis||'working')===k?'selected':''}>${v}</option>`).join('')}</select></div>
     <div class="field" style="flex:1;min-width:240px"><label for="cyBn">Note on the budget's source</label><input class="inp" id="cyBn" value="${esc(S.cycle.basis_note||'')}" placeholder="e.g. Approved by MD on 12 Dec; or: department submissions, no formal approval issued"></div>
+    <div class="field"><label for="cyBm">Budget prepared for</label><select class="inp" id="cyBm">${[[0,'Full year'],[3,'First quarter only'],[6,'First half only'],[9,'First 9 months only']].map(([k,l])=>`<option value="${k}" ${(S.cycle.budget_months||0)===k?'selected':''}>${l}</option>`).join('')}</select><div class="hint" style="font-size:11.5px;max-width:230px">For analysis only: departments whose budget stops early are extended to 12 months at their average monthly rate.</div></div>
     <div class="field"><label for="cySt">Status</label><select class="inp" id="cySt"><option value="open" ${S.cycle.status==='open'?'selected':''}>Open — departments can edit</option><option value="locked" ${S.cycle.status==='locked'?'selected':''}>Locked — read only</option></select></div>
     <button class="btn primary" onclick="saveCycle()">Save settings</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Start a new budget year</h3><div style="padding:14px">
@@ -1226,7 +1227,7 @@ async function updUser(id, patch){
   Object.assign(S.users.find(u=>u.id===id), patch); toast('Saved');
 }
 async function saveCycle(){
-  const patch = { due_date:$('#cyDue').value||null, capex_threshold:Number($('#cyTh').value)||20000, status:$('#cySt').value, basis:$('#cyBa').value, basis_note:$('#cyBn').value.trim()||null };
+  const patch = { due_date:$('#cyDue').value||null, capex_threshold:Number($('#cyTh').value)||20000, status:$('#cySt').value, basis:$('#cyBa').value, basis_note:$('#cyBn').value.trim()||null, budget_months:Number($('#cyBm').value)||null };
   const { data, error } = await sb.from('bgt_cycles').update(patch).eq('id', S.cycle.id).select().single(); if (error) return fail(error);
   Object.assign(S.cycle, data); toast('Settings saved'); loadMaster().then(()=>go('admin'));
 }
@@ -1248,7 +1249,7 @@ async function loadYearData(year, deptId){
   const key = year + '|' + (deptId||'all');
   if (S.act.cache[key]) return S.act.cache[key];
   const cyc = S.cycles.find(c=>c.year===year);
-  let bud = [], capBud = [];
+  let bud = [], capBud = [], ext = [];
   if (cyc) {
     const { data:bs, error } = await sb.from('bgt_dept_budgets').select('id,department_id').eq('cycle_id', cyc.id); if (error) throw error;
     const list = (bs||[]).filter(b=>!deptId || b.department_id===deptId), ids = list.map(b=>b.id), dm = Object.fromEntries(list.map(b=>[b.id,b.department_id]));
@@ -1256,13 +1257,30 @@ async function loadYearData(year, deptId){
       const [o, c] = await Promise.all([fetchAll(()=>sb.from('bgt_opex_lines').select(MCOLS.replace(',category','')).in('budget_id', ids).order('sort')),
                                         fetchAll(()=>sb.from('bgt_capex_lines').select(MCOLS.replace('line_item,','')).in('budget_id', ids).order('sort'))]);
       bud = o.map(l=>({...l, department_id:dm[l.budget_id]})); capBud = c.map(l=>({...l, department_id:dm[l.budget_id]}));
+      ext = extendPartial(bud, cyc.budget_months);
     }
   }
   const qa = () => { let q = sb.from('bgt_actuals').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
   const qp = () => { let q = sb.from('bgt_projections').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
   const [act, proj] = await Promise.all([fetchAll(qa), fetchAll(qp)]);
-  return (S.act.cache[key] = { year, bud, capBud, act, proj, hasCycle:!!cyc });
+  return (S.act.cache[key] = { year, bud, capBud, act, proj, hasCycle:!!cyc, ext, budgetMonths:cyc?.budget_months||null });
 }
+// a year budgeted for only the first N months (e.g. Q1): extend each department that stops early to 12 months at its average monthly rate (OPEX only)
+function extendPartial(bud, n){
+  if (!n || n>=12) return [];
+  const byDept = {}; bud.forEach(l => (byDept[l.department_id] ||= []).push(l));
+  const ext = [];
+  Object.entries(byDept).forEach(([d, lines]) => {
+    const later = sum(lines.map(l=>{ let t = 0; for (let i=n+1;i<=12;i++) t += Number(l['m'+i])||0; return t; }));
+    const early = sum(lines.map(l=>{ let t = 0; for (let i=1;i<=n;i++) t += Number(l['m'+i])||0; return t; }));
+    if (later || !early) return;
+    lines.forEach(l => { let t = 0; for (let i=1;i<=n;i++) t += Number(l['m'+i])||0; const avg = t/n; for (let i=n+1;i<=12;i++) l['m'+i] = Math.round(avg*100)/100; l._ext = true; });
+    ext.push({ dept:d, early, full: early*12/n });
+  });
+  return ext;
+}
+function extNote(D){ if (!D?.ext?.length) return ''; const n = D.budgetMonths, q = n===3?'first-quarter':n===6?'first-half':`first ${n}-month`;
+  return `The ${D.year} budget for ${D.ext.map(e=>esc(deptById(e.dept)?.name||'?')).join(', ')} covered only ${n===3?'Q1':`Jan–${MONTHS[n-1]}`}. For comparison it is extended to the full year at the same monthly rate (${q} × ${12/n%1?(12/n).toFixed(1):12/n}): ${short(sum(D.ext.map(e=>e.early)))} → ${short(sum(D.ext.map(e=>e.full)))}. CAPEX is not extended.`; }
 function actModel(D, method='budget', drv=null){
   const opexAct = D.act.filter(a=>a.kind!=='capex');
   const closed = opexAct.length ? Math.max(...opexAct.map(a=>a.month)) : 0;
@@ -1332,6 +1350,7 @@ async function renderActuals(){
       <div class="field" style="margin:0"><label for="acMeth">Project the remaining months using</label><select class="inp" id="acMeth" onchange="S.act.method=this.value;renderActuals()"><option value="budget" ${S.act.method==='budget'?'selected':''}>The budget for those months</option><option value="runrate" ${S.act.method==='runrate'?'selected':''}>Average monthly actual so far (run-rate)</option><option value="outlook" ${S.act.method==='outlook'?'selected':''}>Run-rate adjusted for the cost outlook (fuel, power, wages, peso)</option></select></div>
       <span class="grow"></span><span class="hint" style="max-width:340px">Your own forecasts for a line override this. Click a line to enter them.</span>
     </div>
+    ${extNote(D) ? `<div class="banner amber">${extNote(D)}</div>` : ''}
     ${M.closed ? '' : `<div class="banner blue">No actuals loaded for ${Y} yet.${canManageData()?' Use <b>Import Odoo actuals</b> to upload the monthly Plant OPEX export from Odoo.':' The Head of Plant Operations uploads them from Odoo.'}</div>`}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">${Y} OPEX budget</div><div class="v">${short(M.budFY)}</div><div class="s">${short(M.budYTD)} budgeted for ${thru(M.closed)}</div></div>
@@ -1697,7 +1716,7 @@ async function renderOutlook(){
     <h3 class="sec">Sales and production direction</h3>
     <div class="ol-grid">
       <div class="ol-card"><div class="eyebrow">Sales target ${y}</div><div class="v">${sT!=null?short(sT):'—'}</div><div class="s">${sA!=null?`${y-1} actual (full-year rate): ${short(sA)}${sT!=null&&sA?` (${sT>=sA?'+':''}${Math.round(100*(sT-sA)/sA)}%)`:''}`:`No ${y-1} sales recorded yet.`}</div><div class="means">Volume-driven costs (power, boiler fuel, supplies, delivery, agency helpers) should move with sales and production.</div></div>
-      <div class="ol-card"><div class="eyebrow">Production plan ${y}</div><div class="v">${pT!=null?Number(pT).toLocaleString('en-PH')+' sheets':'—'}</div><div class="s">${pA!=null?`${y-1} output (full-year rate): ${Math.round(pA).toLocaleString('en-PH')} sheets${pT!=null&&pA?` (${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}%)`:''}`:`No ${y-1} production recorded yet.`}</div><div class="means"><a onclick="go('perf')">Enter or upload sales and plant performance →</a></div></div>
+      <div class="ol-card"><div class="eyebrow">Production plan ${y}</div><div class="v">${pT!=null?Number(pT).toLocaleString('en-PH')+' boards':'—'}</div><div class="s">${pA!=null?`${y-1} output (full-year rate): ${Math.round(pA).toLocaleString('en-PH')} boards${pT!=null&&pA?` (${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}%)`:''}`:`No ${y-1} production recorded yet.`}</div><div class="means"><a onclick="go('perf')">Enter or upload sales and plant performance →</a></div></div>
     </div>
     <div class="card" style="margin-top:18px"><h3>Assumed cost change by expense line</h3>
       <p class="hint" style="padding:10px 14px 0;margin:0">"Rest of ${y-1}" adjusts the current-year projection (Actuals page, outlook method). "${y} vs ${y-1}" is the suggested change shown to departments when they budget the line. Lines not listed use general inflation (${generalPct(o)}%).</p>
@@ -1783,7 +1802,13 @@ function indChange(H, k, y0, y1){
   const pct = 100*(b-a)/a; return { pct, txt:`${fmtInd(d,a)} → ${fmtInd(d,b)} (${pctTxt(pct)})` };
 }
 async function yearCompliance(y, drvItems){
-  const D = await loadYearData(y, null), M = actModel(D, 'budget'), n = M.closed;
+  const D = await loadYearData(y, null), M = actModel(D, 'budget'), n = M.closed, K = await loadKpis(y).catch(()=>[]);
+  const kSum = (m, upTo) => { const v = K.filter(r=>r.metric===m && r.month>0 && r.month<=upTo); return v.length ? sum(v.map(r=>r.value)) : null; };
+  // OPEX per board / % of sales use only months that have both OPEX actuals and the sales figure
+  const paired = m => { const v = K.filter(r=>r.metric===m && r.month>0 && r.month<=n && Number(r.value)>0); if (!v.length) return null;
+    return { k: sum(v.map(r=>r.value)), opex: sum(v.map(r=>M.monthly.act[r.month-1])), months: v.length }; };
+  const pS = n ? paired('sales_actual') : null, pV = n ? paired('volume_sold') : null, salesN = pS?.k ?? null, volN = pV?.k ?? null;
+  const salesFY = kSum('sales_actual', 12), volFY = kSum('volume_sold', 12);
   const opexAct = D.act.filter(a=>a.kind!=='capex'), budLines = M.rows.filter(r=>r.budYTD>0), unb = M.rows.filter(r=>!r.budFY && r.actYTD>0);
   const ratio = list => { const b = sum(list.map(r=>r.budYTD)); return b ? 100*sum(list.map(r=>r.actYTD))/b : null; };
   const dAct = new Set(opexAct.map(a=>a.department_id)), dBud = new Set(D.bud.map(l=>l.department_id));
@@ -1794,7 +1819,7 @@ async function yearCompliance(y, drvItems){
     pctDrv: ratio(budLines.filter(r=>drvItems.has(r.item))), pctOther: ratio(budLines.filter(r=>!drvItems.has(r.item))),
     noBudDepts: [...dAct].filter(d=>!dBud.has(d)).map(d=>deptById(d)?.name||'?'),
     capBud: sum(D.capBud.map(annual)), capAct: sum(D.act.filter(a=>a.kind==='capex').map(a=>Number(a.amount)||0)),
-    fullYr: n ? M.actYTD*12/n : null, rowsByItem: Object.fromEntries(M.rows.map(r=>[r.item, r])) };
+    salesN, volN, salesFY, volFY, pV, pS, opexPerBoard: pV ? pV.opex/pV.k : null, opexPctSales: pS ? 100*pS.opex/pS.k : null, ext: D.ext||[], extTxt: extNote(D), fullYr: n ? M.actYTD*12/n : null, rowsByItem: Object.fromEntries(M.rows.map(r=>[r.item, r])) };
 }
 const compChip = p => p==null ? '<span class="hint">—</span>' : `<span class="chip ${p>110?'pri-crit':p<50?'pri-med':p<90?'basis-working':'pri-ok'}">${Math.round(p)}%</span>`;
 async function renderTrend(Y, o){
@@ -1824,7 +1849,7 @@ async function renderTrend(Y, o){
     const chart = `<div class="ychart">${C.map(c=>`<div class="yc"><div class="bars">
         <i class="b" style="height:${100*(c.budFY||0)/maxV}%" title="Budget ${c.y}: ${peso(c.budFY||0)}"></i>
         <i class="a${c.pctAll>110?' over':''}" style="height:${100*(c.fullYr||0)/maxV}%" title="Actual ${c.y}, full-year view: ${peso(c.fullYr||0)}"></i></div>
-        <div class="yl"><b>${c.y}</b><br>${c.pctAll!=null?compChip(c.pctAll):c.hasAct?'<span class="hint">no budget</span>':c.hasBud?'<span class="hint">no actuals</span>':'<span class="hint">no data</span>'}</div></div>`).join('')}</div>
+        <div class="yl"><b>${c.y}</b>${c.ext?.length?'<sup title="Budget extended from a partial year">*</sup>':''}<br>${c.pctAll!=null?compChip(c.pctAll):c.hasAct?'<span class="hint">no budget</span>':c.hasBud?'<span class="hint">no actuals</span>':'<span class="hint">no data</span>'}</div></div>`).join('')}</div>
       <div class="legend"><span><i class="lb"></i>Budget (full year)</span><span><i class="la"></i>Actual, full-year view (months so far × 12 ÷ months)</span></div>`;
     const R = (label, f, hint='') => `<tr><td class="act" style="font-size:13px">${label}${hint?`<div class="item" style="text-transform:none">${hint}</div>`:''}</td>${C.map(c=>`<td class="r num">${c.err?'error':f(c)}</td>`).join('')}</tr>`;
     const none = c => !c.hasAct && !c.hasBud;
@@ -1844,10 +1869,15 @@ async function renderTrend(Y, o){
       ${R('Lines tied to an outside driver', c=>c.hasBud&&c.hasAct?compChip(c.pctDrv):'—', 'fuel, power, wages, FX-linked')}
       ${R('All other lines', c=>c.hasBud&&c.hasAct?compChip(c.pctOther):'—')}
       ${R('CAPEX budget / actual', c=>c.capBud||c.capAct?`${c.capBud?short(c.capBud):'—'} / ${c.capAct?short(c.capAct):'—'}`:'—')}
+      ${R('Sales', c=>c.salesFY!=null?short(c.salesFY):'—', 'full year, or year to date')}
+      ${R('Boards sold', c=>c.volFY!=null?Math.round(c.volFY).toLocaleString('en-PH'):'—', 'full year, or year to date')}
+      ${R('<b>Plant OPEX per board sold</b>', c=>c.opexPerBoard!=null?peso(c.opexPerBoard,2)+(c.pV.months<c.n?`<div class="item" style="text-transform:none">${c.pV.months} months</div>`:''):'—', 'months with both figures')}
+      ${R('Plant OPEX as % of sales', c=>c.opexPctSales!=null?c.opexPctSales.toFixed(1)+'%'+(c.pS.months<c.n?`<div class="item" style="text-transform:none">${c.pS.months===4?'Jan–Apr':c.pS.months+' months'}</div>`:''):'—', 'months with both figures')}
       ${R('Inflation that year', c=>{ const h = hv(H,'inflation',c.y); return h?.value!=null?Number(h.value).toFixed(1)+'%':'—'; })}
       ${R('Diesel that year', c=>{ const h = hv(H,'diesel',c.y); return h?.value!=null?'₱'+Number(h.value).toFixed(2):'—'; })}
       </tbody></table></div>
       ${C.some(c=>c.noBudDepts?.length && c.hasBud) ? `<p class="hint" style="padding:8px 14px 0;margin:0">Departments with spending but no budget loaded: ${C.filter(c=>c.noBudDepts?.length && c.hasBud).map(c=>`<b>${c.y}</b> ${esc(c.noBudDepts.join(', '))}`).join(' · ')}. Their spending counts as "no budget line".</p>` : ''}
+      ${C.filter(c=>c.extTxt).map(c=>`<p class="hint" style="padding:8px 14px 0;margin:0">⚠ ${c.extTxt}</p>`).join('')}
       <p class="hint" style="padding:8px 14px 12px;margin:0">Payroll and benefits are not in department budgets or in these actuals. Green: 90–110% of budget. Blue: 50–90%. Grey: under 50%. Red: over 110%.</p></div>`;
 
     // 3 — line behaviour vs its driver
@@ -1862,7 +1892,7 @@ async function renderTrend(Y, o){
       if (sp!=null && ich?.pct!=null) { const gap = sp - ich.pct;
         read = gap > 15 ? `<span class="chip pri-high">Grew faster than its driver</span>` : gap < -15 ? `<span class="chip basis-working">Grew slower than its driver</span>` : `<span class="chip pri-ok">Moved with its driver</span>`; }
       const comp = C.filter(c=>c.hasAct && c.hasBud).map(c=>{ const r = c.rowsByItem[item]; if (!r || (!r.budYTD && !r.actYTD)) return '';
-        return `<span title="${c.y}: ${peso(r.actYTD)} spent vs ${peso(r.budYTD)} budget">${c.y} ${r.budYTD ? compChip(100*r.actYTD/r.budYTD) : '<span class="chip pri-crit">no budget</span>'}</span>`; }).filter(Boolean).join(' ');
+        return `<span style="white-space:nowrap" title="${c.y}: ${peso(r.actYTD)} spent vs ${peso(r.budYTD)} budget">${c.y} ${r.budYTD ? compChip(100*r.actYTD/r.budYTD) : '<span class="chip pri-crit">no budget</span>'}</span>`; }).filter(Boolean).join(' ');
       return { item, vals, sp, y0, y1, ind, ich, read, comp, drv: drvItems.has(item), size: Math.max(...vals.filter(v=>v!=null)) };
     }).filter(Boolean).sort((a,b)=>(b.drv-a.drv) || (b.size-a.size));
     const lineTbl = `<div class="card" style="margin-top:14px"><h3>How each expense line behaved against its driver</h3>
@@ -1884,6 +1914,9 @@ async function renderTrend(Y, o){
     if (rd.length) ins.push(`<div class="ins"><b>Budget left unused year after year</b><ul>${rd.slice(0,5).map(([k,v])=>`<li><b>${esc(k)}</b> — ${esc(v.join(' · '))}</li>`).join('')}</ul><small>Ask for evidence (plan, quotation) before carrying the same amount into ${Y}.</small></div>`);
     if (fy.length>=2) { const a = fy[0], b = fy[fy.length-1], g = 100*(b.fullYr-a.fullYr)/a.fullYr, inf = indChange(H,'inflation',a.y,b.y);
       ins.push(`<div class="ins amber"><b>Plant OPEX ${a.y}→${b.y}: ${pctTxt(g)}</b> (full-year view ${short(a.fullYr)} → ${short(b.fullYr)}).${inf?` Over the same years ${esc(inf.txt)}, so about ${pctTxt(g-inf.pct)} came from more volume, scope or reclassification rather than price.`:''}</div>`); }
+    const pb = C.filter(c=>c.opexPerBoard!=null);
+    if (pb.length>=2) { const a = pb[0], b = pb[pb.length-1], g = 100*(b.opexPerBoard-a.opexPerBoard)/a.opexPerBoard, vg = a.pV && b.pV ? 100*((b.pV.k/b.pV.months)-(a.pV.k/a.pV.months))/(a.pV.k/a.pV.months) : null;
+      ins.push(`<div class="ins ${g>15?'red':'amber'}"><b>Plant OPEX per board sold: ${peso(a.opexPerBoard,2)} (${a.y}) → ${peso(b.opexPerBoard,2)} (${b.y}), ${pctTxt(g)}</b>${vg!=null?` Boards sold per month ${pctTxt(vg)} over the same years — ${vg<0&&g>0?'fixed plant costs are spread over fewer boards':'cost is tracking volume'}.`:''}</div>`); }
     const dvo = withBoth.filter(c=>c.pctDrv!=null && c.pctOther!=null);
     if (dvo.length) ins.push(`<div class="ins"><b>Driver-linked lines vs the rest</b><ul>${dvo.map(c=>`<li>${c.y}: driver-linked lines at ${Math.round(c.pctDrv)}% of budget, other lines at ${Math.round(c.pctOther)}%${hv(H,'inflation',c.y)?` (inflation ${Number(hv(H,'inflation',c.y).value).toFixed(1)}%)`:''}</li>`).join('')}</ul><small>When outside costs rise, these lines are the first to break the budget — size them from the outlook, not last year.</small></div>`);
     const fast = lineRows.filter(l=>/faster/.test(l.read)).slice(0,4);
@@ -1963,7 +1996,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_sold','Volume sold','sheets','num'],['production_target','Production target','sheets','num'],['production_output','Production output','sheets','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 S.pf = { year:null };
@@ -1979,7 +2012,7 @@ async function renderPerf(){
     const opexM = M ? M.monthly.act : Array(12).fill(0), closed = M?.closed||0;
     const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
     const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
-    const salesY = ytd('sales_actual'), prodY = ytd('production_output'), opexY = sum(opexM.slice(0,closed));
+    const salesY = ytd('sales_actual'), prodY = ytd('production_output'), volY = ytd('volume_sold'), opexY = sum(opexM.slice(0,closed)), perB = prodY || volY, perLbl = prodY ? 'produced' : 'sold';
     const years = [...new Set([...S.cycles.map(c=>c.year), Y, new Date().getFullYear()])].sort((a,b)=>b-a);
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · Pasig Plant</div><h1>Sales and plant performance</h1>
@@ -1989,19 +2022,19 @@ async function renderPerf(){
       <span class="grow"></span><span class="hint">${ed?'Type values directly in the table, then Save. Use the Year column for annual targets.':'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
     <div class="stats">
       <div class="stat"><div class="eyebrow">Sales ${thru(closed)}</div><div class="v">${salesY!=null?short(salesY):'—'}</div><div class="s">${tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>
-      <div class="stat"><div class="eyebrow">Production ${thru(closed)}</div><div class="v">${prodY!=null?Number(prodY).toLocaleString('en-PH'):'—'}</div><div class="s">sheets${tot('production_target')!=null?` · target ${Number(tot('production_target')).toLocaleString('en-PH')}`:''}</div></div>
-      <div class="stat opex"><div class="eyebrow">Plant OPEX per sheet</div><div class="v">${prodY?peso(opexY/prodY,2):'—'}</div><div class="s">${prodY?`${short(opexY)} OPEX ÷ ${Number(prodY).toLocaleString('en-PH')} sheets`:'Needs production output'}</div></div>
+      <div class="stat"><div class="eyebrow">Production ${thru(closed)}</div><div class="v">${prodY!=null?Number(prodY).toLocaleString('en-PH'):'—'}</div><div class="s">boards${tot('production_target')!=null?` · target ${Number(tot('production_target')).toLocaleString('en-PH')}`:''}</div></div>
+      <div class="stat opex"><div class="eyebrow">Plant OPEX per board ${perB?perLbl:''}</div><div class="v">${perB?peso(opexY/perB,2):'—'}</div><div class="s">${perB?`${short(opexY)} OPEX ÷ ${Number(perB).toLocaleString('en-PH')} boards ${perLbl}`:'Needs boards sold or produced'}</div></div>
       <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${salesY?(100*opexY/salesY).toFixed(1)+'%':'—'}</div><div class="s">${salesY?`${thru(closed)}`:'Needs sales actual'}</div></div>
     </div>
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
       ${KPI_DEFS.map(([k,l,u,t])=>`<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
         return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
       <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${short(opexY)}</td></tr>
-      <tr class="calc"><td class="act">OPEX per sheet produced</td>${opexM.map((v,i)=>{ const p = g('production_output',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${prodY?peso(opexY/prodY,2):''}</td></tr>
+      <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(prodY?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${perB?peso(opexY/perB,2):''}</td></tr>
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${salesY?(100*opexY/salesY).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
-    <p class="hint" style="margin-top:10px">Peso per sheet is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
+    <p class="hint" style="margin-top:10px">Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
   } catch(e){ fail(e); }
 }
 async function saveKpis(Y){

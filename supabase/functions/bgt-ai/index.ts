@@ -112,15 +112,31 @@ async function plantRecordsText(db: SupabaseClient, deptId: string, year: number
     Object.entries(byLine).sort((a, b) => b[1].a - a[1].a).slice(0, 25).map(([k, v]) => `- ${k}: ${peso(v.a)} — top items: ${Object.entries(v.items).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([i, a]) => `${i} ${peso(a)}`).join('; ')}`).join('\n') : 'No PO records.') +
     (Object.keys(res).length ? `\nConsumption and utility bills ${year}:\n` + Object.entries(res).map(([k, v]) => `- ${k}: ${Math.round(v.q).toLocaleString('en-PH')} ${v.u} over ${v.n.size} months${v.a ? `, billed ${peso(v.a)}` : ''}${v.a && v.q ? ` (₱${(v.a / v.q).toFixed(2)}/${v.u})` : ''}`).join('\n') : '');
 }
-/* stores withdrawals (WRF) by budget line, last 3 years — what the department actually drew from the stockroom */
+/* stores withdrawals (WRF) by budget line, last 3 years — what the department actually drew from the stockroom.
+   One-time items are listed apart; forklifts/vehicles follow the department that uses them now (bgt_settings.equipment_assignment). */
 async function storesText(db: SupabaseClient, deptId: string, Y: number) {
+  const [{ data:st }, { data:dps }] = await Promise.all([db.from('bgt_settings').select('value').eq('key', 'equipment_assignment').maybeSingle(), db.from('bgt_departments').select('id,code,name')]);
+  const EA: Record<string, string> = (st?.value && typeof st.value === 'object') ? st.value : {};
+  const code = (id: string) => (dps || []).find((d: any) => d.id === id)?.code || '?', name = (c: string) => (dps || []).find((d: any) => d.code === c)?.name || c, me = code(deptId);
+  const sel = 'year,month,rec_date,department_id,line_item,section,category,item,amount,ref_no,one_off,one_off_note';
   const rows: any[] = [];
-  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('year,month,rec_date,line_item,section,category,item,amount,ref_no').eq('kind', 'issue').eq('department_id', deptId).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select(sel).eq('kind', 'issue').eq('department_id', deptId).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  const mine = Object.entries(EA).filter(([, v]) => v === me).map(([k]) => k);
+  if (mine.length) for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select(sel).eq('kind', 'issue').neq('department_id', deptId).in('section', mine).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
   if (!rows.length) return 'No stores withdrawals recorded.';
-  const ys = [...new Set(rows.map(r => r.year))].sort();
+  const movedOut: Record<string, number> = {}, movedIn: Record<string, number> = {}, retired: Record<string, number> = {};
+  const use = rows.filter(r => {
+    const a = r.section ? EA[r.section] : undefined, own = r.department_id === deptId;
+    if (!a) return own;
+    if (a === 'RETIRED') { if (own) retired[r.section] = (retired[r.section] || 0) + Number(r.amount); return false; }
+    if (a !== me) { if (own) movedOut[`${r.section} → ${name(a)}`] = (movedOut[`${r.section} → ${name(a)}`] || 0) + Number(r.amount); return false; }
+    if (!own) movedIn[`${r.section} from ${name(code(r.department_id))}`] = (movedIn[`${r.section} from ${name(code(r.department_id))}`] || 0) + Number(r.amount);
+    return true; });
+  const once = use.filter(r => r.one_off), rec = use.filter(r => !r.one_off);
+  const ys = [...new Set(rec.map(r => r.year))].sort();
   const out: string[] = [];
   for (const y of ys) {
-    const r = rows.filter(x => x.year === y), last = Math.max(...r.map(x => x.month)), day = Math.max(...r.filter(x => x.month === last).map(x => Number(String(x.rec_date).slice(8, 10))));
+    const r = rec.filter(x => x.year === y), last = Math.max(...r.map(x => x.month)), day = Math.max(...r.filter(x => x.month === last).map(x => Number(String(x.rec_date).slice(8, 10))));
     const cl = day < 20 ? last - 1 : last, by: Record<string, number> = {};
     r.filter(x => x.month <= cl).forEach(x => by[x.line_item || 'other'] = (by[x.line_item || 'other'] || 0) + Number(x.amount));
     const t = sum(Object.values(by));
@@ -131,6 +147,10 @@ async function storesText(db: SupabaseClient, deptId: string, Y: number) {
     if (Object.keys(sec).length) out.push(`  sections: ${Object.entries(sec).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
     if (Object.keys(it).length) out.push(`  large equipment/parts items (check if one-off or CAPEX; fuel and consumables are routine OPEX and excluded): ${Object.entries(it).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
   }
+  if (once.length) out.push(`ONE-TIME items already left out of the figures above (do not carry into the next budget): ${once.map(x => `${x.year} ${x.item} ${peso(Number(x.amount))}${x.one_off_note ? ' (' + x.one_off_note + ')' : ''}`).join('; ')}`);
+  if (Object.keys(movedIn).length) out.push(`Equipment now used by this department — its past costs are included above: ${Object.entries(movedIn).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
+  if (Object.keys(movedOut).length) out.push(`Equipment this department no longer uses — its past costs are excluded above (budgeted by the new user): ${Object.entries(movedOut).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
+  if (Object.keys(retired).length) out.push(`Units no longer in use — past costs excluded: ${Object.entries(retired).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
   return out.join('\n');
 }
 async function volumeText(db: SupabaseClient, year: number) {

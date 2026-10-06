@@ -2887,11 +2887,14 @@ function storeLine(cat, sec, item){
 }
 async function loadIssues(Y, dept){
   const k = 'iss|'+Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
-  const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('department_id,month,line_item,section,category,item,qty,amount,ref_no,rec_date,id,unit_price').eq('year', Y).eq('kind','issue'); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
+  const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('department_id,month,line_item,section,category,item,qty,amount,ref_no,rec_date,id,unit_price,one_off,one_off_note').eq('year', Y).eq('kind','issue'); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
   return (S.rc.cache[k] = rows);
 }
-async function issueView(Y, dept, iss){
-  const [p1, p2, D] = await Promise.all([loadIssues(Y-1, dept), loadIssues(Y-2, dept), loadYearData(Y, dept).catch(()=>null)]);
+async function issueView(Y, dept, issAll){
+  const [p1a, p2a, D] = await Promise.all([loadIssues(Y-1, dept), loadIssues(Y-2, dept), loadYearData(Y, dept).catch(()=>null)]);
+  // one-time items (e.g. a powerline rehabilitation) stay visible but are left out of comparisons and the pace
+  const oneOffs = [...issAll, ...p1a, ...p2a].filter(r=>r.one_off), iss = issAll.filter(r=>!r.one_off), p1 = p1a.filter(r=>!r.one_off), p2 = p2a.filter(r=>!r.one_off);
+  const eq = !dept ? await equipCard(Y, [...issAll, ...p1a, ...p2a]) : '';
   const ms = [...new Set(iss.map(r=>r.month))].sort((a,b)=>a-b), last = ms.length ? ms[ms.length-1] : 0, n = ms.length;
   const amt = r => Number(r.amount)||0, tot = a => sum(a.map(amt));
   const by = (a, f) => { const o = {}; a.forEach(r => { const k = f(r) || '—'; o[k] = (o[k]||0) + amt(r); }); return o; };
@@ -2914,7 +2917,7 @@ async function issueView(Y, dept, iss){
   const topSec = Object.entries(Object.keys(secY).length ? secY : secP).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const items = {}; iss.filter(r=>r.ref_no!=='SUMMARY').forEach(r => { const k = r.item||'—'; (items[k] ||= { a:0, q:0, n:0, sec:new Set() }); items[k].a += amt(r); items[k].q += Number(r.qty)||0; items[k].n++; if (r.section) items[k].sec.add(r.section); });
   const topItems = Object.entries(items).sort((a,b)=>b[1].a-a[1].a).slice(0,15);
-  const list = iss.filter(r=>r.ref_no!=='SUMMARY' && (!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.line_item,r.section,r.category]).toLowerCase().includes(S.rc.q.toLowerCase())));
+  const list = issAll.filter(r=>r.ref_no!=='SUMMARY' && (!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.line_item,r.section,r.category]).toLowerCase().includes(S.rc.q.toLowerCase())));
   const consumable = r => /FUEL|LUBRICANT|STATIONARY|CLEANING|PACKAGING|MEDICAL|FORMS/i.test(r.category||'') || /DIESEL|GASOLINE|FUEL|OIL|LUBRIC|GREASE|LPG/i.test(r.item||'');
   const big = iss.filter(r=>r.ref_no!=='SUMMARY' && amt(r) >= 50000 && !consumable(r)).sort((a,b)=>amt(b)-amt(a)).slice(0,8);
   const fpb = await fuelPerBoard(Y, dept);
@@ -2940,15 +2943,19 @@ async function issueView(Y, dept, iss){
     </tbody></table></div></div>`:''}
     ${topSec.length?`<div class="card" style="margin-top:16px"><h3>Where it goes — sections and equipment ${Object.keys(secY).length?Y:Y-1}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Section / equipment</th><th class="r">${Object.keys(secY).length?Y+' '+span:Y-1}</th>${Object.keys(secY).length?`<th class="r">${Y-1} full year</th>`:''}</tr></thead><tbody>
       ${topSec.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${short(v)}</td>${Object.keys(secY).length?`<td class="r num">${secP[k]?short(secP[k]):''}</td>`:''}</tr>`).join('')}</tbody></table></div></div>`:''}
+    ${oneOffs.length?`<div class="card" style="margin-top:16px"><h3>One-time items — left out of comparisons and the full-year pace</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Item</th><th>Department / section</th><th>Why one-time</th><th class="r">Amount</th>${canManageData()?'<th></th>':''}</tr></thead><tbody>
+      ${oneOffs.sort((a,b)=>String(b.rec_date).localeCompare(String(a.rec_date))).map(r=>`<tr><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td>${esc(r.item||'')}</td><td style="font-size:12.5px">${esc(recDept(r.department_id))}${r.section?' · '+esc(r.section):''}</td><td style="font-size:12.5px">${esc(r.one_off_note||'')}</td><td class="r num">${peso(r.amount)}</td>${canManageData()?`<td><button class="btn ghost sm" onclick="setOneOff('${r.id}',false)">Count as recurring</button></td>`:''}</tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="4">Total</td><td class="r num">${peso(sum(oneOffs.map(amt)))}</td>${canManageData()?'<td></td>':''}</tr></tfoot></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">These are still part of what was withdrawn; they are kept out of the yearly comparison so a single project does not inflate the next budget. Long-life works (15–20 years) are better treated as CAPEX.</p></div>`:''}
+    ${eq}
     ${big.length?`<div class="card" style="margin-top:16px"><h3>Large equipment and parts withdrawals to review</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Item</th><th>Department / section</th><th class="r">Amount</th></tr></thead><tbody>
       ${big.map(r=>`<tr><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.item||'')}</td><td style="font-size:12.5px">${esc(recDept(r.department_id))} · ${esc(r.section||'')}</td><td class="r num">${peso(r.amount)}</td></tr>`).join('')}
     </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Fuel, lubricants and other consumables are routine OPEX and are not listed. Equipment such as laptops may belong in CAPEX rather than the department's OPEX.</p></div>`:''}
     ${topItems.length?`<div class="card" style="margin-top:16px"><h3>Top items ${Y}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Item</th><th class="r">Quantity</th><th class="r">Withdrawals</th><th>Used at</th><th class="r">Amount</th></tr></thead><tbody>
       ${topItems.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${Math.round(v.q).toLocaleString('en-PH')}</td><td class="r num">${v.n}</td><td style="font-size:12.5px">${esc([...v.sec].slice(0,3).join(', '))}</td><td class="r num">${short(v.a)}</td></tr>`).join('')}
     </tbody></table></div></div>`:''}
-    ${anyDetail?`<div class="card" style="margin-top:16px"><h3>Withdrawals</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Date</th><th>WRF</th>${!dept?'<th>Department</th>':''}<th>Item</th><th>Section</th><th>Budget line</th><th class="r">Qty × price</th><th class="r">Amount</th></tr></thead><tbody>
-      ${list.slice(0,400).map(r=>`<tr><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(recDept(r.department_id))}</td>`:''}<td>${esc(r.item||'')}<div class="item">${esc(r.category||'')}</div></td><td style="font-size:12.5px">${esc(r.section||'')}</td><td style="font-size:12px">${esc((r.line_item||'').replace('REPAIRS AND MAINTENANCE','R&M'))}</td><td class="r num" style="font-size:12.5px">${r.qty!=null?Number(r.qty).toLocaleString('en-PH'):''}${r.unit_price!=null?' × '+peso(r.unit_price,2):''}</td><td class="r num">${peso(r.amount,2)}</td></tr>`).join('')}
-    </tbody><tfoot><tr><td colspan="${dept?6:7}">Total shown${list.length>400?' (first 400 rows listed)':''}</td><td class="r num">${peso(sum(list.map(amt)),2)}</td></tr></tfoot></table></div></div>`:''}`;
+    ${anyDetail?`<div class="card" style="margin-top:16px"><h3>Withdrawals</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Date</th><th>WRF</th>${!dept?'<th>Department</th>':''}<th>Item</th><th>Section</th><th>Budget line</th><th class="r">Qty × price</th><th class="r">Amount</th>${canManageData()?'<th></th>':''}</tr></thead><tbody>
+      ${list.slice(0,400).map(r=>`<tr${r.one_off?' style="opacity:.65"':''}><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(recDept(r.department_id))}</td>`:''}<td>${esc(r.item||'')}<div class="item">${esc(r.category||'')}</div></td><td style="font-size:12.5px">${esc(r.section||'')}</td><td style="font-size:12px">${esc((r.line_item||'').replace('REPAIRS AND MAINTENANCE','R&M'))}</td><td class="r num" style="font-size:12.5px">${r.qty!=null?Number(r.qty).toLocaleString('en-PH'):''}${r.unit_price!=null?' × '+peso(r.unit_price,2):''}</td><td class="r num">${peso(r.amount,2)}</td>${canManageData()?`<td>${r.one_off?'<span class="chip">One-time</span>':`<button class="btn ghost sm" onclick="setOneOff('${r.id}',true)">One-time</button>`}</td>`:''}</tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="${dept?6:7}">Total shown${list.length>400?' (first 400 rows listed)':''}</td><td class="r num">${peso(sum(list.map(amt)),2)}</td>${canManageData()?'<td></td>':''}</tr></tfoot></table></div></div>`:''}`;
 }
 /* read the plant's consumption report (any year's layout): sheets named "transaction…", withdrawal rows only */
 function parseStoresWorkbook(wb){
@@ -2998,8 +3005,10 @@ function importStoresDialog(){
     if (!parsed) return; $('#stGo').disabled = true; $('#stMsg').insertAdjacentHTML('beforeend','<p class="hint" id="stProg">Importing…</p>');
     try {
       const byCode = Object.fromEntries(S.depts.map(d=>[d.code, d.id]));
+      // keep one-time marks: same department, month and item
+      const keep = {}; for (const y of Object.keys(parsed.ys)) { const { data:oo } = await sb.from('bgt_plant_records').select('department_id,month,item,one_off_note').eq('kind','issue').eq('year', Number(y)).eq('one_off', true); (oo||[]).forEach(o => keep[`${o.department_id}|${y}|${o.month}|${stU(o.item)}`] = o.one_off_note || ''); }
       for (const [y, v] of Object.entries(parsed.ys)) { const r = await sb.rpc('bgt_clear_issues', { p_year:Number(y), p_months:[...v.m] }); if (r.error) throw r.error; }
-      const rows = parsed.rows.filter(r=>byCode[r.dept]).map(r => ({ company_id:S.company.id, department_id:byCode[r.dept], kind:'issue', rec_date:r.date, section:r.section, category:r.category, line_item:r.line_item, item:r.item, qty:r.qty, unit_price:r.unit_price, amount:r.amount, ref_no:r.ref_no }));
+      const rows = parsed.rows.filter(r=>byCode[r.dept]).map(r => { const k = `${byCode[r.dept]}|${r.y}|${r.m}|${stU(r.item)}`; return { company_id:S.company.id, department_id:byCode[r.dept], kind:'issue', rec_date:r.date, section:r.section, category:r.category, line_item:r.line_item, item:r.item, qty:r.qty, unit_price:r.unit_price, amount:r.amount, ref_no:r.ref_no, one_off:k in keep, one_off_note:k in keep ? keep[k] || null : null }; });
       for (let i=0; i<rows.length; i+=500) { const r = await sb.from('bgt_plant_records').insert(rows.slice(i, i+500)); if (r.error) throw r.error; const p = $('#stProg'); if (p) p.textContent = `Importing… ${Math.min(i+500, rows.length).toLocaleString('en-PH')} of ${rows.length.toLocaleString('en-PH')}`; }
       S.rc.cache = {}; closeModal(); toast(`${rows.length.toLocaleString('en-PH')} withdrawals imported`); renderRecords();
     } catch(e){ fail(e); $('#stGo').disabled = false; }
@@ -3024,6 +3033,45 @@ async function fuelPerBoard(Y, dept){
     <div class="stats" style="padding:0 14px;margin:0 0 6px">${yr.map(x=>`<div class="stat"><div class="eyebrow">${x.y}${x.n<12?` · ${x.n} months`:''}</div><div class="v">${x.pb!=null?peso(x.pb,2):'—'}</div><div class="s">${short(x.f)} fuel ÷ ${Math.round(x.b).toLocaleString('en-PH')} boards</div></div>`).join('')}</div>
     ${roll.length?`<div class="tbl-wrap"><table class="ledger" style="font-size:12.5px"><thead><tr><th>Rolling 3 months, ending</th>${roll.map(x=>`<th class="r">${MONTHS[x.m]} ${String(x.y).slice(2)}</th>`).join('')}</tr></thead><tbody><tr><td>₱ per board</td>${roll.map(x=>`<td class="r num">${peso(x.pb,2)}</td>`).join('')}</tr></tbody></table></div>`:''}
     <p class="hint" style="padding:8px 14px 12px;margin:0">${yr.some(x=>x.det)?'Diesel withdrawn for the boilers':'Production\'s fuel and oil withdrawals (approximate — import the report file to isolate the boilers)'} ÷ boards produced. Diesel is issued in bulk (about 3,500 liters per boiler), so single months jump; the yearly and rolling figures are the ones to budget from. Months after the last fuel withdrawal are left out.</p></div>`;
+}
+
+function setOneOff(id, on){
+  const go = async note => { const r = await sb.from('bgt_plant_records').update({ one_off:on, one_off_note:on ? (note||null) : null }).eq('id', id); if (r.error) return fail(r.error); closeModal(); S.rc.cache = {}; toast(on ? 'Marked as one-time' : 'Counted as recurring again'); renderRecords(); };
+  if (!on) return go();
+  modal(`<h3>Mark as one-time</h3><p>One-time items stay in the records but are left out of the yearly comparison, the full-year pace and the assistant's baseline.</p>
+    <div class="field"><label for="ooNote">Why is it one-time?</label><input class="inp" id="ooNote" placeholder="e.g. Powerline rehabilitation, lasts 15–20 years"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="ooGo">Mark one-time</button></div>`);
+  $('#ooGo').onclick = () => go($('#ooNote').value.trim());
+}
+/* forklifts and vehicles: costs follow the department that uses the unit now (e.g. Production no longer has a forklift) */
+const EQUIP_RX = /FORKLIFT|TRUCK|STRADA|MOTORCYCLE|AVANZA/;
+async function loadEquipAssign(){ if (S.rc.ea !== undefined) return S.rc.ea; const { data } = await sb.from('bgt_settings').select('value').eq('key','equipment_assignment').maybeSingle(); return (S.rc.ea = (data?.value && typeof data.value==='object') ? data.value : {}); }
+async function equipCard(Y, rows){
+  const eqRows = rows.filter(r=>r.section && EQUIP_RX.test(r.section)); if (!eqRows.length) return '';
+  const EA = await loadEquipAssign(), code = id => deptById(id)?.code || '?', ed = canManageData();
+  const units = [...new Set(eqRows.map(r=>r.section))].sort();
+  const yrs = [Y-2, Y-1, Y], yOf = r => Number(String(r.rec_date).slice(0,4));
+  const info = units.map(u => { const rs = eqRows.filter(r=>r.section===u), byY = yrs.map(y=>sum(rs.filter(r=>yOf(r)===y).map(r=>Number(r.amount)||0)));
+    const lastY = [...yrs].reverse().find((y,i)=>byY[2-i]>0), byD = {}; rs.filter(r=>yOf(r)===lastY).forEach(r=>byD[code(r.department_id)] = (byD[code(r.department_id)]||0) + (Number(r.amount)||0));
+    const sug = Object.entries(byD).sort((a,b)=>b[1]-a[1])[0]?.[0] || '';
+    const charged = [...new Set(rs.filter(r=>yOf(r)>=Y-1).map(r=>code(r.department_id)))];
+    return { u, byY, lastY, sug, cur:EA[u], charged, rs }; });
+  const moved = info.filter(x=>x.cur && x.cur!=='RETIRED').map(x=>({ x, out: x.rs.filter(r=>yOf(r)>=Y-1 && code(r.department_id)!==x.cur) })).filter(m=>m.out.length);
+  const opts = (sel, sug) => `<option value="">— not set${sug?` (suggested: ${esc(S.depts.find(d=>d.code===sug)?.name||sug)})`:''} —</option>${S.depts.map(d=>`<option value="${d.code}" ${sel===d.code?'selected':''}>${esc(d.name)}</option>`).join('')}<option value="RETIRED" ${sel==='RETIRED'?'selected':''}>Not in use / disposed</option>`;
+  return `<div class="card" style="margin-top:16px"><h3>Forklifts and vehicles — who uses them now</h3>
+    <p class="hint" style="padding:0 14px 8px;margin:0">Withdrawals are charged to the department on the slip. For ${Y+1}, each unit's fuel, parts and repairs should sit with the department that uses it now — for example, a forklift Production no longer has. Set the current user; the assistant then moves that unit's history to that department (or leaves it out if the unit is no longer in use).</p>
+    <div class="tbl-wrap"><table class="ledger"><thead><tr><th>Unit</th>${yrs.map(y=>`<th class="r">${y}</th>`).join('')}<th>Charged to (${Y-1}–${Y})</th><th>Now used by</th></tr></thead><tbody>
+      ${info.map(x=>`<tr><td>${esc(x.u)}</td>${x.byY.map(v=>`<td class="r num">${v?short(v):''}</td>`).join('')}<td style="font-size:12.5px">${x.charged.map(c=>esc(S.depts.find(d=>d.code===c)?.name||c)).join(', ')}</td>
+        <td>${ed?`<select class="inp ea" data-u="${esc(x.u)}" data-sug="${x.sug}" style="min-width:190px">${opts(x.cur||'', x.sug)}</select>`:esc(x.cur==='RETIRED'?'Not in use':S.depts.find(d=>d.code===x.cur)?.name||'— not set —')}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${moved.length?`<p class="hint" style="padding:8px 14px 0;margin:0">Moved for the ${Y+1} baseline: ${moved.map(m=>`${esc(m.x.u)} ${short(sum(m.out.map(r=>Number(r.amount)||0)))} from ${[...new Set(m.out.map(r=>S.depts.find(d=>d.code===code(r.department_id))?.name))].join(', ')} → ${esc(S.depts.find(d=>d.code===m.x.cur)?.name||m.x.cur)}`).join('; ')}</p>`:''}
+    ${ed?`<div style="padding:12px 14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="eqUseSuggested()">Use suggestions for blanks</button><button class="btn primary" onclick="saveEquipAssign()">Save</button></div>`:''}</div>`;
+}
+function eqUseSuggested(){ document.querySelectorAll('select.ea').forEach(s => { if (!s.value && s.dataset.sug) s.value = s.dataset.sug; }); toast('Suggestions filled in — check them, then Save'); }
+async function saveEquipAssign(){
+  const v = { ...(await loadEquipAssign()) }; document.querySelectorAll('select.ea').forEach(s => { if (s.value) v[s.dataset.u] = s.value; else delete v[s.dataset.u]; });
+  const r = await sb.from('bgt_settings').upsert({ key:'equipment_assignment', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
+  S.rc.ea = v; toast('Saved'); renderRecords();
 }
 
 boot();

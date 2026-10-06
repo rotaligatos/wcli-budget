@@ -666,7 +666,26 @@ function route(){
   renderNav();
   if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else if (S.view==='capex') renderCapexTracker(); else if (S.view==='records') renderRecords(); else openBudget(S.budgetId);
 }
-function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.cx.cache = {}; S.rc.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
+function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.cx.cache = {}; S.rc.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; S._keepY = null; S._nav = true; try { route(); } finally { S._nav = false; } window.scrollTo(0,0); }
+/* Keep the reader's place: when a page re-draws after a save, stay at the same scroll position instead of jumping to the top. */
+function mainLoading(msg){
+  const m = $('#main');
+  if (S._nav || !m.firstElementChild || m.firstElementChild.classList.contains('loading')) { m.style.minHeight = ''; m.innerHTML = `<div class="loading">${msg}</div>`; return; }
+  holdScroll();   // same page being refreshed — leave the current content in place until the new one is ready
+}
+function holdScroll(){
+  const y = window.scrollY, m = $('#main'); if (!y) return;
+  m.style.minHeight = m.offsetHeight + 'px';
+  S._keepY = { y, until: Date.now() + 4000 };
+  clearTimeout(S._keepT); S._keepT = setTimeout(()=>{ S._keepY = null; m.style.minHeight = ''; }, 4000);
+}
+(function(){
+  const stop = () => { if (S._keepY) { S._keepY = null; } };
+  ['wheel','touchmove','keydown','mousedown'].forEach(ev => window.addEventListener(ev, e => { if (!e.target.closest || !e.target.closest('.modal,.drawer')) stop(); }, { passive:true }));
+  const obs = new MutationObserver(() => { const k = S._keepY; if (k && Date.now() < k.until && Math.abs(window.scrollY - k.y) > 2) window.scrollTo(0, k.y); });
+  document.addEventListener('DOMContentLoaded', () => { const m = $('#main'); if (m) obs.observe(m, { childList:true, subtree:true }); });
+  if (document.readyState !== 'loading') { const m = document.getElementById('main'); if (m) obs.observe(m, { childList:true, subtree:true }); }
+})();
 function renderNav(){
   const main = [];
   if (isReviewer()) main.push(`<a class="${S.view==='overview'?'on':''}" onclick="go('overview')">Plant overview</a>`);
@@ -684,7 +703,7 @@ function renderNav(){
 async function openBudget(id){
   const b = budgetById(id);
   if (!b) { $('#main').innerHTML = `<div class="empty"><b>No budget to show</b>Your account is not linked to a department yet.</div>`; return; }
-  $('#main').innerHTML = '<div class="loading">Loading budget…</div>';
+  mainLoading('Loading budget…');
   try {
     const [o, c, cm, ev] = await Promise.all([
       sb.from('bgt_opex_lines').select('*').eq('budget_id', id).order('sort').order('created_at'),
@@ -1092,7 +1111,7 @@ async function loadAllLines(){
   return { o, c };
 }
 async function renderOverview(){
-  $('#main').innerHTML = '<div class="loading">Loading plant overview…</div>';
+  mainLoading('Loading plant overview…');
   try {
     await loadBudgets();
     const { o, c } = await loadAllLines(); S._all = { o, c };
@@ -1253,7 +1272,7 @@ function lockedBanner(){
     ${open?`<div style="margin-top:8px"><button class="btn primary" onclick="switchYear('${open.id}')">Go to the ${open.year} budget</button></div>`:''}</div>`;
 }
 async function switchYear(id){ const dep = budgetById(S.budgetId)?.department_id; S.cycle = S.cycles.find(c=>c.id===id); const sel = $('#cycleSel'); if (sel) sel.value = id; await loadBudgets();
-  if (S.view==='budget') { const cur = S.budgets.find(b=>b.department_id===dep); S.budgetId = cur?.id || null; } route(); window.scrollTo(0,0); }
+  if (S.view==='budget') { const cur = S.budgets.find(b=>b.department_id===dep); S.budgetId = cur?.id || null; } S._nav = true; try { route(); } finally { S._nav = false; } window.scrollTo(0,0); }
 const canManageData = () => ['admin','plant_head'].includes(S.me?.role);
 const canEditDept = d => ['admin','plant_head'].includes(S.me.role) || (['preparer','dept_manager'].includes(S.me.role) && S.me.department_id === d);
 const MCOLS = 'budget_id,line_item,category,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12';
@@ -1333,7 +1352,7 @@ function varPill(r){
 
 /* ================= ACTUALS VIEW ================= */
 async function renderActuals(){
-  $('#main').innerHTML = '<div class="loading">Loading actuals…</div>';
+  mainLoading('Loading actuals…');
   try {
     if (!isReviewer()) S.act.dept = S.me.department_id;
     if (!S.act.year) {
@@ -1537,7 +1556,7 @@ async function loadPrices(force){ if (!S.prices || force) S.prices = await fetch
 const today = () => new Date().toISOString().slice(0,10);
 function priceMatches(p, q){ q = (q||'').toLowerCase(); return !q || [p.item,p.category,p.supplier,p.quote_ref,p.notes].some(v=>String(v||'').toLowerCase().includes(q)); }
 async function renderPrices(){
-  $('#main').innerHTML = '<div class="loading">Loading price list…</div>';
+  mainLoading('Loading price list…');
   try { await loadPrices(true); } catch(e){ return fail(e); }
   const cats = [...new Set(S.prices.map(p=>p.category).filter(Boolean))].sort();
   $('#main').innerHTML = `
@@ -1706,7 +1725,8 @@ async function outlookStrip(){
   } catch(e){ return ''; }
 }
 async function renderOutlook(){
-  $('#main').innerHTML = '<div class="loading">Loading outlook…</div>';
+  const prevTrend = $('#olTrend')?.innerHTML || '';
+  mainLoading('Loading outlook…');
   try {
     const y = await outlookYear(), o = await loadOutlook(y), ed = canManageData();
     const latest = o.A.reduce((m,a)=>a.as_of && a.as_of>m ? a.as_of : m, '');
@@ -1727,7 +1747,7 @@ async function renderOutlook(){
         ${a.value_text?`<div class="s">${esc(a.value_text)}</div>`:''}
         ${a.outlook?`<div class="means"><b>For the budget:</b> ${esc(a.outlook)}</div>`:''}
         <div class="src">${a.source_url?`<a href="${esc(a.source_url)}" target="_blank" rel="noopener">${esc(a.source_title||'Source')}</a>`:esc(a.source_title||'')}${a.as_of?` · ${a.as_of}`:''}${ed?` · <a onclick="editAssump('${a.id}')">Edit</a>`:''}</div></div>`).join('')}</div>`; }).join('')}
-    <div id="olTrend"><div class="loading">Loading the five-year trend…</div></div>
+    <div id="olTrend">${prevTrend || '<div class="loading">Loading the five-year trend…</div>'}</div>
     <h3 class="sec">Sales and production direction</h3>
     <div class="ol-grid">
       <div class="ol-card"><div class="eyebrow">Sales target ${y}</div><div class="v">${sT!=null?short(sT):'—'}</div><div class="s">${sA!=null?`${y-1} actual (full-year rate): ${short(sA)}${sT!=null&&sA?` (${sT>=sA?'+':''}${Math.round(100*(sT-sA)/sA)}%)`:''}`:`No ${y-1} sales recorded yet.`}</div><div class="means">Volume-driven costs (power, boiler fuel, supplies, delivery, agency helpers) should move with sales and production.</div></div>
@@ -1756,7 +1776,7 @@ async function saveDrivers(y){
     if (changed) ups.push({ company_id:S.company.id, year:y, line_item:r.item, driver_keys:d?.driver_keys||[], rest_of_year_pct:Number(r.rest_of_year_pct)||0, next_year_pct:r.next_year_pct===''?generalPct(o):Number(r.next_year_pct), rationale:r.rationale||null, updated_by:S.me.id }); });
   if (!ups.length) { toast('No changes'); return; }
   const r = await sb.from('bgt_cost_drivers').upsert(ups, { onConflict:'company_id,year,line_item' }); if (r.error) return fail(r.error);
-  S.ol.cache = {}; toast(`${ups.length} line${ups.length>1?'s':''} saved`); renderOutlook();
+  S.ol.cache = {}; toast(`${ups.length} line${ups.length>1?'s':''} saved`);   // values are already on screen — no redraw, so the page stays where it is
 }
 async function editAssump(id){
   const y = await outlookYear(), o = await loadOutlook(y), a = id ? o.A.find(x=>x.id===id) : { category:'custom' };
@@ -2017,7 +2037,7 @@ const KPI_DEFS = [
 S.pf = { year:null };
 async function loadKpis(year){ const k = 'k'+year; if (S.ol.cache[k]) return S.ol.cache[k]; const { data, error } = await sb.from('bgt_kpis').select('*').eq('year', year); if (error) throw error; return (S.ol.cache[k] = data||[]); }
 async function renderPerf(){
-  $('#main').innerHTML = '<div class="loading">Loading performance…</div>';
+  mainLoading('Loading performance…');
   try {
     if (!S.pf.year) S.pf.year = S.act.year || new Date().getFullYear();
     const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData();
@@ -2379,7 +2399,7 @@ function lineDepr(l, AC){ const life = lifeOf(l, AC), sv = salvageOf(l.category,
 
 /* ---------- CAPEX tracker page ---------- */
 async function renderCapexTracker(){
-  $('#main').innerHTML = '<div class="loading">Loading CAPEX…</div>';
+  mainLoading('Loading CAPEX…');
   try {
     const [L, AC] = await Promise.all([loadCapexAll(), loadAssetClasses()]);
     const open = S.cycles.find(c=>c.status==='open'), years = [...new Set(L.map(l=>l.year))].sort((a,b)=>b-a);
@@ -2556,7 +2576,7 @@ async function loadRecords(Y, dept){
 }
 const recAmt = r => r.status==='Cancelled' ? 0 : Number(r.amount)||0;
 async function renderRecords(){
-  $('#main').innerHTML = '<div class="loading">Loading plant records…</div>';
+  mainLoading('Loading plant records…');
   try {
     if (!S.rc.year) S.rc.year = new Date().getFullYear();
     if (!isReviewer()) S.rc.dept = S.me.department_id;

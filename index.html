@@ -2567,7 +2567,7 @@ async function ovDeprCard(opexT){
 const RESOURCES = [['Electricity','kWh','UTILITIES - ELECTRICITY'],['Diesel','liter','GAS AND OIL'],['Gasoline','liter','GAS AND OIL'],['LPG','kg','GAS AND OIL'],
   ['Water','m³','UTILITIES - WATER'],['Lubricant / oil','liter','REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT'],['Boiler fuel','liter','GAS AND OIL'],['Other','','']];
 const PO_STATUS = ['Ordered','Received','Paid','Cancelled'];
-S.rc = { year:null, dept:null, kind:'po', month:0, q:'', cache:{} };
+S.rc = { year:null, dept:null, kind:'utility', month:0, q:'', cache:{} };
 const canEditRecords = d => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===d);
 async function loadRecords(Y, dept){
   const k = Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
@@ -2581,7 +2581,7 @@ async function renderRecords(){
     if (!S.rc.year) S.rc.year = new Date().getFullYear();
     if (!isReviewer()) S.rc.dept = S.me.department_id;
     const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
-    if (S.rc.kind==='consumption') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
+    if (S.rc.kind!=='po') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
     const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
     const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption');
     const list = (S.rc.kind==='po'?po:co).filter(r=>(!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.supplier,r.line_item,r.resource,r.notes]).toLowerCase().includes(S.rc.q.toLowerCase())));
@@ -2590,15 +2590,15 @@ async function renderRecords(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
       <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
-      <div class="actions">${ed?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
+      <div class="actions">${ed&&S.rc.kind!=='utility'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
       <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
-    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['po','PO expenses',po.length],['consumption','Consumption',co.length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
-    ${S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    ${S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
   } catch(e){ fail(e); }
 }
 async function poView(Y, dept, po, list, poMonths, ed){
@@ -2616,7 +2616,7 @@ async function poView(Y, dept, po, list, poMonths, ed){
       <div class="stat"><div class="eyebrow">Top suppliers</div><div class="v" style="font-size:15px;line-height:1.35">${topS.map(([s])=>esc(s)).join('<br>')||'—'}</div><div class="s">${topS.map(([,v])=>short(v)).join(' · ')}</div></div>
     </div>
     <div class="card"><h3>Purchase orders</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Date</th><th>PO no.</th>${!dept?'<th>Department</th>':''}<th>Expense line / item</th><th>Supplier</th><th class="r">Qty × price</th><th class="r">Amount</th><th>Status</th></tr></thead><tbody>
-      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(deptById(r.department_id)?.name)}</td>`:''}
+      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(recDept(r.department_id))}</td>`:''}
         <td><div class="item">${esc(r.line_item||'No line item')}</div><div class="act" style="font-weight:500">${esc(r.item||'')}</div></td><td style="font-size:13px">${esc(r.supplier||'')}</td>
         <td class="r num" style="font-size:12.5px">${r.qty!=null?`${Number(r.qty).toLocaleString('en-PH')} ${esc(r.unit||'')}`:''}${r.unit_price!=null?` × ${peso(r.unit_price,2)}`:''}</td><td class="r num">${peso(r.amount,2)}</td><td><span class="chip ${r.status==='Paid'?'pri-ok':r.status==='Cancelled'?'pri-crit':r.status==='Received'?'basis-working':'pri-med'}">${esc(r.status||'—')}</span></td></tr>`).join('') || `<tr><td colspan="8" class="hint" style="padding:16px">No PO records${S.rc.month||S.rc.q?' for this filter':''} yet.${ed?' Use <b>Add PO</b> or <b>Import Excel</b>.':''}</td></tr>`}
       </tbody>${list.length?`<tfoot><tr><td colspan="${dept?5:6}">Total shown${list.length>500?' (first 500 rows listed)':''}</td><td class="r num">${peso(sum(list.map(recAmt)),2)}</td><td></td></tr></tfoot>`:''}</table></div></div>
@@ -2639,7 +2639,7 @@ function consView(Y, co, list, K, ed){
     </tbody></table></div>`:`<div class="empty"><b>No consumption recorded for ${Y}</b>${ed?'Record monthly meter readings or deliveries — electricity kWh, diesel liters, water m³, LPG kg. Adding the peso amount gives the unit cost; with boards produced or sold, the app shows usage per board.':''}</div>`}</div>
     ${utilityCard(Y, co)}
     ${co.length?`<div class="card" style="margin-top:16px"><h3>Entries</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Resource</th>${!S.rc.dept?'<th>Department</th>':''}<th class="r">Quantity</th><th class="r">Amount</th><th>Reference</th><th>Notes</th></tr></thead><tbody>
-      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.resource||'')}</td>${!S.rc.dept?`<td style="font-size:12.5px">${esc(deptById(r.department_id)?.name)}</td>`:''}<td class="r num">${Number(r.qty||0).toLocaleString('en-PH')} ${esc(r.unit||'')}</td><td class="r num">${r.amount!=null?peso(r.amount,2):''}</td><td class="num">${esc(r.ref_no||'')}</td><td style="font-size:12.5px">${esc(r.notes||'')}</td></tr>`).join('')}
+      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.resource||'')}</td>${!S.rc.dept?`<td style="font-size:12.5px">${esc(recDept(r.department_id))}</td>`:''}<td class="r num">${Number(r.qty||0).toLocaleString('en-PH')} ${esc(r.unit||'')}</td><td class="r num">${r.amount!=null?peso(r.amount,2):''}</td><td class="num">${esc(r.ref_no||'')}</td><td style="font-size:12.5px">${esc(r.notes||'')}</td></tr>`).join('')}
     </tbody></table></div></div>`:''}`;
 }
 async function editRecord(id){
@@ -2685,10 +2685,10 @@ const REC_COLS = ['Date','Department code','Type (PO / Consumption)','PO / refer
 async function exportRecords(){
   const Y = S.rc.year, R = await loadRecords(Y, S.rc.dept), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Plant records ${Y}`);
   const h = ws.addRow(REC_COLS); h.font = { bold:true };
-  R.slice().reverse().forEach(r => ws.addRow([new Date(r.rec_date), deptById(r.department_id)?.code, r.kind==='po'?'PO':'Consumption', r.ref_no, r.line_item, r.kind==='po'?r.item:r.resource, r.supplier, r.qty!=null?Number(r.qty):null, r.unit, r.unit_price!=null?Number(r.unit_price):null, r.amount!=null?Number(r.amount):null, r.status, r.notes]));
+  R.slice().reverse().forEach(r => ws.addRow([new Date(r.rec_date), r.department_id ? deptById(r.department_id)?.code : 'PLANT', r.kind==='po'?'PO':'Consumption', r.ref_no, r.line_item, r.kind==='po'?r.item:r.resource, r.supplier, r.qty!=null?Number(r.qty):null, r.unit, r.unit_price!=null?Number(r.unit_price):null, r.amount!=null?Number(r.amount):null, r.status, r.notes]));
   [12,10,14,16,34,34,26,10,8,12,14,10,30].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(1).numFmt='yyyy-mm-dd'; [10,11].forEach(c=>ws.getColumn(c).numFmt='#,##0.00');
   const g = wb.addWorksheet('Guide');
-  [['How to fill'],['Date: PO date or reading date.'],['Department code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')],['Type: PO or Consumption.'],['Expense line (PO): one of the budget line items, e.g. SUPPLIES.'],
+  [['How to fill'],['Date: PO date or reading date.'],['Department code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')+'; PLANT = whole plant (main electricity/water bill)'],['Type: PO or Consumption.'],['Expense line (PO): one of the budget line items, e.g. SUPPLIES.'],
    ['Item or resource: item description for POs; for consumption one of '+RESOURCES.map(r=>r[0]).join(', ')+'.'],['Status (PO): '+PO_STATUS.join(', ')+'.'],['Amount: peso amount. For consumption it is optional (adds unit cost).']].forEach(r=>g.addRow(r));
   g.getColumn(1).width = 120;
   download(await wb.xlsx.writeBuffer(), `Plant records ${Y} - ${S.company.code}.xlsx`); toast('Downloaded');
@@ -2710,10 +2710,11 @@ function importRecordsDialog(){
         const dv = g('d'); if (dv==null || dv==='') continue;
         const d = dv instanceof Date ? dv : new Date(dv); if (isNaN(d)) { bad.push(i); continue; }
         const dep = S.depts.find(x=>String(x.code).toLowerCase()===String(g('dept')||'').trim().toLowerCase() || x.name.toLowerCase()===String(g('dept')||'').trim().toLowerCase());
-        if (!dep || !canEditRecords(dep.id)) { bad.push(i); continue; }
+        const plantLvl = !dep && /^(|plant|whole plant)$/i.test(String(g('dept')||'').trim()) && ['admin','plant_head'].includes(S.me.role);
+        if (!plantLvl && (!dep || !canEditRecords(dep.id))) { bad.push(i); continue; }
         const isPO = !/cons/i.test(String(g('t')||'PO')), num = k => { const x = g(k); return x==null || x==='' || isNaN(Number(x)) ? null : Number(x); };
         const it = g('it') ? String(g('it')).trim() : null, res = RESOURCES.find(r=>r[0].toLowerCase()===String(it||'').toLowerCase());
-        rows.push({ company_id:S.company.id, department_id:dep.id, kind:isPO?'po':'consumption', rec_date:d.toISOString().slice(0,10), ref_no:g('ref')?String(g('ref')):null,
+        rows.push({ company_id:S.company.id, department_id:plantLvl ? null : dep.id, kind:isPO?'po':'consumption', rec_date:d.toISOString().slice(0,10), ref_no:g('ref')?String(g('ref')):null,
           line_item:isPO ? (g('li')?String(g('li')).trim().toUpperCase():null) : (res?.[2]||null), item:isPO?it:null, resource:isPO?null:(res?.[0]||it), supplier:g('sup')?String(g('sup')).trim():null,
           qty:num('q'), unit:g('u')?String(g('u')):(res?.[1]||null), unit_price:num('p'), amount:num('a') ?? (num('q')!=null&&num('p')!=null ? num('q')*num('p') : null), status:isPO?(g('st')||'Ordered'):null, notes:g('n')?String(g('n')):null }); }
       if (!rows.length) { $('#riMsg').textContent = 'No rows found.' + (bad.length ? ` Rows skipped (bad date or department, or not your department): ${bad.slice(0,12).join(', ')}` : ''); return; }
@@ -2738,6 +2739,65 @@ function utilityCard(Y, co){
       </tbody><tfoot><tr><td>Total</td><td class="r num">${Math.round(tq).toLocaleString('en-PH')}</td><td class="r num">${peso(ta,2)}</td><td class="r num">${ta&&tq?peso(ta/tq,2):''}</td><td class="r num">${D?peso(sum(rows.map(r=>r.acc||0)),2):''}</td></tr></tfoot></table></div>
       ${pub?`<p class="hint" style="padding:8px 14px 12px;margin:0">Published Meralco rate ${Y}: ₱${Number(pub.value).toFixed(2)}/kWh (household benchmark${pub.basis==='ytd'?', '+esc(pub.period||'so far'):''}). Industrial bills differ by demand charges and time of use — the plant's own ₱/kWh above is the figure to budget with.</p>`:''}</div>`; }).join('');
 }
+
+const recDept = id => id ? (deptById(id)?.name || '?') : 'Whole plant (main bill)';
+S.rc.uRes = S.rc.uRes || 'Electricity';
+/* Electricity and water: one row per month — consumption and billed amount — for the plant's main bill or a department's sub-meter */
+async function utilView(Y, R){
+  const res = S.rc.uRes, unit = res==='Electricity' ? 'kWh' : 'm³', li = res==='Electricity' ? 'UTILITIES - ELECTRICITY' : 'UTILITIES - WATER';
+  const all = (await loadRecords(Y, null).catch(()=>R)).filter(r=>r.kind==='consumption' && r.resource===res);
+  const canPlant = ['admin','plant_head'].includes(S.me.role);
+  const opts = [...(canPlant||isReviewer() ? [['', 'Whole plant — main bill']] : []), ...S.depts.filter(d=>isReviewer() || d.id===S.me.department_id).map(d=>[d.id, d.name+' — sub-meter / share'])];
+  if (S.rc.uDept===undefined) S.rc.uDept = isReviewer() ? '' : S.me.department_id;
+  const dsel = S.rc.uDept || null, ed = dsel ? canEditRecords(dsel) : canPlant;
+  const mine = all.filter(r=>(r.department_id||null)===dsel), cell = m => { const v = mine.filter(r=>r.month===m); return v.length ? { q:sum(v.map(r=>r.qty)), a:sum(v.map(r=>r.amount)), ref:v.map(r=>r.ref_no).filter(Boolean).join(', '), n:v.length } : null; };
+  const rows = MONTHS.map((_,i)=>({ m:i+1, c:cell(i+1) }));
+  // who used what: department sub-meters against the main bill
+  const deptRows = S.depts.map(d=>({ d, v:MONTHS.map((_,i)=>{ const x = all.filter(r=>r.department_id===d.id && r.month===i+1); return x.length ? { q:sum(x.map(r=>r.qty)), a:sum(x.map(r=>r.amount)) } : null; }) })).filter(x=>x.v.some(Boolean));
+  const main = MONTHS.map((_,i)=>{ const x = all.filter(r=>!r.department_id && r.month===i+1); return x.length ? { q:sum(x.map(r=>r.qty)), a:sum(x.map(r=>r.amount)) } : null; });
+  const tq = sum(rows.map(r=>r.c?.q||0)), ta = sum(rows.map(r=>r.c?.a||0));
+  return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
+      <div class="field" style="margin:0"><label for="uRes">Utility</label><select class="inp" id="uRes" onchange="S.rc.uRes=this.value;renderRecords()">${['Electricity','Water'].map(x=>`<option ${x===res?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;min-width:260px"><label for="uDept">Bill / meter</label><select class="inp" id="uDept" onchange="S.rc.uDept=this.value;renderRecords()">${opts.map(([v,l])=>`<option value="${v}" ${(v||null)===dsel?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+      <span class="grow"></span><span class="hint" style="max-width:420px">Enter the plant's main ${res==='Electricity'?'Meralco':'water'} bill under <b>Whole plant</b>. If departments have sub-meters or an agreed share, enter each department too — the summary below shows what is left as common use.</span></div>
+    <div class="card"><h3>${res} ${Y} — ${esc(dsel?deptById(dsel)?.name:'Whole plant, main bill')}</h3>
+      <div class="tbl-wrap"><table class="ledger" style="min-width:720px"><thead><tr><th>Month</th><th class="r">Consumption (${unit})</th><th class="r">Billed amount (₱)</th><th class="r">₱ per ${unit}</th><th>Bill / account no.</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${MONTHS[r.m-1]}</td>
+        <td class="r">${ed?`<input class="inp num ut" data-m="${r.m}" data-k="q" type="number" step="any" min="0" value="${r.c?.q??''}" style="max-width:150px;margin-left:auto">`:`<span class="num">${r.c?Math.round(r.c.q).toLocaleString('en-PH'):''}</span>`}</td>
+        <td class="r">${ed?`<input class="inp num ut" data-m="${r.m}" data-k="a" type="number" step="any" min="0" value="${r.c?.a??''}" style="max-width:160px;margin-left:auto">`:`<span class="num">${r.c?.a?peso(r.c.a,2):''}</span>`}</td>
+        <td class="r num ut-rate" data-m="${r.m}">${r.c?.q&&r.c?.a?peso(r.c.a/r.c.q,2):''}</td>
+        <td>${ed?`<input class="inp ut" data-m="${r.m}" data-k="ref" value="${esc(r.c?.ref||'')}" placeholder="optional" style="max-width:200px">`:esc(r.c?.ref||'')}${r.c?.n>1?' <span class="hint" style="font-size:11.5px">('+r.c.n+' bills)</span>':''}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td>Year</td><td class="r num">${Math.round(tq).toLocaleString('en-PH')}</td><td class="r num">${peso(ta,2)}</td><td class="r num">${tq&&ta?peso(ta/tq,2):''}</td><td></td></tr></tfoot></table></div>
+      ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveUtil(${Y})">Save ${res.toLowerCase()} figures</button></div>`:''}</div>
+    ${deptRows.length ? `<div class="card" style="margin-top:16px"><h3>${res} by department ${Y} (${unit})</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1100px"><thead><tr><th>Bill / meter</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th><th class="r">₱ year</th></tr></thead><tbody>
+      ${main.some(Boolean)?`<tr><td class="act">Whole plant — main bill</td>${main.map(c=>`<td class="r num" style="font-size:12.5px">${c?Math.round(c.q).toLocaleString('en-PH'):''}</td>`).join('')}<td class="r num">${Math.round(sum(main.map(c=>c?.q||0))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(main.map(c=>c?.a||0)))}</td></tr>`:''}
+      ${deptRows.map(x=>`<tr><td style="font-size:13px">${esc(x.d.name)}</td>${x.v.map(c=>`<td class="r num" style="font-size:12.5px">${c?Math.round(c.q).toLocaleString('en-PH'):''}</td>`).join('')}<td class="r num">${Math.round(sum(x.v.map(c=>c?.q||0))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(x.v.map(c=>c?.a||0)))}</td></tr>`).join('')}
+      ${main.some(Boolean)?`<tr class="calc"><td class="act">Common use (main bill − departments)</td>${main.map((c,i)=>{ const d = sum(deptRows.map(x=>x.v[i]?.q||0)); return `<td class="r num" style="font-size:12.5px">${c?Math.round(c.q-d).toLocaleString('en-PH'):''}</td>`; }).join('')}<td class="r num">${Math.round(sum(main.map(c=>c?.q||0)) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.q||0))))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(main.map(c=>c?.a||0)) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.a||0)))))}</td></tr>`:''}
+    </tbody></table></div></div>` : ''}
+    ${dsel ? '' : utilityCard(Y, all.filter(r=>!r.department_id))}`;
+}
+async function saveUtil(Y){
+  const res = S.rc.uRes, unit = res==='Electricity' ? 'kWh' : 'm³', dsel = S.rc.uDept || null, li = res==='Electricity' ? 'UTILITIES - ELECTRICITY' : 'UTILITIES - WATER';
+  const all = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && r.resource===res && (r.department_id||null)===dsel);
+  const v = {}; document.querySelectorAll('.ut').forEach(e => { (v[e.dataset.m] ||= {})[e.dataset.k] = e.value.trim(); });
+  let n = 0;
+  try {
+    for (const [m, x] of Object.entries(v)) {
+      const ex = all.filter(r=>r.month===Number(m)), q = x.q==='' ? null : Number(x.q), a = x.a==='' ? null : Number(x.a);
+      if (q==null && a==null) { if (ex.length) { const r = await sb.from('bgt_plant_records').delete().in('id', ex.map(r=>r.id)); if (r.error) throw r.error; n++; } continue; }
+      if (ex.length > 1) continue;   // several bills in that month — edit them under "Other consumption"
+      const row = { company_id:S.company.id, department_id:dsel, kind:'consumption', resource:res, unit, line_item:li, rec_date:`${Y}-${String(m).padStart(2,'0')}-01`, qty:q, amount:a, ref_no:x.ref||null };
+      if (ex.length) { const e0 = ex[0]; if (Number(e0.qty)===q && (e0.amount==null?null:Number(e0.amount))===a && (e0.ref_no||'')===(x.ref||'')) continue;
+        const r = await sb.from('bgt_plant_records').update(row).eq('id', e0.id); if (r.error) throw r.error; }
+      else { const r = await sb.from('bgt_plant_records').insert(row); if (r.error) throw r.error; }
+      n++;
+    }
+    S.rc.cache = {}; toast(n ? `${n} month${n>1?'s':''} saved` : 'No changes'); renderRecords();
+  } catch(e){ fail(e); }
+}
+document.addEventListener('input', e => { if (!e.target.classList?.contains('ut') || e.target.dataset.k==='ref') return; const m = e.target.dataset.m;
+  const q = Number(document.querySelector(`.ut[data-m="${m}"][data-k="q"]`)?.value), a = Number(document.querySelector(`.ut[data-m="${m}"][data-k="a"]`)?.value), c = document.querySelector(`.ut-rate[data-m="${m}"]`);
+  if (c) c.textContent = q && a ? peso(a/q,2) : ''; });
 
 boot();
 </script>

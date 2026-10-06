@@ -1908,7 +1908,7 @@ async function aiDraft(kind){
 /* --- review a department budget --- */
 async function aiReview(){
   const b = budgetById(S.budgetId), d = deptById(b.department_id);
-  modal(`<h3>Assistant review — ${esc(d?.name)} ${S.cycle.year}</h3><div id="arBody">${AI_BUSY('Reading the budget, last year\'s spending and the cost outlook… this takes about 30 seconds.')}</div>`, 'wide');
+  modal(`<h3>Assistant review — ${esc(d?.name)} ${S.cycle.year}</h3><div id="arBody">${AI_BUSY('Reading the budget, last year\'s spending and the cost outlook… this takes about a minute.')}</div>`, 'wide');
   try {
     const r = await ai({ mode:'review_budget', budget_id:S.budgetId }); S._review = { id:S.budgetId, r };
     const ov = OVERALL[r.overall] || OVERALL.minor_changes;
@@ -1932,7 +1932,7 @@ async function postReview(){
 
 /* --- plant summary for the MD --- */
 async function aiPlant(){
-  modal(`<h3>Plant summary for the Managing Director — ${S.cycle.year}</h3><div id="apBody">${AI_BUSY('Summarising all departments against last year and the cost outlook… about 30–40 seconds.')}</div>`, 'wide');
+  modal(`<h3>Plant summary for the Managing Director — ${S.cycle.year}</h3><div id="apBody">${AI_BUSY('Summarising all departments against last year and the cost outlook… about a minute.')}</div>`, 'wide');
   try {
     const r = await ai({ mode:'review_plant', cycle_id:S.cycle.id }); S._memo = r;
     $('#apBody').innerHTML = `<div class="ai-res memo"><h4>${esc(r.headline)}</h4>

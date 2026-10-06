@@ -663,18 +663,18 @@ function route(){
     if (own && !isReviewer()) S.budgetId = own.id; else S.view = isReviewer() ? 'overview' : 'budget';
   }
   renderNav();
-  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else openBudget(S.budgetId);
+  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else if (S.view==='capex') renderCapexTracker(); else if (S.view==='records') renderRecords(); else openBudget(S.budgetId);
 }
-function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
+function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.cx.cache = {}; S.rc.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
 function renderNav(){
   const main = [];
   if (isReviewer()) main.push(`<a class="${S.view==='overview'?'on':''}" onclick="go('overview')">Plant overview</a>`);
-  main.push(`<a class="${S.view==='outlook'?'on':''}" onclick="go('outlook')">Cost outlook</a>`, `<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='perf'?'on':''}" onclick="go('perf')">Sales and plant performance</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
+  main.push(`<a class="${S.view==='outlook'?'on':''}" onclick="go('outlook')">Cost outlook</a>`, `<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='records'?'on':''}" onclick="go('records')">Plant records (PO, consumption)</a>`, `<a class="${S.view==='capex'?'on':''}" onclick="go('capex')">CAPEX tracker</a>`, `<a class="${S.view==='perf'?'on':''}" onclick="go('perf')">Sales and plant performance</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
   if (S.me.role==='admin') main.push(`<a class="${S.view==='admin'?'on':''}" onclick="go('admin')">Users and settings</a>`);
   $('#navMain').innerHTML = main.join('');
   const list = isReviewer() ? S.budgets : S.budgets.filter(b=>b.department_id===S.me.department_id);
   $('#deptNavTitle').textContent = isReviewer() ? 'Departments' : 'My department';
-  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="outlook:" ${S.view==='outlook'?'selected':''}>Cost outlook</option><option value="perf:" ${S.view==='perf'?'selected':''}>Sales and plant performance</option><option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
+  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="outlook:" ${S.view==='outlook'?'selected':''}>Cost outlook</option><option value="perf:" ${S.view==='perf'?'selected':''}>Sales and plant performance</option><option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="records:" ${S.view==='records'?'selected':''}>Plant records (PO, consumption)</option><option value="capex:" ${S.view==='capex'?'selected':''}>CAPEX tracker</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
     + list.map(b=>`<option value="budget:${b.id}" ${S.view==='budget'&&S.budgetId===b.id?'selected':''}>${esc(deptById(b.department_id)?.name)} — ${STATUS_LABEL[b.status]}</option>`).join('');
   $('#navDepts').innerHTML = list.map(b => `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}"><span>${esc(deptById(b.department_id)?.name)}</span><span class="dot st-${b.status}"></span></a>`).join('') || '<span style="color:#8FA09A;font-size:12px;padding:0 8px">No department assigned</span>';
 }
@@ -713,6 +713,7 @@ function renderBudget(){
       <div class="sub">${S.cycle.status==='locked' ? basisChip() : `<span class="chip st-${b.status}">${STATUS_LABEL[b.status]}</span>`}<span>Version ${b.version}</span>${d?.notes?`<span>· ${esc(d.notes)}</span>`:''}${!ed?'<span>· Read only</span>':''}</div></div>
     <div class="actions">
       ${actionsFor(b).map(([a,l,cls])=>`<button class="btn ${cls}" onclick="doAction('${a}')">${l}</button>`).join('')}
+      ${ed?'<button class="btn" onclick="aiBudgetDialog()">Draft budget with assistant</button>':''}
       <button class="btn" onclick="aiReview()">Review with assistant</button>
       <button class="btn" onclick="exportDept()">Export for Finance</button>
       ${ed?'<button class="btn ghost" onclick="importDialog()">Import Excel</button>':''}
@@ -743,7 +744,7 @@ function renderBudget(){
   if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
   const body = $('#tabBody');
   if (S.tab==='opex') body.innerHTML = renderOpexTable(ed, checks);
-  else if (S.tab==='capex') body.innerHTML = renderCapexTable(ed, checks);
+  else if (S.tab==='capex') { body.innerHTML = renderCapexTable(ed, checks); const bb = budgetById(S.budgetId); if (bb) capexCarryBanner(bb).then(h=>{ const e=$('#capexCarry'); if (e) e.innerHTML = h; }); }
   else if (S.tab==='checks') body.innerHTML = renderChecks(checks);
   else body.innerHTML = renderActivity();
 }
@@ -762,7 +763,7 @@ function opexTableHtml(checks){
   const list = filterLines(S.opex, ['line_item','activity','description','priority','basis']);
   return `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Line item / activity</th><th>Type</th><th>Priority</th><th>Basis of estimate</th><th>Timing Jan–Dec</th><th class="r">Annual</th><th></th></tr></thead><tbody>
   ${list.map(l=>`<tr class="row" tabindex="0" onclick="editLine('opex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('opex','${l.id}')">
-    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div></td>
+    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div>${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}</td>
     <td>${esc(l.expense_type||'')}</td><td>${priPill(l.priority)}</td><td>${esc(l.basis||'')}</td>
     <td>${ply(l)}</td><td class="r num">${peso(annual(l))}</td><td>${flagFor(checks,'opex',l.id)}</td></tr>`).join('')}
   </tbody><tfoot><tr><td colspan="5">Total OPEX${S.search?' (filtered)':''}</td><td class="r num">${peso(sum(list.map(annual)))}</td><td></td></tr></tfoot></table></div>`;
@@ -770,13 +771,18 @@ function opexTableHtml(checks){
 function renderCapexTable(ed, checks){
   const list = filterLines(S.capex, ['category','asset','description','priority']);
   const tb = `<div class="toolbar">${ed?'<button class="btn primary" onclick="editLine(\'capex\')">Add CAPEX item</button>':''}<span class="grow"></span><span style="color:var(--faint);font-size:12.5px">CAPEX: ₱${Number(S.cycle.capex_threshold).toLocaleString()} or more per unit and used for more than a year</span></div>`;
-  if (!S.capex.length) return tb + `<div class="empty"><b>No CAPEX items yet</b>${ed?'Add assets or projects such as machinery, vehicles, IT equipment or plant improvements.':'This department has not added CAPEX items.'}</div>`;
-  return tb + `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th></th></tr></thead><tbody>
-  ${list.map(l=>`<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
-    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div></td>
+  if (!S.capex.length) return tb + `<div id="capexCarry"></div><div class="empty"><b>No CAPEX items yet</b>${ed?'Add assets or projects such as machinery, vehicles, IT equipment or plant improvements.':'This department has not added CAPEX items.'}</div>`;
+  const AC = S.cx.cache.ac; if (!AC) { loadAssetClasses().then(()=>{ if (S.tab==='capex') renderBudget(); }).catch(console.error); }
+  const dp = l => AC ? lineDepr({ ...l, year:S.cycle.year }, AC) : null, dT = AC ? sum(list.map(l=>dp(l).inYear)) : 0, dY = AC ? sum(list.map(l=>dp(l).yr)) : 0;
+  const locked = S.cycle.status==='locked', b = budgetById(S.budgetId), canSt = b && canSetCapexStatus(b.department_id);
+  return tb + `<div id="capexCarry"></div><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th class="r" title="Straight-line depreciation, from the month after purchase">Depreciation<br>${S.cycle.year} / full year</th>${locked?'<th>Status</th>':''}<th></th></tr></thead><tbody>
+  ${list.map(l=>{ const d = dp(l); return `<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
+    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}</td>
     <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}</td>
-    <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td>${flagFor(checks,'capex',l.id)}</td></tr>`).join('')}
-  </tbody><tfoot><tr><td colspan="5">Total CAPEX</td><td class="r num">${peso(sum(list.map(annual)))}</td><td></td></tr></tfoot></table></div>`;
+    <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${d?(d.life?`${short(d.inYear)} / ${short(d.yr)}`:'<span class="hint">not depreciated</span>'):''}</td>
+    ${locked?`<td onclick="event.stopPropagation()">${capexChip(l.impl_status)}${canSt?` <a class="hint" style="cursor:pointer;color:var(--teal)" onclick="S.cx.cache={};capexStatusDialog('${l.id}')">Update</a>`:''}</td>`:''}<td>${flagFor(checks,'capex',l.id)}</td></tr>`; }).join('')}
+  </tbody><tfoot><tr><td colspan="5">Total CAPEX</td><td class="r num">${peso(sum(list.map(annual)))}</td><td class="r num" style="font-size:12.5px">${AC?`${short(dT)} / ${short(dY)}`:''}</td>${locked?'<td></td>':''}<td></td></tr></tfoot></table></div>
+  <p class="hint" style="padding:8px 14px;margin:0">Depreciation is a non-cash cost that the CAPEX adds to plant operating cost each year it is in use. ${AC?`These items add about ${short(dT)} in ${S.cycle.year} and ${short(dY)} in each full year after.`:''}</p>`;
 }
 
 /* ================= SMART CHECKS ================= */
@@ -786,6 +792,7 @@ function runChecks(){
   const seen = {};
   S.opex.forEach(l => {
     const n = l.activity || l.line_item || 'Untitled line', m = months(l), t = sum(m);
+    if (l.calc?.ai) add('opex',l.id,'warn','Drafted by the assistant and not yet confirmed — open the line, check it and save.',n);
     if (!l.line_item) add('opex',l.id,'err','Choose an expense line item.',n);
     if (!l.activity) add('opex',l.id,'err','Name the activity or requirement.',n);
     if (!l.priority) add('opex',l.id,'err','Set a priority.',n);
@@ -1019,7 +1026,7 @@ async function deleteLine(kind, id){
 }
 async function duplicateLine(kind, id){
   const list = kind==='opex' ? S.opex : S.capex, src = list.find(x=>x.id===id);
-  const { id:_, annual:__, created_at, updated_at, created_by, updated_by, ...copy } = src;
+  const { id:_, annual:__, created_at, updated_at, created_by, updated_by, impl_status:_s, impl_note:_n, impl_amount:_a, impl_date:_d, target_year:_ty, target_month:_tm, carried_from:_cf, status_by:_sb, status_at:_sa, ...copy } = src;
   copy.sort = Math.max(...list.map(x=>x.sort||0)) + 1;
   if (kind==='opex') copy.activity = (copy.activity||'') + ' (copy)'; else copy.asset = (copy.asset||'') + ' (copy)';
   const { data, error } = await sb.from(kind==='opex'?'bgt_opex_lines':'bgt_capex_lines').insert(copy).select().single();
@@ -1116,6 +1123,7 @@ async function renderOverview(){
       <div class="stat"><div class="eyebrow">Total requested</div><div class="v">${short(T.opex+T.capex)}</div><div class="s">${o.length} OPEX lines · ${c.length} CAPEX items${hasPY?` · ${chg(T.opex+T.capex, pyT)} vs ${PY}`:''}</div></div>
       <div class="stat"><div class="eyebrow">Deferrable</div><div class="v">${short(pv[2]+pv[3])}</div><div class="s">Medium + Low priority — first place to cut</div></div>
     </div>
+    <div id="ovDepr"></div>
       <div class="card"><h3>Departments</h3><div class="tbl-wrap"><table class="ledger" style="min-width:640px"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX</th><th class="r">CAPEX</th><th>Share of plant</th><th class="r">Critical</th>${hasPY?`<th class="r">${PY} budget</th><th class="r">Change</th>`:''}</tr></thead><tbody>
         ${rows.map(r=>`<tr class="row" tabindex="0" onclick="go('budget','${r.b.id}')" onkeydown="if(event.key==='Enter')go('budget','${r.b.id}')"><td class="act">${esc(r.d?.name)}<div style="font-size:12px;color:var(--faint);font-weight:400">${r.n} lines · updated ${new Date(r.b.updated_at).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}</div></td><td>${S.cycle.status==='locked'?basisChip():`<span class="chip st-${r.b.status}">${STATUS_LABEL[r.b.status]}</span>`}</td>
           <td class="r num">${peso(r.opex)}</td><td class="r num">${peso(r.capex)}</td>
@@ -1131,6 +1139,7 @@ async function renderOverview(){
     </div>
     <div class="card" style="margin-top:16px"><h3>Top OPEX line items</h3><div class="bars">${topItems(o).map(([k,v])=>`<div class="bar" style="grid-template-columns:minmax(160px,320px) 1fr 120px"><span style="font-size:12px">${esc(k)}</span><div class="track2"><i style="width:${100*v/(topItems(o)[0]?.[1]||1)}%;background:var(--teal)"></i></div><span class="num" style="text-align:right">${short(v)}</span></div>`).join('') || '<div class="empty">No OPEX lines yet.</div>'}</div></div>`;
     if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
+    ovDeprCard(T.opex).then(h=>{ const e=$('#ovDepr'); if (e) e.innerHTML = h; });
   } catch(e){ fail(e); }
 }
 function topItems(o){ const m={}; o.forEach(l=>{ const k=l.line_item||'(no line item)'; m[k]=(m[k]||0)+annual(l); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10); }
@@ -1996,7 +2005,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],['capacity_boards','Plant capacity','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 S.pf = { year:null };
@@ -2039,6 +2048,7 @@ async function renderPerf(){
         return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
       <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
+      <tr class="calc"><td class="act">Capacity utilization<div class="item" style="text-transform:none">output ÷ capacity</div></td>${MONTHS.map((_,i)=>{ const p = g('production_output',i+1) ?? g('volume_sold',i+1), c = g('capacity_boards',i+1) ?? (g('capacity_boards',0)!=null ? g('capacity_boards',0)/12 : null); return `<td class="r num">${p!=null&&c?(100*p/c).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>(g('production_output',m)??g('volume_sold',m))!=null && (g('capacity_boards',m)!=null || g('capacity_boards',0)!=null)); if (!ms.length) return ''; const p = sum(ms.map(m=>g('production_output',m)??g('volume_sold',m))), c = sum(ms.map(m=>g('capacity_boards',m) ?? g('capacity_boards',0)/12)); return c?(100*p/c).toFixed(0)+'%':''; })()}</td></tr>
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
@@ -2212,6 +2222,486 @@ async function aiPriceSave(){
   const rows = picks.map(p => ({ company_id:S.company.id, item:p.item, category:$('#plCat').value||null, unit:p.unit||null, unit_price:Number(p.price)||0, supplier:p.seller||null, notes:[p.notes, p.date_text?('Seen '+p.date_text):''].filter(Boolean).join(' · ')||null, source_type:'market', source_url:p.url||null, as_of:today(), active:true, updated_by:S.me.id }));
   const { error } = await sb.from('bgt_price_items').insert(rows); if (error) return fail(error);
   closeModal(); toast(`${rows.length} price${rows.length>1?'s':''} added`); renderPrices();
+}
+
+/* --- draft the whole department budget for review --- */
+function aiBudgetDialog(){
+  const b = budgetById(S.budgetId), d = deptById(b.department_id);
+  modal(`<h3>Draft the ${S.cycle.year} budget with the assistant — ${esc(d?.name)}</h3>
+    <p style="margin-top:0">The assistant proposes every recurring expense line from your actual spending (Accounting and plant records), utility consumption, sales and volume targets, capacity use and the cost outlook — plus any CAPEX deferred into ${S.cycle.year}. You choose which lines to add; each one is then yours to check, adjust and justify.</p>
+    <div class="field"><label for="abText">Anything it should know? (optional)</label><textarea class="inp" id="abText" rows="3" placeholder="e.g. Security contract renews in March at +8%; new 2nd-shift helpers from June; no more rented forklift after Q1"></textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="abGo">Draft my budget</button></div><div id="abBody"></div>`, 'wide');
+  $('#abGo').onclick = () => aiBudgetRun($('#abText').value.trim());
+}
+async function aiBudgetRun(text){
+  const go = $('#abGo'); if (go) go.disabled = true;
+  $('#abBody').innerHTML = AI_BUSY('Building the draft — reading history, plant records, volume and the cost outlook… this takes one to two minutes.');
+  try {
+    const r = await ai({ mode:'draft_budget', budget_id:S.budgetId, text });
+    const b = budgetById(S.budgetId), Y = S.cycle.year, P = await loadYearData(Y-1, b.department_id).catch(()=>null), PM = P ? actModel(P,'budget') : null;
+    r.lines = (r.lines||[]).map(l => ({ ...l, months: spreadAI(l, PM) }));
+    S._draft = r;
+    const conf = c => `<span class="pri ${c==='high'?'pri-ok':c==='low'?'pri-crit':'pri-high'}">${esc(c||'medium')}</span>`;
+    const SRC = { history:'history', accounting_actuals:'Accounting', plant_records:'plant records', outlook:'outlook', sales_volume:'volume', price_list:'price list', capacity:'capacity', estimate:'estimate' };
+    $('#abBody').innerHTML = `<div class="ai-res">
+      <p><b>Total of the proposed lines: ${peso(sum(r.lines.map(l=>Number(l.annual)||0)))} OPEX${(r.capex||[]).length?` + ${peso(sum(r.capex.map(c=>(Number(c.qty)||1)*(Number(c.unit_cost)||0))))} CAPEX`:''}</b> (computed by the app — if the note below quotes a different total, this one is correct).</p>
+      <p>${esc(r.summary||'')}</p>${r.volume_assumption?`<p><b>Volume assumed:</b> ${esc(r.volume_assumption)}</p>`:''}
+      <div class="tbl-wrap"><table class="ledger" style="min-width:860px"><thead><tr><th><input type="checkbox" id="abAll" checked aria-label="Select all"></th><th>Expense line / activity</th><th class="r">Proposed</th><th class="r">vs last year</th><th>Timing</th><th>How it was built</th><th>Confidence</th></tr></thead><tbody>
+      ${r.lines.map((l,i)=>`<tr><td><input type="checkbox" class="abc" data-k="o" data-i="${i}" checked aria-label="Add this line"></td>
+        <td><div class="item">${esc(l.line_item)}</div><div class="act">${esc(l.activity)}</div><div class="hint" style="font-size:12px">${esc(l.description||'')}</div></td>
+        <td class="r num">${peso(l.annual)}</td><td class="r num" style="font-size:12.5px">${l.last_year?`${peso(l.last_year)}<div class="item" style="text-transform:none">${Number(l.change_pct)>=0?'+':''}${Math.round(Number(l.change_pct)||0)}%</div>`:'<span class="hint">new</span>'}</td>
+        <td style="font-size:12px">${esc({last_year_pattern:'like last year',monthly_even:'every month',quarterly:'quarterly',semi_annual:'twice a year',one_time:'once'}[l.phasing]||l.phasing)}${l.phasing==='one_time'&&l.month?' · '+MONTHS[l.month-1]:''}</td>
+        <td style="font-size:12.5px;max-width:360px">${esc(l.rationale||'')}<div>${(l.sources||[]).map(s=>`<span class="chip basis-working" style="font-size:10.5px;padding:1px 6px;margin:2px 2px 0 0">${esc(SRC[s]||s)}</span>`).join('')}</div></td><td>${conf(l.confidence)}</td></tr>`).join('')}
+      ${(r.capex||[]).map((c,i)=>`<tr><td><input type="checkbox" class="abc" data-k="c" data-i="${i}" checked aria-label="Add this CAPEX item"></td>
+        <td><div class="item">CAPEX · ${esc(c.category)}</div><div class="act">${esc(c.asset)}</div>${c.carried_over?'<span class="chip pri-high" style="font-size:10.5px">deferred from an earlier year</span>':''}</td>
+        <td class="r num">${peso((Number(c.qty)||1)*(Number(c.unit_cost)||0))}</td><td></td><td style="font-size:12px">${c.month?MONTHS[c.month-1]:''}</td><td style="font-size:12.5px">${esc(c.rationale||c.justification||'')}</td><td></td></tr>`).join('')}
+      </tbody><tfoot><tr><td></td><td>Selected</td><td class="r num" id="abTot"></td><td colspan="4"></td></tr></tfoot></table></div>
+      ${listHtml('Data gaps the draft could not cover', r.gaps)}${listHtml('Please confirm', r.questions)}
+      <div class="actions" style="justify-content:space-between;margin-top:10px"><span class="hint">Lines are added as drafts marked "Assistant draft". Open each to confirm the amount, months and justification before you submit.</span>
+        <span class="actions"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn primary" id="abAdd">Add selected to my budget</button></span></div></div>`;
+    const tot = () => { let t = 0; document.querySelectorAll('.abc').forEach(e => { if (!e.checked) return; const i = Number(e.dataset.i); t += e.dataset.k==='o' ? Number(r.lines[i].annual)||0 : (Number(r.capex[i].qty)||1)*(Number(r.capex[i].unit_cost)||0); }); $('#abTot').textContent = peso(t); };
+    document.querySelectorAll('.abc').forEach(e => e.onchange = tot); $('#abAll').onchange = e => { document.querySelectorAll('.abc').forEach(x=>x.checked=e.target.checked); tot(); }; tot();
+    $('#abAdd').onclick = aiBudgetAdd;
+  } catch(e){ $('#abBody').innerHTML = `<div class="banner red" style="margin:8px 0 0">${esc(e.message)}</div>`; }
+  finally { if (go) go.disabled = false; }
+}
+// spread an annual amount to months the way the assistant asked
+function spreadAI(l, PM){
+  const amt = Number(l.annual)||0, m0 = Math.min(12, Math.max(1, Number(l.month)||1)); let w = Array(12).fill(0);
+  if (l.phasing==='one_time') w[m0-1] = 1;
+  else if (l.phasing==='quarterly') [0,3,6,9].forEach(k=>w[(m0-1+k)%12] = 1);
+  else if (l.phasing==='semi_annual') [0,6].forEach(k=>w[(m0-1+k)%12] = 1);
+  else if (l.phasing==='last_year_pattern' && PM) { const row = PM.rows.find(x=>x.item===l.line_item), n = PM.closed;
+    if (row && n && sum(row.act.slice(0,n)) > 0) { const avg = sum(row.act.slice(0,n))/n; w = row.act.map((v,i)=>i<n ? Math.max(0,v) : avg); } else w = Array(12).fill(1); }
+  else w = Array(12).fill(1);
+  const tw = sum(w) || 1; let left = Math.round(amt*100)/100;
+  return w.map((x,i)=>{ if (i===11) return Math.round(left*100)/100; const v = Math.round(amt*x/tw*100)/100; left -= v; return v; }).map((v,i,a)=> i===11 && w[11]===0 && v!==0 ? v : v);
+}
+async function aiBudgetAdd(){
+  const r = S._draft, b = budgetById(S.budgetId); if (!r || !b) return;
+  const pick = k => [...document.querySelectorAll('.abc')].filter(e=>e.checked && e.dataset.k===k).map(e=>Number(e.dataset.i));
+  const base = Math.max(0, ...S.opex.map(x=>x.sort||0), ...S.capex.map(x=>x.sort||0));
+  const opex = pick('o').map((i,j)=>{ const l = r.lines[i], row = { budget_id:b.id, line_item:l.line_item, expense_type:l.expense_type, activity:l.activity, description:l.description, purpose:l.purpose, basis:l.basis, priority:l.priority,
+    remarks:`Assistant draft (${l.confidence||'medium'} confidence): ${l.rationale||''} — review and confirm.`, calc:{ ai:true, qty:Number(l.qty)||null, unit:l.unit||null, rate:Number(l.rate)||null, times:Number(l.times)||null }, sort:base+j+1 };
+    // the last month gets any rounding difference
+    const m = l.months.slice(); const diff = Math.round((Number(l.annual) - sum(m))*100)/100; if (diff) { const k = m.map((v,x)=>v?x:-1).filter(x=>x>=0).pop() ?? 11; m[k] = Math.round((m[k]+diff)*100)/100; }
+    m.forEach((v,k)=>row['m'+(k+1)] = v || 0); return row; });
+  let L = []; try { L = await loadCapexAll(); } catch(e){}
+  const capex = pick('c').map((i,j)=>{ const c = r.capex[i], amt = (Number(c.qty)||1)*(Number(c.unit_cost)||0), src = c.carried_over ? L.find(x=>x.department_id===b.department_id && x.impl_status==='deferred' && x.target_year===S.cycle.year && (x.asset||'').trim().toLowerCase()===(c.asset||'').trim().toLowerCase()) : null;
+    const row = { budget_id:b.id, category:c.category, asset:c.asset, description:c.description||null, justification:c.justification, qty:Number(c.qty)||1, unit_cost:Number(c.unit_cost)||0, priority:c.priority,
+      remarks:`Assistant draft: ${c.rationale||''}${c.carried_over?' (deferred from an earlier year)':''} — review and confirm.`, carried_from:src?.id||null, sort:base+opex.length+j+1 };
+    for (let k=1;k<=12;k++) row['m'+k] = k===(Number(c.month)||1) ? amt : 0; return row; });
+  if (!opex.length && !capex.length) { toast('Select at least one line.', true); return; }
+  try {
+    if (opex.length) { const x = await sb.from('bgt_opex_lines').insert(opex); if (x.error) throw x.error; }
+    if (capex.length) { const x = await sb.from('bgt_capex_lines').insert(capex); if (x.error) throw x.error; }
+    closeModal(); toast(`${opex.length + capex.length} draft line${opex.length+capex.length>1?'s':''} added — review each before submitting`); openBudget(S.budgetId);
+  } catch(e){ fail(e); }
+}
+
+/* ================= CAPEX TRACKING & DEPRECIATION ================= */
+const fmtDay = d => d ? new Date(String(d).slice(0,10)+"T00:00:00").toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"}) : "";
+const CAPEX_ST = {
+  planned:['Planned','pri-med'], in_progress:['In progress','basis-working'], done:['Done — in use','pri-ok'],
+  rescheduled:['Rescheduled','pri-high'], deferred:['Deferred to a later year','pri-high'], cancelled:['Cancelled','pri-crit']
+};
+const capexChip = s => { const c = CAPEX_ST[s||'planned']; return `<span class="chip ${c[1]}">${c[0]}</span>`; };
+S.cx = { year:null, dept:null, status:'', cache:{} };
+const canSetCapexStatus = d => ['admin','plant_head'].includes(S.me?.role) || (S.me?.role==='dept_manager' && S.me.department_id===d);
+
+async function loadAssetClasses(){ if (S.cx.cache.ac) return S.cx.cache.ac; const { data, error } = await sb.from('bgt_asset_classes').select('*'); if (error) throw error; return (S.cx.cache.ac = data||[]); }
+async function loadCapexAll(){
+  if (S.cx.cache.all) return S.cx.cache.all;
+  const { data:bs, error } = await sb.from('bgt_dept_budgets').select('id,cycle_id,department_id'); if (error) throw error;
+  const bm = Object.fromEntries((bs||[]).map(b=>[b.id, { ...b, year:S.cycles.find(c=>c.id===b.cycle_id)?.year }]));
+  const ids = Object.keys(bm); let lines = [];
+  for (let i=0; i<ids.length; i+=150) lines.push(...await fetchAll(()=>sb.from('bgt_capex_lines').select('*').in('budget_id', ids.slice(i,i+150)).order('sort')));
+  lines = lines.map(l => ({ ...l, year:bm[l.budget_id]?.year, department_id:bm[l.budget_id]?.department_id })).filter(l=>l.year);
+  return (S.cx.cache.all = lines);
+}
+async function loadDeprExisting(){ if (S.cx.cache.de) return S.cx.cache.de; const { data, error } = await sb.from('bgt_depr_existing').select('*'); if (error) throw error; return (S.cx.cache.de = data||[]); }
+async function loadCapexActuals(){ if (S.cx.cache.ca) return S.cx.cache.ca; const rows = await fetchAll(()=>sb.from('bgt_actuals').select('year,month,department_id,line_item,amount').eq('kind','capex').order('year')); return (S.cx.cache.ca = rows); }
+
+const firstMonth = l => { for (let i=1;i<=12;i++) if (Number(l['m'+i])) return i; return 1; };
+const lifeOf = (l, AC) => { if (l.useful_life_months!=null) return Number(l.useful_life_months); const c = AC.find(a=>a.category===l.category); return c ? Number(c.useful_life_months) : 60; };
+const salvageOf = (cat, AC) => Number(AC.find(a=>a.category===cat)?.salvage_pct||0)/100;
+// spending events of a budget line: [{y, m, amt}] — what actually gets capitalised and when
+function capexEvents(l, all){
+  const st = l.impl_status || 'planned';
+  if (st==='cancelled') return [];
+  if (st==='deferred') { // counts in the later year only while it has not been carried into that year's budget yet
+    if (!l.target_year || all.some(x=>x.carried_from===l.id)) return [];
+    return [{ y:l.target_year, m:l.target_month||firstMonth(l), amt:Number(l.impl_amount)||annual(l), pending:true }];
+  }
+  if (st==='done') { const d = l.impl_date ? new Date(l.impl_date) : null;
+    return [{ y:d ? d.getFullYear() : l.year, m:d ? d.getMonth()+1 : firstMonth(l), amt:l.impl_amount!=null ? Number(l.impl_amount) : annual(l) }]; }
+  if (st==='rescheduled' && l.target_month) return [{ y:l.target_year||l.year, m:l.target_month, amt:annual(l) }];
+  const ev = []; for (let i=1;i<=12;i++){ const v = Number(l['m'+i])||0; if (v) ev.push({ y:l.year, m:i, amt:v }); } return ev;
+}
+// monthly depreciation of one spend: starts the month after it is spent / put in use
+function deprInYear(ev, life, salvage, Y){
+  if (!life || !ev.amt) return Array(12).fill(0);
+  const per = ev.amt*(1-salvage)/life, start = ev.y*12 + ev.m; // month index after spend
+  return MONTHS.map((_,i)=>{ const k = Y*12 + i; return k>=start && k<start+life ? per : 0; });
+}
+// depreciation for year Y: existing assets (Accounting), CAPEX already spent (ledger where loaded, else budget items), and new CAPEX in the budget
+async function deprModel(Y, deptId=null){
+  const [AC, L, DE, CA] = await Promise.all([loadAssetClasses(), loadCapexAll(), loadDeprExisting(), loadCapexActuals()]);
+  const ledgerYears = new Set(CA.map(a=>a.year));
+  const out = { Y, existing:Array(12).fill(0), past:Array(12).fill(0), current:Array(12).fill(0), byDept:{}, items:[], pending:0 };
+  const add = (bucket, d, arr) => { for (let i=0;i<12;i++){ out[bucket][i] += arr[i]; } out.byDept[d] = (out.byDept[d]||0) + sum(arr); };
+  DE.filter(e=>e.year===Y && (!deptId || e.department_id===deptId)).forEach(e => add('existing', e.department_id||'plant', Array(12).fill(Number(e.amount)/12)));
+  CA.filter(a=>a.year<Y && (!deptId || a.department_id===deptId)).forEach(a => { const life = AC.find(c=>c.category===a.line_item)?.useful_life_months ?? 60;
+    add('past', a.department_id, deprInYear({ y:a.year, m:a.month, amt:Number(a.amount) }, Number(life), salvageOf(a.line_item, AC), Y)); });
+  L.filter(l=>!deptId || l.department_id===deptId).forEach(l => capexEvents(l, L).forEach(ev => {
+    if (ev.y < Y && ledgerYears.has(ev.y)) return;            // that year's spending is taken from the ledger instead
+    if (ev.y > Y) return;
+    const arr = deprInYear(ev, lifeOf(l, AC), salvageOf(l.category, AC), Y); if (!sum(arr)) return;
+    add(ev.y===Y ? 'current' : 'past', l.department_id, arr);
+    if (ev.pending && ev.y===Y) out.pending += sum(arr);
+    out.items.push({ l, ev, depr:sum(arr) });
+  }));
+  out.total = sum(out.existing)+sum(out.past)+sum(out.current);
+  out.monthly = MONTHS.map((_,i)=>out.existing[i]+out.past[i]+out.current[i]);
+  return out;
+}
+// one line, full-year depreciation once in use, and the part that falls in its own budget year
+function lineDepr(l, AC){ const life = lifeOf(l, AC), sv = salvageOf(l.category, AC); if (!life) return { yr:0, inYear:0, life };
+  const inYear = sum(capexEvents({ ...l, impl_status:'planned' }, []).map(ev=>sum(deprInYear(ev, life, sv, l.year))));
+  return { yr: annual(l)*(1-sv)/life*12, inYear, life }; }
+
+/* ---------- CAPEX tracker page ---------- */
+async function renderCapexTracker(){
+  $('#main').innerHTML = '<div class="loading">Loading CAPEX…</div>';
+  try {
+    const [L, AC] = await Promise.all([loadCapexAll(), loadAssetClasses()]);
+    const open = S.cycles.find(c=>c.status==='open'), years = [...new Set(L.map(l=>l.year))].sort((a,b)=>b-a);
+    if (S.cx.year==null) S.cx.year = years.find(y=>y<(open?.year||9999)) || years[0] || S.cycle.year;
+    if (!isReviewer()) S.cx.dept = S.me.department_id;
+    const Y = S.cx.year, list = L.filter(l=>(Y==='all'||l.year===Y) && (!S.cx.dept || l.department_id===S.cx.dept) && (!S.cx.status || (l.impl_status||'planned')===S.cx.status))
+      .sort((a,b)=>b.year-a.year || (deptById(a.department_id)?.sort||0)-(deptById(b.department_id)?.sort||0) || annual(b)-annual(a));
+    const yl = L.filter(l=>(Y==='all'||l.year===Y) && (!S.cx.dept || l.department_id===S.cx.dept));
+    const by = s => sum(yl.filter(l=>(l.impl_status||'planned')===s).map(l=>s==='done'&&l.impl_amount!=null?Number(l.impl_amount):annual(l)));
+    const budT = sum(yl.map(annual)), doneT = by('done');
+    const waiting = open ? L.filter(l=>l.impl_status==='deferred' && l.target_year===open.year && !L.some(x=>x.carried_from===l.id) && (!S.cx.dept || l.department_id===S.cx.dept)) : [];
+    const D = open ? await deprModel(open.year, S.cx.dept) : null;
+    $('#main').innerHTML = `
+    <div class="ph"><div><div class="eyebrow">${esc(S.site?.name||'Pasig Plant')} · ${S.cx.dept?esc(deptById(S.cx.dept)?.name):'Whole plant'}</div><h1>CAPEX tracker</h1>
+      <div class="sub">What happened to each approved CAPEX item — done, in progress, rescheduled, deferred to a later year or cancelled — and the depreciation it adds to operating cost.</div></div>
+      <div class="actions"><button class="btn" onclick="exportCapexTracker()">Download Excel</button></div></div>
+    <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)">
+      <div class="field" style="margin:0"><label for="cxYear">Budget year</label><select class="inp" id="cxYear" onchange="S.cx.year=this.value==='all'?'all':Number(this.value);renderCapexTracker()"><option value="all" ${Y==='all'?'selected':''}>All years</option>${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
+      ${isReviewer()?`<div class="field" style="margin:0"><label for="cxDept">Department</label><select class="inp" id="cxDept" onchange="S.cx.dept=this.value||null;renderCapexTracker()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===S.cx.dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+      <div class="field" style="margin:0"><label for="cxSt">Status</label><select class="inp" id="cxSt" onchange="S.cx.status=this.value;renderCapexTracker()"><option value="">All</option>${Object.entries(CAPEX_ST).map(([k,v])=>`<option value="${k}" ${S.cx.status===k?'selected':''}>${v[0]}</option>`).join('')}</select></div>
+      <span class="grow"></span><span class="hint" style="max-width:360px">Department managers update their own items; the Head of Plant Operations can update all. Works on locked years too.</span></div>
+    <div class="stats">
+      <div class="stat capex"><div class="eyebrow">CAPEX budget ${Y==='all'?'(all years)':Y}</div><div class="v">${short(budT)}</div><div class="s">${yl.length} item${yl.length===1?'':'s'}</div></div>
+      <div class="stat"><div class="eyebrow">Done</div><div class="v">${short(doneT)}</div><div class="s">${budT?Math.round(100*by('done')/budT)+'% of budget implemented':''}${by('in_progress')?` · ${short(by('in_progress'))} in progress`:''}</div></div>
+      <div class="stat"><div class="eyebrow">Deferred / rescheduled</div><div class="v">${short(by('deferred')+by('rescheduled'))}</div><div class="s">${yl.filter(l=>l.impl_status==='deferred').length} deferred · ${yl.filter(l=>l.impl_status==='rescheduled').length} rescheduled</div></div>
+      <div class="stat"><div class="eyebrow">Cancelled</div><div class="v">${short(by('cancelled'))}</div><div class="s">${short(by('planned'))} still marked planned</div></div>
+    </div>
+    ${waiting.length ? `<div class="card" style="margin-bottom:16px;border-left:4px solid #D9A441"><h3>Deferred to ${open.year} — not yet in the ${open.year} budget</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>From</th><th>Department</th><th>Asset</th><th class="r">Amount</th><th>Month</th><th>Reason</th><th></th></tr></thead><tbody>
+      ${waiting.map(l=>`<tr><td class="num">${l.year}</td><td>${esc(deptById(l.department_id)?.name)}</td><td><div class="item">${esc(l.category||'')}</div><div class="act">${esc(l.asset||'')}</div></td><td class="r num">${peso(l.impl_amount??annual(l))}</td><td>${l.target_month?MONTHS[l.target_month-1]:'—'}</td><td style="font-size:12.5px;max-width:280px">${esc(l.impl_note||'')}</td>
+        <td>${canCarry(l, open)?`<button class="btn" onclick="carryCapex('${l.id}')">Add to ${open.year} budget</button>`:'<span class="hint">Department adds it</span>'}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Until they are added, these items are still counted in the ${open.year} depreciation outlook (flagged as pending).</p></div>` : ''}
+    <div class="card"><h3>CAPEX items</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1050px"><thead><tr><th>Year</th><th>Department</th><th>Category / asset</th><th class="r">Budget</th><th>Planned</th><th>Status</th><th>Actual / new timing</th><th class="r">Depreciation / yr</th><th></th></tr></thead><tbody>
+      ${list.map(l=>{ const st = l.impl_status||'planned', dp = lineDepr(l, AC), carried = L.find(x=>x.carried_from===l.id), src = l.carried_from ? L.find(x=>x.id===l.carried_from) : null;
+        const timing = st==='done' ? `${l.impl_amount!=null?peso(l.impl_amount):peso(annual(l))}${l.impl_date?' · in use '+fmtDay(l.impl_date):''}` : st==='deferred' ? `To ${l.target_year||'?'}${l.target_month?' '+MONTHS[l.target_month-1]:''}${carried?' · <span class="chip pri-ok" style="font-size:11px">in '+carried.year+' budget</span>':''}` : st==='rescheduled' ? `Moved to ${l.target_month?MONTHS[l.target_month-1]:'?'} ${l.target_year||l.year}` : '';
+        return `<tr><td class="num">${l.year}</td><td style="font-size:13px">${esc(deptById(l.department_id)?.name)}</td>
+          <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled')}</div>${src?`<div class="hint" style="font-size:11.5px">Carried over from ${src.year}</div>`:''}${l.impl_note?`<div class="hint" style="font-size:12px">${esc(l.impl_note)}</div>`:''}</td>
+          <td class="r num">${peso(annual(l))}</td><td style="font-size:12.5px">${plannedMonths(l)}</td><td>${capexChip(st)}</td><td style="font-size:12.5px">${timing}</td>
+          <td class="r num">${dp.life?peso(dp.yr):'<span class="hint">none</span>'}<div class="item" style="text-transform:none">${dp.life?Math.round(dp.life/12*10)/10+' yrs':'not depreciated'}</div></td>
+          <td>${canSetCapexStatus(l.department_id)?`<button class="btn" onclick="capexStatusDialog('${l.id}')">Update</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="9" class="hint" style="padding:16px">No CAPEX items for this selection.</td></tr>`}
+      </tbody></table></div></div>
+    ${D ? deprCard(D, open.year, AC) : ''}`;
+  } catch(e){ fail(e); }
+}
+const plannedMonths = l => { const m = MONTHS.filter((_,i)=>Number(l['m'+(i+1)])); return m.length ? (m.length>3 ? `${m[0]}–${m[m.length-1]}` : m.join(', ')) : '—'; };
+const canCarry = (l, open) => open && (['admin','plant_head'].includes(S.me.role) || (['preparer','dept_manager'].includes(S.me.role) && S.me.department_id===l.department_id));
+function deprCard(D, Y, AC){
+  const ed = canManageData();
+  return `<div class="card" style="margin-top:16px"><h3>Depreciation in ${Y} — added to operating cost</h3>
+    <div class="stats" style="padding:14px 14px 0;margin:0">
+      <div class="stat"><div class="eyebrow">Assets already on the books</div><div class="v">${short(sum(D.existing))}</div><div class="s">${sum(D.existing)?'from Accounting':'Not entered — ask Accounting for the yearly figure'}</div></div>
+      <div class="stat"><div class="eyebrow">CAPEX of earlier years</div><div class="v">${short(sum(D.past))}</div><div class="s">ledger CAPEX where loaded, otherwise items marked done</div></div>
+      <div class="stat capex"><div class="eyebrow">New ${Y} CAPEX</div><div class="v">${short(sum(D.current))}</div><div class="s">from the month after purchase${D.pending?` · incl. ${short(D.pending)} pending carry-overs`:''}</div></div>
+      <div class="stat opex"><div class="eyebrow">Total depreciation ${Y}</div><div class="v">${short(D.total)}</div><div class="s">${peso(D.total/12)} a month on average</div></div>
+    </div>
+    <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start;min-width:0">
+      <div style="min-width:0"><b style="font-size:13px">Useful life by asset class</b> <span class="hint" style="font-size:12px">— straight line, starts the month after purchase. Confirm with Accounting's policy.</span>
+        <table class="ledger" style="margin-top:6px"><thead><tr><th>Asset class</th><th class="r">Years</th><th class="r">Salvage %</th></tr></thead><tbody>
+        ${AC.sort((a,b)=>a.category.localeCompare(b.category)).map(a=>`<tr><td style="font-size:13px">${esc(a.category)}</td><td class="r">${ed?`<input class="inp num acl" data-c="${esc(a.category)}" data-k="y" type="number" step="0.5" min="0" value="${a.useful_life_months/12}" style="max-width:70px;margin-left:auto">`:a.useful_life_months/12}</td><td class="r">${ed?`<input class="inp num acl" data-c="${esc(a.category)}" data-k="s" type="number" step="1" min="0" max="100" value="${Number(a.salvage_pct)}" style="max-width:70px;margin-left:auto">`:Number(a.salvage_pct)}</td></tr>`).join('')}
+        </tbody></table>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveAssetClasses()">Save useful lives</button></div>':''}</div>
+      <div style="min-width:0"><b style="font-size:13px">Depreciation of assets already on the books</b> <span class="hint" style="font-size:12px">— yearly amount from Accounting's fixed-asset register (plant total).</span>
+        <table class="ledger" style="margin-top:6px"><thead><tr><th>Year</th><th class="r">Amount</th></tr></thead><tbody>
+        ${[Y-1, Y, Y+1].map(y=>{ const e = (S.cx.cache.de||[]).find(x=>x.year===y && !x.department_id); return `<tr><td class="num">${y}</td><td class="r">${ed?`<input class="inp num dex" data-y="${y}" type="number" step="any" value="${e?Number(e.amount):''}" placeholder="0" style="max-width:150px;margin-left:auto">`:peso(e?.amount||0)}</td></tr>`; }).join('')}
+        </tbody></table>${ed?'<div style="text-align:right;margin-top:8px"><button class="btn" onclick="saveDeprExisting()">Save</button></div>':''}
+        <p class="hint" style="font-size:12px">The 2023 general ledger has depreciation accounts — Accounting can give the yearly total so the plant's full cost is complete.</p></div>
+    </div></div>`;
+}
+async function saveAssetClasses(){
+  const rows = {}; document.querySelectorAll('.acl').forEach(e => { const r = rows[e.dataset.c] ||= { category:e.dataset.c }; if (e.dataset.k==='y') r.useful_life_months = Math.round(Number(e.value||0)*12); else r.salvage_pct = Number(e.value||0); });
+  const r = await sb.from('bgt_asset_classes').upsert(Object.values(rows).map(x=>({ ...x, updated_at:new Date().toISOString() })), { onConflict:'category' }); if (r.error) return fail(r.error);
+  S.cx.cache = {}; toast('Useful lives saved'); route();
+}
+async function saveDeprExisting(){
+  const DE = await loadDeprExisting(), ups = [];
+  for (const e of document.querySelectorAll('.dex')) { const y = Number(e.dataset.y), v = e.value.trim(), ex = DE.find(x=>x.year===y && !x.department_id);
+    if (v==='' && !ex) continue;
+    const row = { company_id:S.company.id, year:y, department_id:null, amount:Number(v)||0, updated_by:S.me.id, updated_at:new Date().toISOString() };
+    const r = ex ? await sb.from('bgt_depr_existing').update(row).eq('id', ex.id) : await sb.from('bgt_depr_existing').insert(row); if (r.error) return fail(r.error); ups.push(y); }
+  S.cx.cache = {}; toast(ups.length ? 'Saved' : 'No changes'); route();
+}
+async function capexStatusDialog(id){
+  const L = await loadCapexAll(), l = L.find(x=>x.id===id); if (!l) return;
+  const st = l.impl_status||'planned', yNext = l.year+1;
+  modal(`<h3>${esc(l.asset||'CAPEX item')} <span class="hint" style="font-weight:400">· ${l.year} · ${esc(deptById(l.department_id)?.name)}</span></h3>
+    <p style="margin-top:0">${esc(l.category||'')} · budget ${peso(annual(l))} · planned ${plannedMonths(l)}</p>
+    <div class="field"><label for="csSt">What happened</label><select class="inp" id="csSt">${Object.entries(CAPEX_ST).map(([k,v])=>`<option value="${k}" ${st===k?'selected':''}>${v[0]}</option>`).join('')}</select></div>
+    <div id="csDone" class="g2"><div class="field"><label for="csAmt">Actual cost (₱)</label><input class="inp num" id="csAmt" type="number" step="any" value="${l.impl_amount??''}" placeholder="${annual(l)}"></div>
+      <div class="field"><label for="csDate">In use from</label><input class="inp" id="csDate" type="date" value="${l.impl_date||''}"></div></div>
+    <div id="csMove" class="g2"><div class="field"><label for="csTy">Year</label><input class="inp num" id="csTy" type="number" value="${l.target_year||(st==='rescheduled'?l.year:yNext)}"></div>
+      <div class="field"><label for="csTm">Month</label><select class="inp" id="csTm"><option value="">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${l.target_month===i+1?'selected':''}>${m}</option>`).join('')}</select></div></div>
+    <div class="field"><label for="csNote" id="csNoteL">Note</label><textarea class="inp" id="csNote" placeholder="Why — e.g. supplier delay, budget cut, no longer needed, replaced by…">${esc(l.impl_note||'')}</textarea></div>
+    <div class="field"><label for="csLife">Useful life (years) — leave blank to use the asset class (${(lifeOf({ category:l.category }, S.cx.cache.ac||[])/12)||'—'} yrs)</label><input class="inp num" id="csLife" type="number" step="0.5" min="0" value="${l.useful_life_months!=null?l.useful_life_months/12:''}" style="max-width:120px"></div>
+    <p class="hint" id="csHint"></p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="csGo">Save</button></div>`);
+  const sync = () => { const v = $('#csSt').value;
+    $('#csDone').style.display = v==='done' ? '' : 'none'; $('#csMove').style.display = ['deferred','rescheduled'].includes(v) ? '' : 'none';
+    $('#csNoteL').textContent = v==='cancelled' ? 'Reason for cancelling (required)' : v==='deferred' ? 'Reason for deferring (required)' : 'Note';
+    $('#csHint').textContent = v==='deferred' ? `The item will be listed for the department to add to the ${$('#csTy').value} budget, and its depreciation moves to that year.` : v==='rescheduled' ? 'Same project, new timing within the year — depreciation starts after the new month.' : v==='cancelled' ? 'Abandoned — no spending and no depreciation.' : v==='done' ? 'Depreciation starts the month after it is put in use, using the actual cost.' : ''; };
+  $('#csSt').onchange = sync; $('#csTy').oninput = sync; sync();
+  $('#csGo').onclick = async () => {
+    const v = $('#csSt').value, note = $('#csNote').value.trim();
+    if (['cancelled','deferred'].includes(v) && !note) { toast('Please give the reason.', true); return; }
+    if (v==='deferred' && Number($('#csTy').value) <= l.year) { toast('Deferred items move to a later year.', true); return; }
+    const p = { impl_status:v, impl_note:note, useful_life_months: $('#csLife').value==='' ? '' : String(Math.round(Number($('#csLife').value)*12)) };
+    if (v==='done') { p.impl_amount = $('#csAmt').value; p.impl_date = $('#csDate').value; }
+    if (['deferred','rescheduled'].includes(v)) { p.target_year = $('#csTy').value; p.target_month = $('#csTm').value; }
+    const r = await sb.rpc('bgt_capex_set_status', { p_line:id, p }); if (r.error) return fail(r.error);
+    S.cx.cache = {}; closeModal(); toast('CAPEX status saved'); route();
+  };
+}
+async function carryCapex(id){
+  const L = await loadCapexAll(), l = L.find(x=>x.id===id), open = S.cycles.find(c=>c.status==='open' && c.year===l?.target_year);
+  if (!l || !open) { toast('The target budget year is not open.', true); return; }
+  const { data:b } = await sb.from('bgt_dept_budgets').select('id,status').eq('cycle_id', open.id).eq('department_id', l.department_id).maybeSingle();
+  if (!b) { toast('This department has no budget for '+open.year+' yet.', true); return; }
+  const amt = Number(l.impl_amount)||annual(l), m = l.target_month || firstMonth(l), row = { budget_id:b.id, category:l.category, asset:l.asset, description:l.description, justification:l.justification,
+    qty:l.qty, unit_cost:l.qty ? Math.round(amt/l.qty*100)/100 : l.unit_cost, priority:l.priority, remarks:`Carried over from the ${l.year} budget (deferred${l.impl_note?': '+l.impl_note:''}).`, carried_from:l.id, sort:999 };
+  for (let i=1;i<=12;i++) row['m'+i] = i===m ? amt : 0;
+  const r = await sb.from('bgt_capex_lines').insert(row); if (r.error) return fail(r.error);
+  S.cx.cache = {}; toast(`Added to the ${open.year} budget of ${deptById(l.department_id)?.name}`); route();
+}
+async function exportCapexTracker(){
+  const [L, AC] = await Promise.all([loadCapexAll(), loadAssetClasses()]), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('CAPEX tracker');
+  const h = ws.addRow(['Year','Department','Category','Asset','Budget','Planned months','Status','Actual cost','In use from','Target year','Target month','Note','Useful life (yrs)','Depreciation / yr','Carried from']); h.font = { bold:true };
+  L.filter(l=>(S.cx.year==='all'||l.year===S.cx.year) && (!S.cx.dept||l.department_id===S.cx.dept)).forEach(l => { const dp = lineDepr(l, AC);
+    ws.addRow([l.year, deptById(l.department_id)?.name, l.category, l.asset, annual(l), plannedMonths(l), CAPEX_ST[l.impl_status||'planned'][0], l.impl_amount!=null?Number(l.impl_amount):null, l.impl_date||null, l.target_year||null, l.target_month?MONTHS[l.target_month-1]:null, l.impl_note||null, dp.life/12, Math.round(dp.yr), l.carried_from?L.find(x=>x.id===l.carried_from)?.year:null]); });
+  [8,18,24,36,14,14,20,14,12,10,10,40,12,14,10].forEach((w,i)=>ws.getColumn(i+1).width=w); [5,8,14].forEach(c=>ws.getColumn(c).numFmt='#,##0');
+  download(await wb.xlsx.writeBuffer(), `CAPEX tracker ${S.cx.year} - ${S.company.code}.xlsx`); toast('Downloaded');
+}
+
+/* deferred items for this department, shown on its budget's CAPEX tab */
+async function capexCarryBanner(b){
+  try { const L = await loadCapexAll(), Y = S.cycle.year;
+    const w = L.filter(l=>l.department_id===b.department_id && l.impl_status==='deferred' && l.target_year===Y && !L.some(x=>x.carried_from===l.id));
+    if (!w.length) return '';
+    return `<div class="banner amber"><b>${w.length} CAPEX item${w.length>1?'s were':' was'} deferred to ${Y}</b> (${short(sum(w.map(l=>Number(l.impl_amount)||annual(l))))}): ${w.slice(0,3).map(l=>esc(l.asset)).join(', ')}${w.length>3?'…':''}. ${S.cycle.status==='open'?`<a onclick="S.cx.year=${Y-1};S.cx.status='deferred';go('capex')">Review and add to this budget →</a>`:''}</div>`;
+  } catch(e){ console.error(e); return ''; }
+}
+
+/* plant overview: OPEX + depreciation = operating cost, per board */
+async function ovDeprCard(opexT){
+  try {
+    const Y = S.cycle.year, D = await deprModel(Y), K = await loadKpis(Y).catch(()=>[]), K1 = await loadKpis(Y-1).catch(()=>[]);
+    const vt = K.filter(r=>r.metric==='volume_target' && r.month>0), v1 = K1.filter(r=>r.metric==='volume_sold' && r.month>0);
+    const boards = vt.length ? sum(vt.map(r=>r.value)) * (vt.length<12 ? 12/vt.length : 1) : v1.length ? sum(v1.map(r=>r.value))*12/v1.length : null;
+    const bTxt = vt.length ? `${Y} volume target` : v1.length ? `${Y-1} boards sold, full-year rate` : '';
+    const tot = opexT + D.total;
+    return `<div class="card" style="margin-bottom:16px"><h3>Operating cost view ${Y}: OPEX + depreciation</h3><div class="stats" style="padding:14px;margin:0">
+      <div class="stat opex"><div class="eyebrow">OPEX budget</div><div class="v">${short(opexT)}</div><div class="s">cash spending, excluding payroll</div></div>
+      <div class="stat capex"><div class="eyebrow">Depreciation</div><div class="v">${short(D.total)}</div><div class="s">${short(sum(D.existing))} existing assets · ${short(sum(D.past))} earlier CAPEX · ${short(sum(D.current))} new ${Y} CAPEX</div></div>
+      <div class="stat"><div class="eyebrow">Plant operating cost</div><div class="v">${short(tot)}</div><div class="s">${D.total&&tot?Math.round(100*D.total/tot)+'% is depreciation':''}</div></div>
+      <div class="stat"><div class="eyebrow">Per board</div><div class="v">${boards?peso(tot/boards,2):'—'}</div><div class="s">${boards?`${Math.round(boards).toLocaleString('en-PH')} boards (${bTxt})`:'Enter a volume target on Sales and plant performance'}</div></div>
+    </div>${!sum(D.existing)?`<p class="hint" style="padding:0 14px 12px;margin:0">Depreciation of assets bought before the app's records is not entered yet — <a style="cursor:pointer;color:var(--teal)" onclick="go('capex')">add Accounting's figure on the CAPEX tracker</a>.</p>`:''}</div>`;
+  } catch(e){ console.error(e); return ''; }
+}
+
+/* ================= PLANT RECORDS (PO-based expenses, consumption) ================= */
+const RESOURCES = [['Electricity','kWh','UTILITIES - ELECTRICITY'],['Diesel','liter','GAS AND OIL'],['Gasoline','liter','GAS AND OIL'],['LPG','kg','GAS AND OIL'],
+  ['Water','m³','UTILITIES - WATER'],['Lubricant / oil','liter','REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT'],['Boiler fuel','liter','GAS AND OIL'],['Other','','']];
+const PO_STATUS = ['Ordered','Received','Paid','Cancelled'];
+S.rc = { year:null, dept:null, kind:'po', month:0, q:'', cache:{} };
+const canEditRecords = d => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===d);
+async function loadRecords(Y, dept){
+  const k = Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
+  const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('*').eq('year', Y); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
+  return (S.rc.cache[k] = rows);
+}
+const recAmt = r => r.status==='Cancelled' ? 0 : Number(r.amount)||0;
+async function renderRecords(){
+  $('#main').innerHTML = '<div class="loading">Loading plant records…</div>';
+  try {
+    if (!S.rc.year) S.rc.year = new Date().getFullYear();
+    if (!isReviewer()) S.rc.dept = S.me.department_id;
+    const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
+    if (S.rc.kind==='consumption') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
+    const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
+    const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption');
+    const list = (S.rc.kind==='po'?po:co).filter(r=>(!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.supplier,r.line_item,r.resource,r.notes]).toLowerCase().includes(S.rc.q.toLowerCase())));
+    const years = [...new Set([new Date().getFullYear()+0, new Date().getFullYear()-1, new Date().getFullYear()-2, ...S.cycles.map(c=>c.year), Y])].sort((a,b)=>b-a);
+    const poMonths = [...new Set(po.map(r=>r.month))].sort((a,b)=>a-b);
+    $('#main').innerHTML = `
+    <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
+      <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
+      <div class="actions">${ed?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
+    <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
+      <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
+      ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+      <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
+    </div>
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['po','PO expenses',po.length],['consumption','Consumption',co.length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    ${S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
+  } catch(e){ fail(e); }
+}
+async function poView(Y, dept, po, list, poMonths, ed){
+  const D = await loadYearData(Y, dept).catch(()=>null), acc = {};
+  (D?.act||[]).filter(a=>a.kind!=='capex' && poMonths.includes(a.month)).forEach(a => acc[a.line_item] = (acc[a.line_item]||0) + Number(a.amount));
+  const byLine = {}; po.forEach(r => byLine[r.line_item||'(no line item)'] = (byLine[r.line_item||'(no line item)']||0) + recAmt(r));
+  (S.rc.cache[Y+'|'+(dept||'')]||[]).filter(r=>r.kind==='consumption' && Number(r.amount) && r.line_item && poMonths.includes(r.month)).forEach(r => byLine[r.line_item] = (byLine[r.line_item]||0) + Number(r.amount));
+  const items = [...new Set([...Object.keys(byLine), ...Object.keys(acc)])].map(i=>({ i, p:byLine[i]||0, a:acc[i]||0 })).sort((x,y)=>Math.max(y.p,y.a)-Math.max(x.p,x.a));
+  const tP = sum(po.map(recAmt)), tA = sum(Object.values(acc)), open = po.filter(r=>r.status==='Ordered');
+  const sup = {}; po.forEach(r => { if (r.supplier) sup[r.supplier] = (sup[r.supplier]||0) + recAmt(r); }); const topS = Object.entries(sup).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  return `<div class="stats">
+      <div class="stat opex"><div class="eyebrow">PO spending ${Y}</div><div class="v">${short(tP)}</div><div class="s">${po.length} record${po.length===1?'':'s'}${poMonths.length?` · ${MONTHS[poMonths[0]-1]}–${MONTHS[poMonths[poMonths.length-1]-1]}`:''}</div></div>
+      <div class="stat"><div class="eyebrow">Accounting, same months</div><div class="v">${tA?short(tA):'—'}</div><div class="s">${tA?`PO records cover ${Math.round(100*tP/tA)}% of booked expense`:'No Accounting/Odoo actuals for these months'}</div></div>
+      <div class="stat"><div class="eyebrow">Ordered, not yet received</div><div class="v">${short(sum(open.map(recAmt)))}</div><div class="s">${open.length} PO${open.length===1?'':'s'} — commitments still to come</div></div>
+      <div class="stat"><div class="eyebrow">Top suppliers</div><div class="v" style="font-size:15px;line-height:1.35">${topS.map(([s])=>esc(s)).join('<br>')||'—'}</div><div class="s">${topS.map(([,v])=>short(v)).join(' · ')}</div></div>
+    </div>
+    <div class="card"><h3>Purchase orders</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Date</th><th>PO no.</th>${!dept?'<th>Department</th>':''}<th>Expense line / item</th><th>Supplier</th><th class="r">Qty × price</th><th class="r">Amount</th><th>Status</th></tr></thead><tbody>
+      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(deptById(r.department_id)?.name)}</td>`:''}
+        <td><div class="item">${esc(r.line_item||'No line item')}</div><div class="act" style="font-weight:500">${esc(r.item||'')}</div></td><td style="font-size:13px">${esc(r.supplier||'')}</td>
+        <td class="r num" style="font-size:12.5px">${r.qty!=null?`${Number(r.qty).toLocaleString('en-PH')} ${esc(r.unit||'')}`:''}${r.unit_price!=null?` × ${peso(r.unit_price,2)}`:''}</td><td class="r num">${peso(r.amount,2)}</td><td><span class="chip ${r.status==='Paid'?'pri-ok':r.status==='Cancelled'?'pri-crit':r.status==='Received'?'basis-working':'pri-med'}">${esc(r.status||'—')}</span></td></tr>`).join('') || `<tr><td colspan="8" class="hint" style="padding:16px">No PO records${S.rc.month||S.rc.q?' for this filter':''} yet.${ed?' Use <b>Add PO</b> or <b>Import Excel</b>.':''}</td></tr>`}
+      </tbody>${list.length?`<tfoot><tr><td colspan="${dept?5:6}">Total shown${list.length>500?' (first 500 rows listed)':''}</td><td class="r num">${peso(sum(list.map(recAmt)),2)}</td><td></td></tr></tfoot>`:''}</table></div></div>
+    ${items.length ? `<div class="card" style="margin-top:16px"><h3>PO records vs Accounting, by expense line (${poMonths.length?MONTHS[poMonths[0]-1]+'–'+MONTHS[poMonths[poMonths.length-1]-1]:''})</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Expense line</th><th class="r">Plant records (PO + bills)</th><th class="r">Accounting / Odoo</th><th class="r">Difference</th><th>Reading</th></tr></thead><tbody>
+      ${items.map(x=>`<tr><td style="font-size:13px">${esc(x.i)}</td><td class="r num">${peso(x.p)}</td><td class="r num">${x.a?peso(x.a):'—'}</td><td class="r num">${peso(x.p-x.a)}</td>
+        <td style="font-size:12.5px">${!x.a?'<span class="chip pri-high">Not yet booked</span>':!x.p?'<span class="chip pri-med">Booked, no PO recorded</span>':Math.abs(x.p-x.a)<=0.1*x.a?'<span class="chip pri-ok">Matches</span>':x.p>x.a?'<span class="chip basis-working">PO ahead of booking</span>':'<span class="chip pri-med">Part not on PO</span>'}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Differences are normal: POs are recorded when ordered, Accounting books when billed; some costs (utilities, petty cash, contracts) have no PO. Accounting stays the official figure.</p></div>` : ''}`;
+}
+function consView(Y, co, list, K, ed){
+  const g = (m, mo) => { const r = K.find(x=>x.metric===m && x.month===mo); return r ? Number(r.value) : null; };
+  const res = [...new Set(co.map(r=>r.resource||'Other'))];
+  const cell = (rs, mo) => { const v = co.filter(r=>(r.resource||'Other')===rs && r.month===mo); return v.length ? { q:sum(v.map(r=>r.qty)), a:sum(v.map(r=>r.amount)), u:v[0].unit||RESOURCES.find(x=>x[0]===rs)?.[1]||'' } : null; };
+  const boards = mo => g('production_output', mo) ?? g('volume_sold', mo), bLbl = K.some(r=>r.metric==='production_output') ? 'produced' : 'sold';
+  return `<div class="card"><h3>Monthly consumption ${Y}</h3>${res.length?`<div class="tbl-wrap"><table class="ledger" style="min-width:1150px"><thead><tr><th>Resource</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
+      ${res.map(rs=>{ const cs = MONTHS.map((_,i)=>cell(rs,i+1)), u = cs.find(Boolean)?.u||'', tq = sum(cs.map(c=>c?.q||0)), ta = sum(cs.map(c=>c?.a||0));
+        const bq = sum(MONTHS.map((_,i)=>cs[i] && boards(i+1) ? cs[i].q : 0)), bb = sum(MONTHS.map((_,i)=>cs[i] && boards(i+1) ? boards(i+1) : 0));
+        return `<tr><td class="act">${esc(rs)}<div class="item" style="text-transform:none">${esc(u)}</div></td>${cs.map(c=>`<td class="r num" style="font-size:12.5px">${c?Number(c.q).toLocaleString('en-PH',{maximumFractionDigits:0}):''}</td>`).join('')}<td class="r num">${tq.toLocaleString('en-PH',{maximumFractionDigits:0})}</td></tr>
+          <tr class="calc"><td class="act" style="font-size:12px">₱ per ${esc(u||'unit')}</td>${cs.map(c=>`<td class="r num" style="font-size:12px">${c&&c.a&&c.q?peso(c.a/c.q,2):''}</td>`).join('')}<td class="r num" style="font-size:12px">${ta&&tq?peso(ta/tq,2):''}</td></tr>
+          <tr class="calc"><td class="act" style="font-size:12px">${esc(u||'units')} per board ${bLbl}</td>${cs.map((c,i)=>`<td class="r num" style="font-size:12px">${c&&boards(i+1)?(c.q/boards(i+1)).toFixed(2):''}</td>`).join('')}<td class="r num" style="font-size:12px">${bb?(bq/bb).toFixed(2):''}</td></tr>`; }).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>No consumption recorded for ${Y}</b>${ed?'Record monthly meter readings or deliveries — electricity kWh, diesel liters, water m³, LPG kg. Adding the peso amount gives the unit cost; with boards produced or sold, the app shows usage per board.':''}</div>`}</div>
+    ${utilityCard(Y, co)}
+    ${co.length?`<div class="card" style="margin-top:16px"><h3>Entries</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Resource</th>${!S.rc.dept?'<th>Department</th>':''}<th class="r">Quantity</th><th class="r">Amount</th><th>Reference</th><th>Notes</th></tr></thead><tbody>
+      ${list.slice(0,500).map(r=>`<tr class="row" tabindex="0" ${canEditRecords(r.department_id)?`onclick="editRecord('${r.id}')"`:''}><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.resource||'')}</td>${!S.rc.dept?`<td style="font-size:12.5px">${esc(deptById(r.department_id)?.name)}</td>`:''}<td class="r num">${Number(r.qty||0).toLocaleString('en-PH')} ${esc(r.unit||'')}</td><td class="r num">${r.amount!=null?peso(r.amount,2):''}</td><td class="num">${esc(r.ref_no||'')}</td><td style="font-size:12.5px">${esc(r.notes||'')}</td></tr>`).join('')}
+    </tbody></table></div></div>`:''}`;
+}
+async function editRecord(id){
+  const Y = S.rc.year, all = await loadRecords(Y, S.rc.dept), r = id ? all.find(x=>x.id===id) : { kind:S.rc.kind, rec_date:today(), department_id:S.rc.dept||S.me.department_id, status:'Ordered' };
+  const isPO = (r.kind||S.rc.kind)==='po', depts = S.depts.filter(d=>canEditRecords(d.id));
+  modal(`<h3>${id?'Edit':'Add'} ${isPO?'purchase order':'consumption reading'}</h3>
+    <div class="g2"><div class="field"><label for="rDate">${isPO?'PO date':'Date (reading or delivery)'}</label><input class="inp" id="rDate" type="date" value="${r.rec_date||today()}"></div>
+      <div class="field"><label for="rDept">Department</label><select class="inp" id="rDept">${depts.map(d=>`<option value="${d.id}" ${d.id===r.department_id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div></div>
+    ${isPO?`<div class="g2"><div class="field"><label for="rRef">PO number</label><input class="inp" id="rRef" value="${esc(r.ref_no||'')}"></div>
+      <div class="field"><label for="rLine">Expense line</label><select class="inp" id="rLine"><option value="">—</option>${S.items.opex.map(i=>`<option ${i===r.line_item?'selected':''}>${esc(i)}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="rItem">Item / description</label><input class="inp" id="rItem" value="${esc(r.item||'')}"></div>
+      <div class="field"><label for="rSup">Supplier</label><input class="inp" id="rSup" value="${esc(r.supplier||'')}" list="rSupList"><datalist id="rSupList">${[...new Set(all.map(x=>x.supplier).filter(Boolean))].slice(0,200).map(s=>`<option value="${esc(s)}">`).join('')}</datalist></div>
+      <div class="g2"><div class="field"><label for="rQty">Quantity</label><input class="inp num" id="rQty" type="number" step="any" value="${r.qty??''}"></div><div class="field"><label for="rUnit">Unit</label><input class="inp" id="rUnit" value="${esc(r.unit||'')}" placeholder="pcs, liter, set…"></div></div>
+      <div class="g2"><div class="field"><label for="rPrice">Unit price (₱)</label><input class="inp num" id="rPrice" type="number" step="any" value="${r.unit_price??''}"></div><div class="field"><label for="rAmt">Amount (₱)</label><input class="inp num" id="rAmt" type="number" step="any" value="${r.amount??''}"></div></div>
+      <div class="field"><label for="rSt">Status</label><select class="inp" id="rSt">${PO_STATUS.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select></div>`
+    :`<div class="g2"><div class="field"><label for="rRes">Resource</label><select class="inp" id="rRes">${RESOURCES.map(x=>`<option ${x[0]===r.resource?'selected':''}>${x[0]}</option>`).join('')}</select></div><div class="field"><label for="rRef">Meter / invoice / reference</label><input class="inp" id="rRef" value="${esc(r.ref_no||'')}"></div></div>
+      <div class="g2"><div class="field"><label for="rQty">Quantity used</label><input class="inp num" id="rQty" type="number" step="any" value="${r.qty??''}"></div><div class="field"><label for="rUnit">Unit</label><input class="inp" id="rUnit" value="${esc(r.unit||RESOURCES.find(x=>x[0]===r.resource)?.[1]||'kWh')}"></div></div>
+      <div class="field"><label for="rAmt" id="rAmtL">Amount (₱), if known</label><input class="inp num" id="rAmt" type="number" step="any" value="${r.amount??''}"></div><p class="hint" id="rUtilHint" style="margin-top:-4px"></p>`}
+    <div class="field"><label for="rNotes">Notes</label><input class="inp" id="rNotes" value="${esc(r.notes||'')}"></div>
+    <div class="actions" style="justify-content:space-between"><span>${id?`<button class="btn danger" onclick="delRecord('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>${id?'':'<button class="btn" id="rMore">Save and add another</button>'}<button class="btn primary" id="rGo">Save</button></span></div>`);
+  if (isPO) { const calc = () => { const q = Number($('#rQty').value), p = Number($('#rPrice').value); if (q && p && !$('#rAmt').dataset.typed) $('#rAmt').value = Math.round(q*p*100)/100; };
+    $('#rQty').oninput = calc; $('#rPrice').oninput = calc; $('#rAmt').oninput = () => $('#rAmt').dataset.typed = 1; }
+  else { const util = () => { const u = ['Electricity','Water'].includes($('#rRes').value);
+      $('#rAmtL').textContent = u ? 'Billed amount (₱) — total on the bill' : 'Amount (₱), if known';
+      $('#rUtilHint').textContent = u ? 'Enter one record per bill: consumption from the bill (kWh or m³), the billed amount, and the bill or account number. Use any date in the billing month.' : ''; };
+    $('#rRes').onchange = () => { $('#rUnit').value = RESOURCES.find(x=>x[0]===$('#rRes').value)?.[1]||''; util(); }; util(); }
+  const save = async more => {
+    const v = x => $('#'+x) ? ($('#'+x).value.trim() || null) : null, n = x => v(x)==null ? null : Number(v(x));
+    const row = { company_id:S.company.id, department_id:$('#rDept').value, kind:isPO?'po':'consumption', rec_date:v('rDate'), ref_no:v('rRef'), notes:v('rNotes'), qty:n('rQty'), unit:v('rUnit'), amount:n('rAmt') };
+    if (isPO) Object.assign(row, { line_item:v('rLine'), item:v('rItem'), supplier:v('rSup'), unit_price:n('rPrice'), status:v('rSt') });
+    else Object.assign(row, { resource:v('rRes'), line_item:RESOURCES.find(x=>x[0]===v('rRes'))?.[2]||null });
+    if (!row.rec_date) { toast('Enter the date.', true); return; }
+    if (isPO && row.amount==null) { toast('Enter the amount (or quantity and unit price).', true); return; }
+    if (!isPO && row.qty==null) { toast('Enter the quantity used.', true); return; }
+    const r2 = id ? await sb.from('bgt_plant_records').update(row).eq('id', id) : await sb.from('bgt_plant_records').insert(row); if (r2.error) return fail(r2.error);
+    S.rc.cache = {}; S.rc.year = Number(row.rec_date.slice(0,4)); toast('Saved');
+    if (more) { renderRecords(); editRecord(); } else { closeModal(); renderRecords(); }
+  };
+  $('#rGo').onclick = () => save(false); if ($('#rMore')) $('#rMore').onclick = () => save(true);
+}
+async function delRecord(id){ const r = await sb.from('bgt_plant_records').delete().eq('id', id); if (r.error) return fail(r.error); S.rc.cache = {}; closeModal(); toast('Deleted'); renderRecords(); }
+const REC_COLS = ['Date','Department code','Type (PO / Consumption)','PO / reference no.','Expense line','Item or resource','Supplier','Quantity','Unit','Unit price','Amount','Status','Notes'];
+async function exportRecords(){
+  const Y = S.rc.year, R = await loadRecords(Y, S.rc.dept), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Plant records ${Y}`);
+  const h = ws.addRow(REC_COLS); h.font = { bold:true };
+  R.slice().reverse().forEach(r => ws.addRow([new Date(r.rec_date), deptById(r.department_id)?.code, r.kind==='po'?'PO':'Consumption', r.ref_no, r.line_item, r.kind==='po'?r.item:r.resource, r.supplier, r.qty!=null?Number(r.qty):null, r.unit, r.unit_price!=null?Number(r.unit_price):null, r.amount!=null?Number(r.amount):null, r.status, r.notes]));
+  [12,10,14,16,34,34,26,10,8,12,14,10,30].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(1).numFmt='yyyy-mm-dd'; [10,11].forEach(c=>ws.getColumn(c).numFmt='#,##0.00');
+  const g = wb.addWorksheet('Guide');
+  [['How to fill'],['Date: PO date or reading date.'],['Department code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')],['Type: PO or Consumption.'],['Expense line (PO): one of the budget line items, e.g. SUPPLIES.'],
+   ['Item or resource: item description for POs; for consumption one of '+RESOURCES.map(r=>r[0]).join(', ')+'.'],['Status (PO): '+PO_STATUS.join(', ')+'.'],['Amount: peso amount. For consumption it is optional (adds unit cost).']].forEach(r=>g.addRow(r));
+  g.getColumn(1).width = 120;
+  download(await wb.xlsx.writeBuffer(), `Plant records ${Y} - ${S.company.code}.xlsx`); toast('Downloaded');
+}
+function importRecordsDialog(){
+  modal(`<h3>Import plant records</h3><p>Use the file from <b>Download template / data</b> (one row per PO line or meter reading). Rows are added; existing records are not changed.</p>
+    <div class="field"><input type="file" id="riFile" accept=".xlsx" class="inp"></div><p id="riMsg"></p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="riGo">Import</button></div>`);
+  $('#riGo').onclick = async () => {
+    const f = $('#riFile').files[0]; if (!f) { toast('Choose a file first.', true); return; }
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
+      const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : (v && typeof v==='object' && 'text' in v) ? v.text : v;
+      const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), col = name => head.findIndex(h=>h.startsWith(name.toLowerCase()));
+      const C = { d:col('date'), dept:col('department'), t:col('type'), ref:col('po'), li:col('expense line'), it:col('item'), sup:col('supplier'), q:col('quantity'), u:col('unit'), p:col('unit price'), a:col('amount'), st:col('status'), n:col('notes') };
+      if (C.d<1 || C.dept<1) { $('#riMsg').textContent = 'The first row needs at least "Date" and "Department code" columns.'; return; }
+      const rows = [], bad = [];
+      for (let i=2; i<=ws.rowCount; i++) { const row = ws.getRow(i), g = k => C[k]>0 ? cv(row.getCell(C[k]).value) : null;
+        const dv = g('d'); if (dv==null || dv==='') continue;
+        const d = dv instanceof Date ? dv : new Date(dv); if (isNaN(d)) { bad.push(i); continue; }
+        const dep = S.depts.find(x=>String(x.code).toLowerCase()===String(g('dept')||'').trim().toLowerCase() || x.name.toLowerCase()===String(g('dept')||'').trim().toLowerCase());
+        if (!dep || !canEditRecords(dep.id)) { bad.push(i); continue; }
+        const isPO = !/cons/i.test(String(g('t')||'PO')), num = k => { const x = g(k); return x==null || x==='' || isNaN(Number(x)) ? null : Number(x); };
+        const it = g('it') ? String(g('it')).trim() : null, res = RESOURCES.find(r=>r[0].toLowerCase()===String(it||'').toLowerCase());
+        rows.push({ company_id:S.company.id, department_id:dep.id, kind:isPO?'po':'consumption', rec_date:d.toISOString().slice(0,10), ref_no:g('ref')?String(g('ref')):null,
+          line_item:isPO ? (g('li')?String(g('li')).trim().toUpperCase():null) : (res?.[2]||null), item:isPO?it:null, resource:isPO?null:(res?.[0]||it), supplier:g('sup')?String(g('sup')).trim():null,
+          qty:num('q'), unit:g('u')?String(g('u')):(res?.[1]||null), unit_price:num('p'), amount:num('a') ?? (num('q')!=null&&num('p')!=null ? num('q')*num('p') : null), status:isPO?(g('st')||'Ordered'):null, notes:g('n')?String(g('n')):null }); }
+      if (!rows.length) { $('#riMsg').textContent = 'No rows found.' + (bad.length ? ` Rows skipped (bad date or department, or not your department): ${bad.slice(0,12).join(', ')}` : ''); return; }
+      for (let i=0; i<rows.length; i+=500) { const r = await sb.from('bgt_plant_records').insert(rows.slice(i,i+500)); if (r.error) throw r.error; }
+      S.rc.cache = {}; closeModal(); toast(`${rows.length} records imported${bad.length?`, ${bad.length} skipped`:''}`); renderRecords();
+    } catch(e){ fail(e); }
+  };
+}
+
+// electricity and water: consumption and billed amount by month, against Accounting's booked utilities and the published rate
+function utilityCard(Y, co){
+  const U = [['Electricity','kWh','UTILITIES - ELECTRICITY','meralco'],['Water','m³','UTILITIES - WATER',null]].filter(([r])=>co.some(x=>x.resource===r));
+  if (!U.length) return '';
+  const D = S.act.cache[Y+'|'+(S.rc.dept||'all')], H = S.ol.cache.hist || [];
+  return U.map(([res, unit, li, ind]) => {
+    const rows = MONTHS.map((_,i)=>{ const v = co.filter(x=>x.resource===res && x.month===i+1); if (!v.length) return null;
+      const q = sum(v.map(x=>x.qty)), a = sum(v.map(x=>x.amount)), acc = D ? sum(D.act.filter(x=>x.kind!=='capex' && x.line_item===li && x.month===i+1).map(x=>x.amount)) : null;
+      return { m:i+1, q, a, acc }; }).filter(Boolean);
+    const tq = sum(rows.map(r=>r.q)), ta = sum(rows.map(r=>r.a)), pub = ind ? H.find(h=>h.key===ind && h.year===Y) : null;
+    return `<div class="card" style="margin-top:16px"><h3>${res} bills ${Y}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Month</th><th class="r">Consumption (${unit})</th><th class="r">Billed amount</th><th class="r">₱ per ${unit}</th><th class="r">Accounting booked (${esc(li)})</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${MONTHS[r.m-1]}</td><td class="r num">${Math.round(r.q).toLocaleString('en-PH')}</td><td class="r num">${r.a?peso(r.a,2):'<span class="hint">not entered</span>'}</td><td class="r num">${r.a&&r.q?peso(r.a/r.q,2):''}</td><td class="r num">${r.acc?peso(r.acc,2):'—'}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="r num">${Math.round(tq).toLocaleString('en-PH')}</td><td class="r num">${peso(ta,2)}</td><td class="r num">${ta&&tq?peso(ta/tq,2):''}</td><td class="r num">${D?peso(sum(rows.map(r=>r.acc||0)),2):''}</td></tr></tfoot></table></div>
+      ${pub?`<p class="hint" style="padding:8px 14px 12px;margin:0">Published Meralco rate ${Y}: ₱${Number(pub.value).toFixed(2)}/kWh (household benchmark${pub.basis==='ytd'?', '+esc(pub.period||'so far'):''}). Industrial bills differ by demand charges and time of use — the plant's own ₱/kWh above is the figure to budget with.</p>`:''}</div>`; }).join('');
 }
 
 boot();

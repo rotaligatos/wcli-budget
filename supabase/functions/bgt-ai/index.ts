@@ -1,5 +1,5 @@
 // bgt-ai — Budget assistant for the WCLI budget app.
-// Modes: draft_line, review_budget, review_plant, price_lookup.
+// Modes: draft_line, draft_budget, review_budget, review_plant, price_lookup.
 // Data is read with the caller's own permissions (RLS). Nothing is written to budgets here —
 // the app shows suggestions and the user decides. Every call is logged to bgt_ai_log.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -22,6 +22,7 @@ async function claude(key: string, system: string, user: string, tool: any, maxT
     if (!r.ok) { lastErr = `${r.status} ${d?.error?.message || ''}`; if (r.status === 404 || /model/i.test(lastErr)) continue; throw new Error('Claude API: ' + lastErr); }
     const tu = (d.content || []).find((c: any) => c.type === 'tool_use');
     if (!tu) throw new Error('No structured answer returned');
+    if (d.stop_reason === 'max_tokens') throw new Error('The assistant\'s answer was too long and got cut off. Please try again, or add a note to narrow it down.');
     return { out: tu.input, model, usage: d.usage || {} };
   }
   throw new Error('Claude API: ' + lastErr);
@@ -45,11 +46,11 @@ function outlookText(o: any) {
   const gen = o.A.find((x: any) => /^inflation_\d{4}$/.test(x.key));
   return `INDICATORS\n${a || '(none)'}\n\nASSUMED COST CHANGE BY EXPENSE LINE (others: general inflation ${gen?.value ?? 5}%)\n${d || '(none)'}`;
 }
-async function deptHistory(db: SupabaseClient, deptId: string, year: number) {
+async function deptHistory(db: SupabaseClient, deptId: string, year: number, nYears = 2) {
   // previous budgets + actuals per line item for this department
   const out: any = {};
-  for (const y of [year - 1, year - 2]) {
-    const { data:cy } = await db.from('bgt_cycles').select('id,basis').eq('year', y).maybeSingle();
+  for (const y of Array.from({ length:nYears }, (_, i) => year - 1 - i)) {
+    const { data:cy } = await db.from('bgt_cycles').select('id,basis,budget_months').eq('year', y).maybeSingle();
     let bud: Record<string, number> = {};
     if (cy) {
       const { data:b } = await db.from('bgt_dept_budgets').select('id').eq('cycle_id', cy.id).eq('department_id', deptId).maybeSingle();
@@ -61,7 +62,8 @@ async function deptHistory(db: SupabaseClient, deptId: string, year: number) {
     const closed = opa.length ? Math.max(...opa.map((a: any) => a.month)) : 0;
     const act: Record<string, number> = {}, partners: Record<string, Record<string, number>> = {};
     opa.forEach((a: any) => { act[a.line_item] = (act[a.line_item] || 0) + Number(a.amount); const p = (partners[a.line_item] ||= {}); p[a.partner || '—'] = (p[a.partner || '—'] || 0) + Number(a.amount); });
-    out[y] = { basis:cy?.basis, closed, bud, act, partners };
+    const monthly: Record<string, number[]> = {}; opa.forEach((a: any) => { (monthly[a.line_item] ||= Array(12).fill(0))[a.month - 1] += Number(a.amount); });
+    out[y] = { basis:cy?.basis, budgetMonths:cy?.budget_months || null, closed, bud, act, partners, monthly };
   }
   return out;
 }
@@ -69,7 +71,7 @@ function historyText(h: any, only?: string) {
   return Object.entries(h).map(([y, v]: any) => {
     const items = [...new Set([...Object.keys(v.bud), ...Object.keys(v.act)])].filter(i => !only || i === only);
     if (!items.length) return `${y}: no data${only ? ' for this line item' : ''}.`;
-    return `${y} (budget ${v.basis === 'approved' ? 'approved' : 'submitted, not formally approved'}; actuals ${v.closed ? 'Jan–' + M[v.closed - 1] : 'not loaded'}):\n` +
+    return `${y} (budget ${v.basis === 'approved' ? 'approved' : 'submitted, not formally approved'}${v.budgetMonths ? `; NOTE: several departments budgeted only Jan–${M[v.budgetMonths - 1]} that year, so a low budget figure may cover only part of the year` : ''}; actuals ${v.closed ? 'Jan–' + M[v.closed - 1] : 'not loaded'}):\n` +
       items.map(i => { const top = Object.entries(v.partners[i] || {}).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([p, a]: any) => `${p} ${peso(a)}`).join(', ');
         return `- ${i}: budget ${peso(v.bud[i] || 0)}; actual ${peso(v.act[i] || 0)}${v.closed && v.closed < 12 && v.act[i] ? ` (full-year rate ${peso(v.act[i] / v.closed * 12)})` : ''}${top ? `; paid to ${top}` : ''}`; }).join('\n');
   }).join('\n\n');
@@ -93,6 +95,44 @@ const RULES = `Finance budgeting rules:
 - CAPEX = unit cost at or above the CAPEX threshold AND useful life over one year; otherwise OPEX.
 - Spread amounts to the months they will actually be incurred or paid — not all in January.
 - Priority: Critical / Mandatory (stops operations or compliance/safety), High, Medium (can be deferred), Low / Discretionary.`;
+
+async function plantRecordsText(db: SupabaseClient, deptId: string, year: number) {
+  const rows: any[] = [];
+  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('kind,month,line_item,item,resource,supplier,qty,unit,amount,status').eq('department_id', deptId).eq('year', year).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  if (!rows.length) return `No plant records (PO / consumption) for ${year}.`;
+  const po = rows.filter(r => r.kind === 'po' && r.status !== 'Cancelled'), co = rows.filter(r => r.kind === 'consumption');
+  const months = [...new Set(po.map(r => r.month))].sort((a, b) => a - b);
+  const byLine: Record<string, { a:number, items:Record<string, number> }> = {};
+  po.forEach(r => { const b = (byLine[r.line_item || '(no line item)'] ||= { a:0, items:{} }); b.a += Number(r.amount) || 0; const k = (r.item || '').slice(0, 60); b.items[k] = (b.items[k] || 0) + (Number(r.amount) || 0); });
+  const res: Record<string, { q:number, a:number, u:string, n:Set<number> }> = {};
+  co.forEach(r => { const k = r.resource || 'Other', x = (res[k] ||= { q:0, a:0, u:r.unit || '', n:new Set() }); x.q += Number(r.qty) || 0; x.a += Number(r.amount) || 0; x.n.add(r.month); });
+  return (po.length ? `PO records ${year}${months.length ? ` (${M[months[0] - 1]}–${M[months[months.length - 1] - 1]})` : ''}:\n` +
+    Object.entries(byLine).sort((a, b) => b[1].a - a[1].a).slice(0, 25).map(([k, v]) => `- ${k}: ${peso(v.a)} — top items: ${Object.entries(v.items).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([i, a]) => `${i} ${peso(a)}`).join('; ')}`).join('\n') : 'No PO records.') +
+    (Object.keys(res).length ? `\nConsumption and utility bills ${year}:\n` + Object.entries(res).map(([k, v]) => `- ${k}: ${Math.round(v.q).toLocaleString('en-PH')} ${v.u} over ${v.n.size} months${v.a ? `, billed ${peso(v.a)}` : ''}${v.a && v.q ? ` (₱${(v.a / v.q).toFixed(2)}/${v.u})` : ''}`).join('\n') : '');
+}
+async function volumeText(db: SupabaseClient, year: number) {
+  const { data } = await db.from('bgt_kpis').select('year,month,metric,value').gte('year', year - 4).lte('year', year);
+  if (!data?.length) return 'No sales, volume or production figures.';
+  const ys = [...new Set(data.map((k: any) => k.year))].sort();
+  const lines = ys.map(y => { const r = data.filter((k: any) => k.year === y);
+    const f = (m: string) => { const v = r.filter((k: any) => k.metric === m && k.month > 0); const a = r.find((k: any) => k.metric === m && k.month === 0); return a ? { t:Number(a.value), n:12 } : v.length ? { t:sum(v.map((k: any) => Number(k.value))), n:v.length } : null; };
+    const parts = [['sales_actual','sales ₱'],['volume_sold','boards sold'],['production_output','boards produced'],['capacity_boards','capacity boards'],['sales_target','sales target ₱'],['volume_target','volume target boards'],['production_target','production target boards']]
+      .map(([m, l]) => { const x = f(m); return x ? `${l} ${Math.round(x.t).toLocaleString('en-PH')}${x.n < 12 ? ` (${x.n} months)` : ''}` : ''; }).filter(Boolean);
+    return parts.length ? `- ${y}: ${parts.join('; ')}` : ''; }).filter(Boolean);
+  return lines.join('\n');
+}
+async function plantOpexPerBoard(db: SupabaseClient, year: number) {
+  const out: string[] = [];
+  for (const y of [year - 1, year - 2, year - 3]) {
+    const ac: any[] = []; for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_actuals').select('month,amount').eq('year', y).eq('kind', 'opex').range(from, from + 999); ac.push(...(data || [])); if (!data || data.length < 1000) break; }
+    if (!ac.length) continue;
+    const { data:k } = await db.from('bgt_kpis').select('month,value').eq('year', y).eq('metric', 'volume_sold').gt('month', 0);
+    const am = new Set(ac.map(a => a.month)), km = (k || []).filter((x: any) => am.has(x.month)), ms = new Set(km.map((x: any) => x.month));
+    const op = sum(ac.filter(a => ms.has(a.month)).map(a => Number(a.amount))), vb = sum(km.map((x: any) => Number(x.value)));
+    if (op && vb) out.push(`- ${y}: plant OPEX ₱${(op / vb).toFixed(2)} per board sold (${ms.size} months)`);
+  }
+  return out.join('\n') || '(not enough data)';
+}
 
 /* ---------- modes ---------- */
 async function draftLine(db: SupabaseClient, key: string, p: any) {
@@ -137,6 +177,87 @@ ALREADY IN THE ${Y} ${isC ? 'CAPEX' : 'OPEX'} BUDGET OF THIS DEPARTMENT (avoid d
   return await claude(key, system, user, tool, 2500);
 }
 
+async function draftBudget(db: SupabaseClient, key: string, p: any) {
+  const { data:b, error } = await db.from('bgt_dept_budgets').select('id,department_id,cycle_id').eq('id', p.budget_id).single();
+  if (error || !b) throw new Error('Budget not found or not allowed');
+  const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
+  const Y = cy!.year, L = await master(db), o = await outlook(db, Y);
+  const [h, pr, vol, opb, rec] = await Promise.all([deptHistory(db, b.department_id, Y, 3), prices(db, b.department_id), volumeText(db, Y), plantOpexPerBoard(db, Y), plantRecordsText(db, b.department_id, Y - 1)]);
+  const [{ data:ol }, { data:cl }] = await Promise.all([db.from('bgt_opex_lines').select('line_item,activity,annual').eq('budget_id', b.id), db.from('bgt_capex_lines').select('category,asset,annual').eq('budget_id', b.id)]);
+  // CAPEX deferred into this year for this department and not yet carried over
+  let deferred = '(none)';
+  const { data:pcs } = await db.from('bgt_cycles').select('id,year').lt('year', Y);
+  if (pcs?.length) {
+    const { data:pbs } = await db.from('bgt_dept_budgets').select('id,cycle_id').eq('department_id', b.department_id).in('cycle_id', pcs.map((c: any) => c.id));
+    if (pbs?.length) {
+      const { data:dl } = await db.from('bgt_capex_lines').select('id,budget_id,category,asset,annual,impl_amount,target_month,impl_note,priority').in('budget_id', pbs.map((x: any) => x.id)).eq('impl_status', 'deferred').eq('target_year', Y);
+      const { data:carried } = await db.from('bgt_capex_lines').select('carried_from').eq('budget_id', b.id).not('carried_from', 'is', null);
+      const cs = new Set((carried || []).map((x: any) => x.carried_from)), w = (dl || []).filter((x: any) => !cs.has(x.id));
+      const yOf = (x: any) => pcs.find((c: any) => c.id === pbs.find((q: any) => q.id === x.budget_id)?.cycle_id)?.year;
+      if (w.length) deferred = w.map((x: any) => `- ${x.category}: ${x.asset} ${peso(Number(x.impl_amount) || Number(x.annual))}${x.target_month ? ' planned ' + M[x.target_month - 1] : ''} (deferred from ${yOf(x)}${x.impl_note ? ': ' + x.impl_note : ''})`).join('\n');
+    }
+  }
+  const last = h[Y - 1];
+  const phasing = last ? Object.entries(last.monthly || {}).filter(([, v]: any) => sum(v) > 0).slice(0, 30).map(([k, v]: any) => `- ${k}: ${v.map((x: number, i: number) => x ? `${M[i]} ${Math.round(x / 1000)}k` : '').filter(Boolean).join(', ')}`).join('\n') : '';
+  const tool = { name:'propose_budget', description:'Proposed department budget for the manager to review. Keep every text field short.', input_schema:{ type:'object', properties:{
+    lines:{ type:'array', maxItems:24, items:{ type:'object', properties:{
+      line_item:{ type:'string', enum:L.opex }, activity:{ type:'string', description:'Short activity name, max 8 words' },
+      description:{ type:'string', description:'Max 12 words, with quantities' },
+      expense_type:{ type:'string', enum:L.expense_type }, basis:{ type:'string', enum:L.basis }, priority:{ type:'string', enum:L.priority },
+      annual:{ type:'number', description:'Proposed peso amount for the year' },
+      phasing:{ type:'string', enum:['last_year_pattern','monthly_even','quarterly','semi_annual','one_time'] },
+      month:{ type:'integer', minimum:1, maximum:12, description:'Month for one_time, or first month for quarterly / semi_annual' },
+      last_year:{ type:'number', description:'Last year full-year reference used, 0 if none' }, change_pct:{ type:'number' },
+      rationale:{ type:'string', description:'Max 30 words: reference × outlook % × volume factor, or price × quantity' },
+      sources:{ type:'array', items:{ type:'string', enum:['history','accounting_actuals','plant_records','outlook','sales_volume','price_list','capacity','estimate'] } },
+      confidence:{ type:'string', enum:['low','medium','high'] } }, required:['line_item','activity','expense_type','basis','priority','annual','phasing','rationale','confidence'] } },
+    capex:{ type:'array', maxItems:6, items:{ type:'object', properties:{ category:{ type:'string', enum:L.capex }, asset:{ type:'string' }, justification:{ type:'string', description:'Max 25 words' },
+      qty:{ type:'number' }, unit_cost:{ type:'number' }, month:{ type:'integer', minimum:1, maximum:12 }, priority:{ type:'string', enum:L.priority }, carried_over:{ type:'boolean' } },
+      required:['category','asset','justification','qty','unit_cost','month','priority'] } },
+    gaps:{ type:'array', maxItems:5, items:{ type:'string' }, description:'Missing or doubtful data, one short sentence each' },
+    questions:{ type:'array', maxItems:5, items:{ type:'string' }, description:'What the manager must confirm, one short sentence each' },
+    volume_assumption:{ type:'string', description:'One or two sentences' },
+    summary:{ type:'string', description:'Max 3 sentences: total, main drivers, biggest changes' } }, required:['lines','gaps','volume_assumption','summary'] } };
+  const system = `You are the budget assistant inside WCLI's budget app. ${COMPANY}
+${RULES}
+Draft a COMPLETE first version of one department's OPEX budget (and CAPEX only for items deferred into this year or clearly needed replacements) for the manager to review, edit and justify. Method for each recurring expense line:
+1) Reference = last year's full-year view (official Accounting/Odoo actuals annualised; if missing, plant PO records and utility bills; if both missing, the prior budget — remember some prior budgets covered only part of the year).
+2) Price change = the cost outlook % for that line (general inflation if none).
+3) Volume factor for volume-driven lines (power, fuel, supplies, delivery, agency/outsourced labor, packaging, R&M of production equipment) = next year's volume target ÷ last year's volume (or the sales/volume trend if there is no target). Keep fixed costs (security, rent, insurance, permits, subscriptions, internet) independent of volume. Use consumption per board (kWh, liters) and the latest unit rates when available.
+4) Drop last year's one-off items; keep contracts; flag lines that ran far above or below budget.
+Combine into at most 24 lines by expense line item and activity; keep every text short (the manager adds detail later); skip lines under ₱10,000 a year unless mandatory. Payroll and benefits are excluded. Never invent suppliers or quotation numbers. State the numbers you used in each rationale. Amounts in pesos.`;
+  const user = `Department: ${dept!.name}${dept!.notes ? ' (' + dept!.notes + ')' : ''}. Budget year ${Y}. CAPEX threshold ₱${cy!.capex_threshold}/unit.
+${p.text ? `Manager's notes: "${String(p.text).slice(0, 1500)}"` : ''}
+
+THIS DEPARTMENT'S HISTORY BY LINE ITEM (budget vs actual)
+${historyText(h)}
+
+LAST YEAR'S MONTHLY ACTUAL PATTERN (₱ thousands)
+${phasing || '(no monthly actuals)'}
+
+PLANT RECORDS ${Y - 1} (purchase orders, consumption, utility bills)
+${rec}
+
+SALES, VOLUME, PRODUCTION AND CAPACITY (plant)
+${vol}
+
+PLANT PRODUCTIVITY
+${opb}
+
+${outlookText(o)}
+
+PRICE LIST
+${pr}
+
+CAPEX DEFERRED INTO ${Y} FOR THIS DEPARTMENT (include these in capex with carried_over=true)
+${deferred}
+
+ALREADY IN THE ${Y} BUDGET (do not duplicate)
+${(ol || []).map((l: any) => `- OPEX ${l.line_item}: ${l.activity} ${peso(Number(l.annual))}`).join('\n') || '(no OPEX lines)'}
+${(cl || []).map((l: any) => `- CAPEX ${l.category}: ${l.asset} ${peso(Number(l.annual))}`).join('\n')}`;
+  return await claude(key, system, user, tool, 8000);
+}
+
 async function reviewBudget(db: SupabaseClient, key: string, p: any) {
   const { data:b, error } = await db.from('bgt_dept_budgets').select('*').eq('id', p.budget_id).single();
   if (error || !b) throw new Error('Budget not found or not allowed');
@@ -169,7 +290,7 @@ HISTORY BY LINE ITEM\n${historyText(h)}
 ${outlookText(o)}
 
 SALES AND PRODUCTION\n${kp}`;
-  return await claude(key, system, user, tool, 4000);
+  return await claude(key, system, user, tool, 6000);
 }
 
 async function reviewPlant(db: SupabaseClient, key: string, p: any) {
@@ -206,7 +327,7 @@ async function reviewPlant(db: SupabaseClient, key: string, p: any) {
     department_notes:{ type:'array', items:{ type:'object', properties:{ department:{ type:'string' }, note:{ type:'string' } }, required:['department','note'] } } }, required:['headline','key_numbers','highlights','risks','recommendations'] } };
   const system = `You prepare the plant budget summary for the Managing Director of WCLI. ${COMPANY}\n${RULES}\nWrite like a Head of Plant Operations briefing the MD: concise, numbers first, honest about gaps (departments not yet submitted, missing data, unbudgeted spending). Recommend where to cut or defer and where the budget looks too low.`;
   const user = `Budget year ${Y}.\nDEPARTMENTS\n${deptRows}\n\nBY PRIORITY\n${Object.entries(prio).map(([k, v]) => `- ${k}: ${peso(v)}`).join('\n')}\n\nOPEX BY LINE ITEM vs LAST YEAR'S ACTUAL\n${items}\n\nLARGEST CAPEX\n${bigCap || '(none)'}\n\n${outlookText(o)}\n\nSALES AND PRODUCTION\n${kp}`;
-  return await claude(key, system, user, tool, 3500);
+  return await claude(key, system, user, tool, 5000);
 }
 
 async function priceLookup(key: string, braveKey: string, p: any) {
@@ -264,6 +385,7 @@ Deno.serve(async (req) => {
   try {
     if (mode === 'draft_line') result = await draftLine(db, key, body);
     else if (mode === 'review_budget') result = await reviewBudget(db, key, body);
+    else if (mode === 'draft_budget') result = await draftBudget(db, key, body);
     else if (mode === 'review_plant') { if (!['admin','plant_head','md','finance'].includes(me.role)) throw new Error('Only reviewers can run the plant summary'); result = await reviewPlant(db, key, body); }
     else if (mode === 'price_lookup') { const bk = Deno.env.get('BRAVE_API_KEY'); if (!bk) throw new Error('Web search is not configured (no BRAVE_API_KEY).'); result = await priceLookup(key, bk, body); }
     else throw new Error('Unknown request');

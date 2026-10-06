@@ -2044,15 +2044,7 @@ const KPI_DEFS = [
   ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (to produce)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
-/* factory index — Plant 1 production monthly performance report */
-const FI_DEFS = [
-  ['fi_factory_yield','Factory yield','%','pct','yield'],['fi_pressing_yield','Pressing yield','%','pct','yield'],['fi_time_yield','Time yield','%','pct','yield'],
-  ['fi_class_a_yield','Class A yield','%','pct','yield'],['fi_class_b_yield','Class B yield','%','pct','yield'],
-  ['fi_machine_trouble','Machine trouble','% loss','pct','loss'],['fi_job_change','Job change','% loss','pct','loss'],['fi_tact_loss','Tact time loss','% loss','pct','loss'],
-  ['fi_def_handling','Defect — handling','%','pct','defect'],['fi_def_machine','Defect — machine','%','pct','defect'],['fi_def_mip','Defect — MIP','%','pct','defect'],
-  ['fi_def_inprocess','Defect — in-process','%','pct','defect'],['fi_def_rawboard','Defect — raw board','%','pct','defect']
-];
-const ALL_KPI = () => KPI_DEFS.concat(FI_DEFS);
+const ALL_KPI = () => KPI_DEFS;
 S.pf = { year:null };
 async function loadKpis(year){ const k = 'k'+year; if (S.ol.cache[k]) return S.ol.cache[k]; const { data, error } = await sb.from('bgt_kpis').select('*').eq('year', year); if (error) throw error; return (S.ol.cache[k] = data||[]); }
 async function renderPerf(){
@@ -2102,34 +2094,17 @@ async function renderPerf(){
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
-    ${fiStrip(Y, g, tot)}
-    <div class="card" style="margin-top:16px"><h3>Factory index — Plant 1 production</h3>
-      <div class="hint" style="padding:0 14px 8px">From the Monthly Performance Report. Total production yield is the production yield efficiency row above; Class B ratio is treated as the reject rate.</div>
-      <div id="fiYears" style="padding:0 14px 12px"><span class="hint">Loading year-by-year…</span></div>
-      <div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
-      <tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Yields</td></tr>${FI_DEFS.filter(d=>d[4]==='yield').map(kRow).join('')}<tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Time losses</td></tr>${FI_DEFS.filter(d=>d[4]==='loss').map(kRow).join('')}<tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Defects</td></tr>${FI_DEFS.filter(d=>d[4]==='defect').map(kRow).join('')}
-      </tbody></table></div>
-      ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
+    <div class="card" style="margin-top:16px"><h3>Yield and reject rate — year by year</h3>
+      <div id="fiYears" style="padding:4px 14px 12px"><span class="hint">Loading…</span></div></div>
     <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
     fiYearTable(Y);
   } catch(e){ fail(e); }
 }
-/* Class B (reject) and factory yield at a glance */
-function fiStrip(Y, g, tot){
-  const cb = tot('reject_pct'), cbT = tot('reject_target_pct'), fy = tot('fi_factory_yield'), ca = tot('fi_class_a_yield'), tl = tot('fi_tact_loss'), jc = tot('fi_job_change');
-  if ([cb,fy,ca,tl].every(v=>v==null)) return '';
-  const p = v => v==null ? '—' : v.toFixed(2)+'%';
-  return `<div class="stats" style="margin-top:-4px">
-    <div class="stat"><div class="eyebrow">Class B ratio (reject rate)</div><div class="v">${p(cb)}</div><div class="s">${cbT!=null?`Target ${p(cbT)}${cb!=null?` · ${cb<=cbT?'within target':'above target by '+(cb-cbT).toFixed(2)+' pts'}`:''}`:'No target set'}</div></div>
-    <div class="stat"><div class="eyebrow">Factory yield</div><div class="v">${p(fy)}</div><div class="s">Factory index, Plant 1</div></div>
-    <div class="stat"><div class="eyebrow">Class A yield</div><div class="v">${p(ca)}</div><div class="s">Saleable first-class output</div></div>
-    <div class="stat"><div class="eyebrow">Biggest time losses</div><div class="v" style="font-size:18px">${tl!=null?'Tact '+p(tl):'—'}</div><div class="s">${jc!=null?'Job change '+p(jc):''}</div></div>
-  </div>`;
-}
+/* yield efficiency and Class B (reject) against target, across years */
 async function fiYearTable(Y){
   const el = document.getElementById('fiYears'); if (!el) return;
-  const keys = ['yield_target_pct','yield_actual_pct','fi_factory_yield','fi_class_a_yield','reject_target_pct','reject_pct','fi_tact_loss','fi_job_change','fi_machine_trouble'];
-  const lbl = { yield_target_pct:'Yield efficiency — target', yield_actual_pct:'Total production yield', reject_target_pct:'Class B ratio — target', reject_pct:'Class B ratio (reject)' };
+  const keys = ['yield_target_pct','yield_actual_pct','reject_target_pct','reject_pct'];
+  const lbl = { yield_target_pct:'Yield efficiency — target', yield_actual_pct:'Yield efficiency — actual (total production yield)', reject_target_pct:'Class B ratio — target', reject_pct:'Class B ratio (reject)' };
   try {
     const { data, error } = await sb.from('bgt_kpis').select('year,month,metric,value').eq('month',0).in('metric', keys); if (error) throw error;
     const ys = [...new Set((data||[]).map(r=>r.year))].filter(y=>y<=Y).sort().slice(-7);

@@ -95,7 +95,8 @@ const RULES = `Finance budgeting rules:
 - Salaries, wages and employee benefits are excluded (HR budgets them). Agency/outsourced labor is OPEX.
 - CAPEX = unit cost at or above the CAPEX threshold AND useful life over one year; otherwise OPEX.
 - Spread amounts to the months they will actually be incurred or paid — not all in January.
-- Priority: Critical / Mandatory (stops operations or compliance/safety), High, Medium (can be deferred), Low / Discretionary.`;
+- Priority: Critical / Mandatory (stops operations or compliance/safety), High, Medium (can be deferred), Low / Discretionary.
+- Fuel, lubricants and other consumables are always OPEX and recurring (boilers, trucks, forklifts) — never CAPEX and never a one-off. Boiler diesel is issued in bulk, so judge it over a year or several months, as pesos or liters per board produced.`;
 
 async function plantRecordsText(db: SupabaseClient, deptId: string, year: number) {
   const rows: any[] = [];
@@ -114,7 +115,7 @@ async function plantRecordsText(db: SupabaseClient, deptId: string, year: number
 /* stores withdrawals (WRF) by budget line, last 3 years — what the department actually drew from the stockroom */
 async function storesText(db: SupabaseClient, deptId: string, Y: number) {
   const rows: any[] = [];
-  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('year,month,rec_date,line_item,section,item,amount,ref_no').eq('kind', 'issue').eq('department_id', deptId).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('year,month,rec_date,line_item,section,category,item,amount,ref_no').eq('kind', 'issue').eq('department_id', deptId).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
   if (!rows.length) return 'No stores withdrawals recorded.';
   const ys = [...new Set(rows.map(r => r.year))].sort();
   const out: string[] = [];
@@ -126,9 +127,9 @@ async function storesText(db: SupabaseClient, deptId: string, Y: number) {
     out.push(`- ${y} ${cl === 12 ? 'full year' : `Jan–${M[cl - 1]} (pace ×12/${cl} = ${peso(t / cl * 12)})`}: ${peso(t)} — ` + Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${peso(v)}`).join('; '));
     const sec: Record<string, number> = {}, it: Record<string, number> = {};
     r.filter(x => x.section).forEach(x => sec[x.section] = (sec[x.section] || 0) + Number(x.amount));
-    r.filter(x => x.ref_no !== 'SUMMARY' && Number(x.amount) >= 30000).forEach(x => it[x.item] = (it[x.item] || 0) + Number(x.amount));
+    r.filter(x => x.ref_no !== 'SUMMARY' && Number(x.amount) >= 30000 && !/FUEL|LUBRICANT|STATIONARY|CLEANING|PACKAGING/i.test(x.category || '') && !/DIESEL|GASOLINE|FUEL|OIL|LUBRIC|GREASE|LPG/i.test(x.item || '')).forEach(x => it[x.item] = (it[x.item] || 0) + Number(x.amount));
     if (Object.keys(sec).length) out.push(`  sections: ${Object.entries(sec).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
-    if (Object.keys(it).length) out.push(`  large single items (one-offs to check): ${Object.entries(it).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
+    if (Object.keys(it).length) out.push(`  large equipment/parts items (check if one-off or CAPEX; fuel and consumables are routine OPEX and excluded): ${Object.entries(it).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
   }
   return out.join('\n');
 }

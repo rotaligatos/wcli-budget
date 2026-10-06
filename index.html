@@ -2915,7 +2915,9 @@ async function issueView(Y, dept, iss){
   const items = {}; iss.filter(r=>r.ref_no!=='SUMMARY').forEach(r => { const k = r.item||'—'; (items[k] ||= { a:0, q:0, n:0, sec:new Set() }); items[k].a += amt(r); items[k].q += Number(r.qty)||0; items[k].n++; if (r.section) items[k].sec.add(r.section); });
   const topItems = Object.entries(items).sort((a,b)=>b[1].a-a[1].a).slice(0,15);
   const list = iss.filter(r=>r.ref_no!=='SUMMARY' && (!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.line_item,r.section,r.category]).toLowerCase().includes(S.rc.q.toLowerCase())));
-  const big = iss.filter(r=>r.ref_no!=='SUMMARY' && amt(r) >= 50000 && !/DIESEL|GASOLINE|FUEL/i.test(r.item||'')).sort((a,b)=>amt(b)-amt(a)).slice(0,8);
+  const consumable = r => /FUEL|LUBRICANT|STATIONARY|CLEANING|PACKAGING|MEDICAL|FORMS/i.test(r.category||'') || /DIESEL|GASOLINE|FUEL|OIL|LUBRIC|GREASE|LPG/i.test(r.item||'');
+  const big = iss.filter(r=>r.ref_no!=='SUMMARY' && amt(r) >= 50000 && !consumable(r)).sort((a,b)=>amt(b)-amt(a)).slice(0,8);
+  const fpb = await fuelPerBoard(Y, dept);
   const th = `<th class="r">${Y-2}</th><th class="r">${Y-1}</th><th class="r">${Y} ${span}${partial?'*':''}</th><th class="r">${Y-1} ${cspan}</th><th class="r">${Y} ${cspan}</th><th class="r">Change</th><th class="r">${Y} full-year pace</th>`;
   const z = v => v ? short(v) : '';
   return `<div class="stats">
@@ -2932,14 +2934,15 @@ async function issueView(Y, dept, iss){
     ${n?`<div class="card" style="margin-top:16px"><h3>Monthly ${Y}</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1060px;font-size:12.5px"><thead><tr><th>Budget line</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>
       ${lines.filter(li=>L0[li]).map(li=>{ const m = monthly(li); return `<tr><td style="font-size:12.5px">${esc(li.replace('REPAIRS AND MAINTENANCE','R&M'))}</td>${m.map(v=>`<td class="r num" style="font-size:12.5px">${v?short(v):''}</td>`).join('')}<td class="r num">${short(L0[li])}</td></tr>`; }).join('')}
     </tbody></table></div></div>`:''}
+    ${fpb}
     ${dRows.length?`<div class="card" style="margin-top:16px"><h3>By department</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Department</th>${th}</tr></thead><tbody>
       ${dRows.map(d=>`<tr><td>${esc(recDept(d.id))}</td><td class="r num">${z(d.p2)}</td><td class="r num">${z(d.p)}</td><td class="r num">${z(d.y)}</td><td class="r num">${z(d.ps)}</td><td class="r num">${z(d.yc)}</td><td class="r num">${cl&&d.ps?pct(d.yc,d.ps):''}</td><td class="r num">${cl&&d.yc?short(d.yc/cl*12):''}</td></tr>`).join('')}
     </tbody></table></div></div>`:''}
     ${topSec.length?`<div class="card" style="margin-top:16px"><h3>Where it goes — sections and equipment ${Object.keys(secY).length?Y:Y-1}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Section / equipment</th><th class="r">${Object.keys(secY).length?Y+' '+span:Y-1}</th>${Object.keys(secY).length?`<th class="r">${Y-1} full year</th>`:''}</tr></thead><tbody>
       ${topSec.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${short(v)}</td>${Object.keys(secY).length?`<td class="r num">${secP[k]?short(secP[k]):''}</td>`:''}</tr>`).join('')}</tbody></table></div></div>`:''}
-    ${big.length?`<div class="card" style="margin-top:16px"><h3>Large single withdrawals to review</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Item</th><th>Department / section</th><th class="r">Amount</th></tr></thead><tbody>
+    ${big.length?`<div class="card" style="margin-top:16px"><h3>Large equipment and parts withdrawals to review</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Item</th><th>Department / section</th><th class="r">Amount</th></tr></thead><tbody>
       ${big.map(r=>`<tr><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.item||'')}</td><td style="font-size:12.5px">${esc(recDept(r.department_id))} · ${esc(r.section||'')}</td><td class="r num">${peso(r.amount)}</td></tr>`).join('')}
-    </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Equipment such as laptops or major parts may belong in CAPEX rather than the department's OPEX.</p></div>`:''}
+    </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Fuel, lubricants and other consumables are routine OPEX and are not listed. Equipment such as laptops may belong in CAPEX rather than the department's OPEX.</p></div>`:''}
     ${topItems.length?`<div class="card" style="margin-top:16px"><h3>Top items ${Y}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Item</th><th class="r">Quantity</th><th class="r">Withdrawals</th><th>Used at</th><th class="r">Amount</th></tr></thead><tbody>
       ${topItems.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${Math.round(v.q).toLocaleString('en-PH')}</td><td class="r num">${v.n}</td><td style="font-size:12.5px">${esc([...v.sec].slice(0,3).join(', '))}</td><td class="r num">${short(v.a)}</td></tr>`).join('')}
     </tbody></table></div></div>`:''}
@@ -3001,6 +3004,26 @@ function importStoresDialog(){
       S.rc.cache = {}; closeModal(); toast(`${rows.length.toLocaleString('en-PH')} withdrawals imported`); renderRecords();
     } catch(e){ fail(e); $('#stGo').disabled = false; }
   };
+}
+
+/* boiler fuel per board produced — diesel is issued in bulk, so look at whole years and a rolling 3-month view */
+async function fuelPerBoard(Y, dept){
+  const P = S.depts.find(d=>d.code==='PROD'); if (!P || (dept && dept!==P.id)) return '';
+  const ys = [Y-2, Y-1, Y], data = await Promise.all(ys.map(y=>loadIssues(y, null).catch(()=>[]))), K = await Promise.all(ys.map(y=>loadKpis(y).catch(()=>[])));
+  const isBoiler = r => /BOILER/i.test(r.section||'');
+  const fuelOf = rows => { const det = rows.some(r=>r.ref_no!=='SUMMARY' && r.section); return { det, rows: rows.filter(r=>r.line_item==='GAS AND OIL' && (det ? isBoiler(r) : r.department_id===P.id)) }; };
+  const series = ys.map((y,i)=>{ const f = fuelOf(data[i]); const fm = MONTHS.map((_,m)=>sum(f.rows.filter(r=>r.month===m+1).map(r=>Number(r.amount)||0)));
+    const bm = MONTHS.map((_,m)=>{ const k = K[i].find(x=>x.metric==='production_output' && x.month===m+1); return k ? Number(k.value) : null; }); return { y, det:f.det, fm, bm }; });
+  const yr = series.map(s=>{ const ms = MONTHS.map((_,m)=>m).filter(m=>s.bm[m]); const last = Math.max(-1, ...MONTHS.map((_,m)=>m).filter(m=>s.fm[m]>0));
+    const use = ms.filter(m=>m<=last); const f = sum(use.map(m=>s.fm[m])), b = sum(use.map(m=>s.bm[m])); return { y:s.y, f, b, n:use.length, pb: b ? f/b : null, det:s.det }; }).filter(x=>x.f);
+  if (!yr.length) return '';
+  // rolling 3 months across the series
+  const flat = []; series.forEach(s=>MONTHS.forEach((_,m)=>flat.push({ y:s.y, m, f:s.fm[m], b:s.bm[m] })));
+  const roll = flat.map((x,i)=>{ const w = flat.slice(Math.max(0,i-2), i+1); if (w.some(z=>z.b==null)) return null; const f = sum(w.map(z=>z.f)), b = sum(w.map(z=>z.b)); return b ? { ...x, pb:f/b } : null; }).filter(Boolean).filter(x=>x.y===Y || x.y===Y-1).filter(x=>x.f || flat.some(z=>z.y===x.y && z.m>x.m && z.f));
+  return `<div class="card" style="margin-top:16px"><h3>Boiler fuel per board produced</h3>
+    <div class="stats" style="padding:0 14px;margin:0 0 6px">${yr.map(x=>`<div class="stat"><div class="eyebrow">${x.y}${x.n<12?` · ${x.n} months`:''}</div><div class="v">${x.pb!=null?peso(x.pb,2):'—'}</div><div class="s">${short(x.f)} fuel ÷ ${Math.round(x.b).toLocaleString('en-PH')} boards</div></div>`).join('')}</div>
+    ${roll.length?`<div class="tbl-wrap"><table class="ledger" style="font-size:12.5px"><thead><tr><th>Rolling 3 months, ending</th>${roll.map(x=>`<th class="r">${MONTHS[x.m]} ${String(x.y).slice(2)}</th>`).join('')}</tr></thead><tbody><tr><td>₱ per board</td>${roll.map(x=>`<td class="r num">${peso(x.pb,2)}</td>`).join('')}</tr></tbody></table></div>`:''}
+    <p class="hint" style="padding:8px 14px 12px;margin:0">${yr.some(x=>x.det)?'Diesel withdrawn for the boilers':'Production\'s fuel and oil withdrawals (approximate — import the report file to isolate the boilers)'} ÷ boards produced. Diesel is issued in bulk (about 3,500 liters per boiler), so single months jump; the yearly and rolling figures are the ones to budget from. Months after the last fuel withdrawal are left out.</p></div>`;
 }
 
 boot();

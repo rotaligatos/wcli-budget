@@ -2042,8 +2042,17 @@ async function applySuggestion(){
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
   ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (to produce)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
-  ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
+  ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
+/* factory index — Plant 1 production monthly performance report */
+const FI_DEFS = [
+  ['fi_factory_yield','Factory yield','%','pct','yield'],['fi_pressing_yield','Pressing yield','%','pct','yield'],['fi_time_yield','Time yield','%','pct','yield'],
+  ['fi_class_a_yield','Class A yield','%','pct','yield'],['fi_class_b_yield','Class B yield','%','pct','yield'],
+  ['fi_machine_trouble','Machine trouble','% loss','pct','loss'],['fi_job_change','Job change','% loss','pct','loss'],['fi_tact_loss','Tact time loss','% loss','pct','loss'],
+  ['fi_def_handling','Defect — handling','%','pct','defect'],['fi_def_machine','Defect — machine','%','pct','defect'],['fi_def_mip','Defect — MIP','%','pct','defect'],
+  ['fi_def_inprocess','Defect — in-process','%','pct','defect'],['fi_def_rawboard','Defect — raw board','%','pct','defect']
+];
+const ALL_KPI = () => KPI_DEFS.concat(FI_DEFS);
 S.pf = { year:null };
 async function loadKpis(year){ const k = 'k'+year; if (S.ol.cache[k]) return S.ol.cache[k]; const { data, error } = await sb.from('bgt_kpis').select('*').eq('year', year); if (error) throw error; return (S.ol.cache[k] = data||[]); }
 async function renderPerf(){
@@ -2053,9 +2062,12 @@ async function renderPerf(){
     const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData();
     const D = await loadYearData(Y, null).catch(()=>null), M = D ? actModel(D,'budget') : null;
     const g = (m, mo) => { const r = K.find(x=>x.metric===m && x.month===mo); return r ? Number(r.value) : null; };
-    const tot = m => { const a = g(m,0); if (a!=null) return a; const v = MONTHS.map((_,i)=>g(m,i+1)).filter(x=>x!=null); return v.length ? (KPI_DEFS.find(d=>d[0]===m)[3]==='pct' ? sum(v)/v.length : sum(v)) : null; };
+    const tot = m => { const a = g(m,0); if (a!=null) return a; const v = MONTHS.map((_,i)=>g(m,i+1)).filter(x=>x!=null); return v.length ? ((ALL_KPI().find(d=>d[0]===m)||[])[3]==='pct' ? sum(v)/v.length : sum(v)) : null; };
     const opexM = M ? M.monthly.act : Array(12).fill(0), closed = M?.closed||0;
     const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
+    const ph = (k,t) => { const v = tot(k); return v==null ? '' : t==='pct' ? v.toFixed(2) : Math.round(v); };
+    const kRow = ([k,l,u,t]) => `<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
+        return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${ph(k,t)}"`:''}>`:`<span class="num">${t==='pct'&&(mo===0?tot(k):v)!=null?(mo===0?tot(k):v).toFixed(2)+'%':fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`;
     const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
     // sales and volume: every month entered; OPEX ratios: only months that have both OPEX actuals and the figure
     const avail = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)!=null); return ms.length ? { sum:sum(ms.map(mo=>g(m,mo))), last:Math.max(...ms), n:ms.length, ms } : null; };
@@ -2081,8 +2093,7 @@ async function renderPerf(){
     ${perfYieldStrip(Y, g, tot)}
     ${!closed && (sA||vA) ? `<div class="banner blue">Sales and volume for ${Y} are recorded. Plant OPEX per board and OPEX as % of sales need ${Y} expense actuals${canManageData()?' — upload them on the Actuals page':''}.</div>` : ''}
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
-      ${KPI_DEFS.map(([k,l,u,t])=>`<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
-        return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
+      ${KPI_DEFS.map(kRow).join('')}
       <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
       <tr class="calc"><td class="act">Trade share of boards sold<div class="item" style="text-transform:none">imported, or sold − produced</div></td>${MONTHS.map((_,i)=>{ const s0 = g('volume_sold',i+1), im = g('volume_imported',i+1) ?? (s0!=null && g('production_output',i+1)!=null ? Math.max(0, s0 - g('production_output',i+1)) : null); return `<td class="r num">${s0&&im!=null?(100*im/s0).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>g('volume_sold',m) && (g('volume_imported',m)!=null || g('production_output',m)!=null)); if (!ms.length) return ''; const so = sum(ms.map(m=>g('volume_sold',m))), im = sum(ms.map(m=>g('volume_imported',m) ?? Math.max(0, g('volume_sold',m) - g('production_output',m)))); return so?(100*im/so).toFixed(0)+'%':''; })()}</td></tr>
@@ -2091,8 +2102,47 @@ async function renderPerf(){
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
+    ${fiStrip(Y, g, tot)}
+    <div class="card" style="margin-top:16px"><h3>Factory index — Plant 1 production</h3>
+      <div class="hint" style="padding:0 14px 8px">From the Monthly Performance Report. Total production yield is the production yield efficiency row above; Class B ratio is treated as the reject rate.</div>
+      <div id="fiYears" style="padding:0 14px 12px"><span class="hint">Loading year-by-year…</span></div>
+      <div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
+      <tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Yields</td></tr>${FI_DEFS.filter(d=>d[4]==='yield').map(kRow).join('')}<tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Time losses</td></tr>${FI_DEFS.filter(d=>d[4]==='loss').map(kRow).join('')}<tr class="grp"><td colspan="14" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">Defects</td></tr>${FI_DEFS.filter(d=>d[4]==='defect').map(kRow).join('')}
+      </tbody></table></div>
+      ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
     <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
+    fiYearTable(Y);
   } catch(e){ fail(e); }
+}
+/* Class B (reject) and factory yield at a glance */
+function fiStrip(Y, g, tot){
+  const cb = tot('reject_pct'), cbT = tot('reject_target_pct'), fy = tot('fi_factory_yield'), ca = tot('fi_class_a_yield'), tl = tot('fi_tact_loss'), jc = tot('fi_job_change');
+  if ([cb,fy,ca,tl].every(v=>v==null)) return '';
+  const p = v => v==null ? '—' : v.toFixed(2)+'%';
+  return `<div class="stats" style="margin-top:-4px">
+    <div class="stat"><div class="eyebrow">Class B ratio (reject rate)</div><div class="v">${p(cb)}</div><div class="s">${cbT!=null?`Target ${p(cbT)}${cb!=null?` · ${cb<=cbT?'within target':'above target by '+(cb-cbT).toFixed(2)+' pts'}`:''}`:'No target set'}</div></div>
+    <div class="stat"><div class="eyebrow">Factory yield</div><div class="v">${p(fy)}</div><div class="s">Factory index, Plant 1</div></div>
+    <div class="stat"><div class="eyebrow">Class A yield</div><div class="v">${p(ca)}</div><div class="s">Saleable first-class output</div></div>
+    <div class="stat"><div class="eyebrow">Biggest time losses</div><div class="v" style="font-size:18px">${tl!=null?'Tact '+p(tl):'—'}</div><div class="s">${jc!=null?'Job change '+p(jc):''}</div></div>
+  </div>`;
+}
+async function fiYearTable(Y){
+  const el = document.getElementById('fiYears'); if (!el) return;
+  const keys = ['yield_target_pct','yield_actual_pct','fi_factory_yield','fi_class_a_yield','reject_target_pct','reject_pct','fi_tact_loss','fi_job_change','fi_machine_trouble'];
+  const lbl = { yield_target_pct:'Yield efficiency — target', yield_actual_pct:'Total production yield', reject_target_pct:'Class B ratio — target', reject_pct:'Class B ratio (reject)' };
+  try {
+    const { data, error } = await sb.from('bgt_kpis').select('year,month,metric,value').eq('month',0).in('metric', keys); if (error) throw error;
+    const ys = [...new Set((data||[]).map(r=>r.year))].filter(y=>y<=Y).sort().slice(-7);
+    if (!ys.length) { el.innerHTML = ''; return; }
+    const v = (k,y) => { const r = data.find(x=>x.metric===k && x.year===y); return r ? Number(r.value) : null; };
+    const name = k => lbl[k] || (ALL_KPI().find(d=>d[0]===k)||[,k])[1];
+    const bad = (k,y) => { const a = v(k,y); if (a==null) return false;
+      if (k==='yield_actual_pct') { const t = v('yield_target_pct',y); return t!=null && a<t; }
+      if (k==='reject_pct') { const t = v('reject_target_pct',y); return t!=null && a>t; } return false; };
+    el.innerHTML = `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Year by year</th>${ys.map(y=>`<th class="r">${y}${y===new Date().getFullYear()?' YTD':''}</th>`).join('')}</tr></thead><tbody>
+      ${keys.filter(k=>ys.some(y=>v(k,y)!=null)).map(k=>`<tr><td class="act">${name(k)}</td>${ys.map(y=>{ const a = v(k,y); return `<td class="r num" ${bad(k,y)?'style="color:var(--red,#b42318);font-weight:600"':''}>${a==null?'':a.toFixed(2)+'%'}</td>`; }).join('')}</tr>`).join('')}
+      </tbody></table></div><div class="hint" style="margin-top:6px">Red = missed the target that year (yield below target, or Class B above target).</div>`;
+  } catch(e){ el.innerHTML = '<span class="hint">Year-by-year view not available.</span>'; }
 }
 async function saveKpis(Y){
   const K = await loadKpis(Y), ups = [], dels = [];
@@ -2107,7 +2157,7 @@ async function saveKpis(Y){
 async function exportKpiTemplate(){
   const Y = S.pf.year, K = await loadKpis(Y), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`${Y} performance`);
   const h = ws.addRow(['Measure', 'Code', ...MONTHS, 'Year']); h.font = { bold:true };
-  KPI_DEFS.forEach(([k,l,u]) => ws.addRow([`${l} (${u})`, k, ...[...MONTHS.map((_,i)=>i+1),0].map(m=>{ const r = K.find(x=>x.metric===k && x.month===m); return r ? Number(r.value) : null; })]));
+  ALL_KPI().forEach(([k,l,u]) => ws.addRow([`${l} (${u})`, k, ...[...MONTHS.map((_,i)=>i+1),0].map(m=>{ const r = K.find(x=>x.metric===k && x.month===m); return r ? Number(r.value) : null; })]));
   ws.getColumn(1).width = 34; ws.getColumn(2).width = 18; for (let i=3;i<=15;i++){ ws.getColumn(i).width = 14; ws.getColumn(i).numFmt = '#,##0.##'; }
   ws.addRow([]); ws.addRow(['Keep the Code column. "Year" is for annual targets or totals.']);
   download(await wb.xlsx.writeBuffer(), `${Y} Sales and plant performance - ${S.company.code}.xlsx`); toast('Downloaded');
@@ -2123,7 +2173,7 @@ function importKpiDialog(){
       const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : v;
       const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), ci = head.indexOf('code');
       if (ci<1) { $('#kfMsg').textContent = 'No "Code" column found in the first row.'; return; }
-      const codes = KPI_DEFS.map(d=>d[0]), ups = [];
+      const codes = ALL_KPI().map(d=>d[0]), ups = [];
       for (let r=2; r<=ws.rowCount; r++) { const row = ws.getRow(r), code = String(cv(row.getCell(ci).value)||'').trim(); if (!codes.includes(code)) continue;
         for (let m=0; m<=12; m++) { const col = m===0 ? head.indexOf('year') : head.indexOf(MONTHS[m-1].toLowerCase()); if (col<1) continue;
           const v = cv(row.getCell(col).value); if (v==null || v==='' || isNaN(Number(v))) continue;

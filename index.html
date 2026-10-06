@@ -239,6 +239,16 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
 .ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
 .ins{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:var(--r);padding:10px 14px;font-size:13px}
 .ins.red{border-left-color:var(--red)}.ins.amber{border-left-color:#D9A441}
+.spark{display:block}
+.trend td.fc{color:var(--muted);font-style:italic}.trend .hedit{color:inherit;cursor:pointer;border-bottom:1px dotted var(--line-strong)}.trend .srclink{color:var(--teal);cursor:pointer;font-weight:600}
+.ychart{display:flex;gap:clamp(6px,2vw,18px);align-items:flex-end;height:170px;padding-bottom:4px}
+.ychart .yc{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;min-width:0}
+.ychart .bars{flex:1;width:100%;display:flex;gap:4px;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--line)}
+.ychart .bars i{display:block;width:34%;max-width:34px;border-radius:2px 2px 0 0;min-height:1px}
+.ychart .bars i.b{background:var(--teal-wash);border:1px dashed var(--teal);border-bottom:0}.ychart .bars i.a{background:var(--teal)}.ychart .bars i.a.over{background:var(--red)}
+.ychart .yl{font-size:12px;text-align:center;padding-top:6px;line-height:1.7}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:6px 0 8px}.legend i{display:inline-block;width:12px;height:10px;margin-right:6px;vertical-align:-1px}
+.legend .lb{background:var(--teal-wash);border:1px dashed var(--teal)}.legend .la{background:var(--teal)}
 .ins ul{margin:6px 0 0;padding-left:18px}.ins li{margin:3px 0}.ins a{color:var(--teal);cursor:pointer;font-weight:600}.ins small{color:var(--faint)}
 .mchart{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:140px;align-items:end}
 .mchart>div{position:relative;height:100%;display:flex;align-items:flex-end}
@@ -1683,6 +1693,7 @@ async function renderOutlook(){
         ${a.value_text?`<div class="s">${esc(a.value_text)}</div>`:''}
         ${a.outlook?`<div class="means"><b>For the budget:</b> ${esc(a.outlook)}</div>`:''}
         <div class="src">${a.source_url?`<a href="${esc(a.source_url)}" target="_blank" rel="noopener">${esc(a.source_title||'Source')}</a>`:esc(a.source_title||'')}${a.as_of?` · ${a.as_of}`:''}${ed?` · <a onclick="editAssump('${a.id}')">Edit</a>`:''}</div></div>`).join('')}</div>`; }).join('')}
+    <div id="olTrend"><div class="loading">Loading the five-year trend…</div></div>
     <h3 class="sec">Sales and production direction</h3>
     <div class="ol-grid">
       <div class="ol-card"><div class="eyebrow">Sales target ${y}</div><div class="v">${sT!=null?short(sT):'—'}</div><div class="s">${sA!=null?`${y-1} actual (full-year rate): ${short(sA)}${sT!=null&&sA?` (${sT>=sA?'+':''}${Math.round(100*(sT-sA)/sA)}%)`:''}`:`No ${y-1} sales recorded yet.`}</div><div class="means">Volume-driven costs (power, boiler fuel, supplies, delivery, agency helpers) should move with sales and production.</div></div>
@@ -1698,6 +1709,7 @@ async function renderOutlook(){
           <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveDrivers(${y})">Save changes</button></div>`:''}</div>`;
+    renderTrend(y, o);
   } catch(e){ fail(e); }
 }
 async function saveDrivers(y){
@@ -1734,6 +1746,180 @@ async function editAssump(id){
   };
 }
 async function delAssump(id){ const r = await sb.from('bgt_assumptions').delete().eq('id', id); if (r.error) return fail(r.error); S.ol.cache = {}; closeModal(); toast('Deleted'); renderOutlook(); }
+
+/* ================= FIVE-YEAR TREND & BUDGET COMPLIANCE ================= */
+// key, label, unit, type ('rate' = a % figure, 'level' = a price), outlook keys that point to it
+const IND_DEFS = [
+  ['inflation','Inflation','%','rate',['inflation_now','inflation_2027']],
+  ['usdphp','Peso per US dollar','₱','level',['usdphp']],
+  ['dubai_crude','Dubai crude','US$/bbl','level',['dubai_crude']],
+  ['diesel','Diesel, Metro Manila','₱/liter','level',['diesel']],
+  ['meralco','Meralco rate','₱/kWh','level',['meralco']],
+  ['min_wage_ncr','NCR minimum wage','₱/day','level',['min_wage_ncr']],
+  ['gdp','GDP growth','%','rate',['gdp']],
+  ['policy_rate','BSP policy rate','%','rate',['policy_rate']]
+];
+const BASIS_TXT = { avg:'yearly average', year_end:'at year-end', ytd:'so far this year', forecast:'outlook' };
+const indDef = k => IND_DEFS.find(d=>d[0]===k);
+const indOfDriver = k => IND_DEFS.find(d=>d[4].includes(k))?.[0] || null;
+async function loadHist(){ if (S.ol.cache.hist) return S.ol.cache.hist; const { data, error } = await sb.from('bgt_indicator_history').select('*').order('year'); if (error) throw error; return (S.ol.cache.hist = data||[]); }
+const hv = (H, k, y) => H.find(h=>h.key===k && h.year===y);
+const fmtInd = (d, v) => v==null ? '—' : d[2]==='%' ? Number(v).toLocaleString('en-PH',{minimumFractionDigits:1,maximumFractionDigits:2})+'%' : (d[2].startsWith('₱')?'₱':'') + Number(v).toLocaleString('en-PH',{minimumFractionDigits:Number(v)>=100?0:2, maximumFractionDigits:Number(v)>=100?0:2});
+const pctTxt = (p, dp=0) => p==null || !isFinite(p) ? '—' : (p>=0?'+':'') + p.toFixed(dp) + '%';
+function spark(vals, fc){ // vals: numbers or null; fc: index drawn as a dashed outlook point
+  const W=112, H=28, p=3, nn=vals.filter(v=>v!=null); if (nn.length<2) return '';
+  const xs = vals.map((_,i)=>p+i*(W-2*p)/Math.max(1,vals.length-1)), mn=Math.min(...nn), mx=Math.max(...nn), yy = v => H-p-(mx===mn?.5:(v-mn)/(mx-mn))*(H-2*p);
+  const pts = vals.map((v,i)=>v==null?null:[+xs[i].toFixed(1), +yy(v).toFixed(1)]), hist = pts.filter((q,i)=>q && i!==fc);
+  let f = ''; if (fc!=null && pts[fc]) { const last = pts.slice(0,fc).reverse().find(Boolean); if (last) f = `<polyline points="${last} ${pts[fc]}" fill="none" stroke="var(--muted)" stroke-dasharray="3 2" stroke-width="1.5"/><circle cx="${pts[fc][0]}" cy="${pts[fc][1]}" r="2.6" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.4"/>`; }
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${hist.join(' ')}" fill="none" stroke="var(--teal)" stroke-width="1.8"/>${hist.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="2" fill="var(--teal)"/>`).join('')}${f}</svg>`;
+}
+// change of an indicator between two years: % for prices, cumulative for inflation, points for rates
+function indChange(H, k, y0, y1){
+  const d = indDef(k); if (!d) return null;
+  if (k==='inflation') { let f = 1; for (let y=y0+1; y<=y1; y++){ const h = hv(H,k,y); if (h?.value==null) return null; f *= 1+Number(h.value)/100; } const pct = (f-1)*100;
+    return { pct, txt:`prices ${pctTxt(pct,1)} (inflation ${y0+1===y1?y1:(y0+1)+'–'+y1})` }; }
+  const a = hv(H,k,y0)?.value, b = hv(H,k,y1)?.value; if (a==null || b==null) return null;
+  if (d[3]==='rate') return { pct:null, txt:`${fmtInd(d,a)} → ${fmtInd(d,b)}` };
+  const pct = 100*(b-a)/a; return { pct, txt:`${fmtInd(d,a)} → ${fmtInd(d,b)} (${pctTxt(pct)})` };
+}
+async function yearCompliance(y, drvItems){
+  const D = await loadYearData(y, null), M = actModel(D, 'budget'), n = M.closed;
+  const opexAct = D.act.filter(a=>a.kind!=='capex'), budLines = M.rows.filter(r=>r.budYTD>0), unb = M.rows.filter(r=>!r.budFY && r.actYTD>0);
+  const ratio = list => { const b = sum(list.map(r=>r.budYTD)); return b ? 100*sum(list.map(r=>r.actYTD))/b : null; };
+  const dAct = new Set(opexAct.map(a=>a.department_id)), dBud = new Set(D.bud.map(l=>l.department_id));
+  return { y, n, M, hasBud:M.budFY>0, hasAct:opexAct.length>0, budFY:M.budFY, budYTD:M.budYTD, actYTD:M.actYTD,
+    pctAll: M.budYTD ? 100*M.actYTD/M.budYTD : null, pctBudLines: ratio(budLines), unbAmt: sum(unb.map(r=>r.actYTD)), unb,
+    within: budLines.filter(r=>Math.abs(r.actYTD-r.budYTD)<=0.1*r.budYTD).length, nBud: budLines.length,
+    over: budLines.filter(r=>r.actYTD>1.1*r.budYTD), under: budLines.filter(r=>r.actYTD<0.5*r.budYTD),
+    pctDrv: ratio(budLines.filter(r=>drvItems.has(r.item))), pctOther: ratio(budLines.filter(r=>!drvItems.has(r.item))),
+    noBudDepts: [...dAct].filter(d=>!dBud.has(d)).map(d=>deptById(d)?.name||'?'),
+    capBud: sum(D.capBud.map(annual)), capAct: sum(D.act.filter(a=>a.kind==='capex').map(a=>Number(a.amount)||0)),
+    fullYr: n ? M.actYTD*12/n : null, rowsByItem: Object.fromEntries(M.rows.map(r=>[r.item, r])) };
+}
+const compChip = p => p==null ? '<span class="hint">—</span>' : `<span class="chip ${p>110?'pri-crit':p<50?'pri-med':p<90?'basis-working':'pri-ok'}">${Math.round(p)}%</span>`;
+async function renderTrend(Y, o){
+  const box = $('#olTrend'); if (!box) return;
+  try {
+    const H = await loadHist(), yrs = [Y-5, Y-4, Y-3, Y-2, Y-1], ed = canManageData();
+    const drvItems = new Set((o.D||[]).filter(d=>(d.driver_keys||[]).length).map(d=>d.line_item));
+    const C = await Promise.all(yrs.map(y=>yearCompliance(y, drvItems).catch(e=>{ console.error(e); return { y, err:true }; })));
+    const withAct = C.filter(c=>c.hasAct), withBoth = C.filter(c=>c.hasAct && c.hasBud);
+    const cell = (k, y) => { const d = indDef(k), h = hv(H,k,y);
+      const t = h ? `${BASIS_TXT[h.basis]||''}${h.period?' · '+h.period:''}${h.approx?' · approximate':''}${h.note?' — '+h.note:''}${h.source_title?' · '+h.source_title:''}` : 'Not recorded';
+      const inner = `${h?.value!=null?fmtInd(d,h.value):'—'}${h?.approx?'<sup>≈</sup>':''}${h?.basis==='ytd'?`<div class="item" style="text-transform:none">${esc(h.period||'YTD')}</div>`:''}`;
+      return `<td class="r num${h?.basis==='forecast'?' fc':''}" title="${esc(t)}">${ed?`<a class="hedit" onclick="editHist('${k}',${y})">${inner}</a>`:inner}</td>`; };
+
+    // 1 — indicator trend
+    const indTbl = `<div class="card"><h3>Economic indicators, ${yrs[0]}–${Y-1} and the ${Y} outlook</h3>
+      <div class="tbl-wrap"><table class="ledger trend" style="min-width:900px"><thead><tr><th>Indicator</th>${yrs.map(y=>`<th class="r">${y}</th>`).join('')}<th class="r">${Y} outlook</th><th>Trend</th><th class="r">${yrs[0]}→${Y-1}</th></tr></thead><tbody>
+      ${IND_DEFS.map(d=>{ const vals = [...yrs, Y].map(y=>{ const h = hv(H,d[0],y); return h?.value!=null ? Number(h.value) : null; });
+        const a = vals.find(v=>v!=null), b = vals[4]; const ch = a==null||b==null ? '—' : d[3]==='rate' ? `${(b-a>=0?'+':'')}${(b-a).toFixed(1)} pts` : pctTxt(100*(b-a)/a);
+        return `<tr><td class="act" style="white-space:nowrap">${esc(d[1])}<div class="item" style="text-transform:none">${esc(d[2])} · <a class="srclink" onclick="histSources('${d[0]}')">sources</a></div></td>${[...yrs, Y].map(y=>cell(d[0],y)).join('')}<td>${spark(vals, 5)}</td><td class="r num">${ch}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      <p class="hint" style="padding:8px 14px 12px;margin:0">Yearly averages, except the minimum wage and the policy rate (rate in force at year-end). ${Y-1} is the year so far. <sup>≈</sup> means the figure is averaged from the months that could be found. Hover a figure for its basis and source${ed?'; click it to correct it':''}.</p></div>`;
+
+    // 2 — plant budget compliance by year
+    const fy = withAct.filter(c=>c.fullYr);
+    const maxV = Math.max(1, ...C.map(c=>Math.max(c.budFY||0, c.fullYr||0)));
+    const chart = `<div class="ychart">${C.map(c=>`<div class="yc"><div class="bars">
+        <i class="b" style="height:${100*(c.budFY||0)/maxV}%" title="Budget ${c.y}: ${peso(c.budFY||0)}"></i>
+        <i class="a${c.pctAll>110?' over':''}" style="height:${100*(c.fullYr||0)/maxV}%" title="Actual ${c.y}, full-year view: ${peso(c.fullYr||0)}"></i></div>
+        <div class="yl"><b>${c.y}</b><br>${c.pctAll!=null?compChip(c.pctAll):c.hasAct?'<span class="hint">no budget</span>':c.hasBud?'<span class="hint">no actuals</span>':'<span class="hint">no data</span>'}</div></div>`).join('')}</div>
+      <div class="legend"><span><i class="lb"></i>Budget (full year)</span><span><i class="la"></i>Actual, full-year view (months so far × 12 ÷ months)</span></div>`;
+    const R = (label, f, hint='') => `<tr><td class="act" style="font-size:13px">${label}${hint?`<div class="item" style="text-transform:none">${hint}</div>`:''}</td>${C.map(c=>`<td class="r num">${c.err?'error':f(c)}</td>`).join('')}</tr>`;
+    const none = c => !c.hasAct && !c.hasBud;
+    const compTbl = `<div class="card" style="margin-top:14px"><h3>Plant OPEX budget compliance by year</h3>
+      <div style="padding:12px 14px 4px">${chart}</div>
+      <div class="tbl-wrap"><table class="ledger trend" style="min-width:860px"><thead><tr><th>Measure</th>${C.map(c=>`<th class="r">${c.y}</th>`).join('')}</tr></thead><tbody>
+      ${R('Months with actuals', c=>none(c)?'—':c.hasAct?thru(c.n):'none')}
+      ${R('Budget, full year', c=>c.hasBud?short(c.budFY):'—')}
+      ${R('Budget for the same months', c=>c.hasBud&&c.hasAct?short(c.budYTD):'—')}
+      ${R('Actual spend', c=>c.hasAct?short(c.actYTD):'—')}
+      ${R('<b>Actual vs budget</b>', c=>c.hasBud&&c.hasAct?compChip(c.pctAll):'—', 'all lines, same months')}
+      ${R('Budgeted lines only', c=>c.hasBud&&c.hasAct?compChip(c.pctBudLines):'—', 'spend on lines that had a budget')}
+      ${R('Spent with no budget line', c=>c.hasAct&&c.hasBud?`<span style="color:${c.unbAmt?'var(--red)':'inherit'}">${short(c.unbAmt)}</span>`:'—')}
+      ${R('Lines within ±10% of budget', c=>c.hasBud&&c.hasAct?`${c.within} of ${c.nBud}`:'—')}
+      ${R('Lines over budget by more than 10%', c=>c.hasBud&&c.hasAct?c.over.length:'—')}
+      ${R('Lines using under half their budget', c=>c.hasBud&&c.hasAct?c.under.length:'—')}
+      ${R('Lines tied to an outside driver', c=>c.hasBud&&c.hasAct?compChip(c.pctDrv):'—', 'fuel, power, wages, FX-linked')}
+      ${R('All other lines', c=>c.hasBud&&c.hasAct?compChip(c.pctOther):'—')}
+      ${R('CAPEX budget / actual', c=>c.capBud||c.capAct?`${c.capBud?short(c.capBud):'—'} / ${c.capAct?short(c.capAct):'—'}`:'—')}
+      ${R('Inflation that year', c=>{ const h = hv(H,'inflation',c.y); return h?.value!=null?Number(h.value).toFixed(1)+'%':'—'; })}
+      ${R('Diesel that year', c=>{ const h = hv(H,'diesel',c.y); return h?.value!=null?'₱'+Number(h.value).toFixed(2):'—'; })}
+      </tbody></table></div>
+      ${C.some(c=>c.noBudDepts?.length && c.hasBud) ? `<p class="hint" style="padding:8px 14px 0;margin:0">Departments with spending but no budget loaded: ${C.filter(c=>c.noBudDepts?.length && c.hasBud).map(c=>`<b>${c.y}</b> ${esc(c.noBudDepts.join(', '))}`).join(' · ')}. Their spending counts as "no budget line".</p>` : ''}
+      <p class="hint" style="padding:8px 14px 12px;margin:0">Payroll and benefits are not in department budgets or in these actuals. Green: 90–110% of budget. Blue: 50–90%. Grey: under 50%. Red: over 110%.</p></div>`;
+
+    // 3 — line behaviour vs its driver
+    const lines = [...new Set([...drvItems, ...withAct.flatMap(c=>c.M.rows.filter(r=>r.actYTD>=300000).map(r=>r.item))])];
+    const lineRows = lines.map(item => {
+      const vals = C.map(c => { const r = c.rowsByItem?.[item]; return c.hasAct && c.n && r && r.actYTD ? r.actYTD*12/c.n : null; });
+      const idx = vals.map((v,i)=>v?i:-1).filter(i=>i>=0); if (!idx.length) return null;
+      const i0 = idx[0], i1 = idx[idx.length-1], y0 = C[i0].y, y1 = C[i1].y, sp = i1>i0 ? 100*(vals[i1]-vals[i0])/vals[i0] : null;
+      const dk = (o.D.find(d=>d.line_item===item)?.driver_keys||[]).map(indOfDriver).filter(Boolean);
+      const ind = [...new Set(dk)].find(k=>indChange(H,k,y0,y1)) || (i1>i0 ? 'inflation' : null), ich = ind && i1>i0 ? indChange(H, ind, y0, y1) : null;
+      let read = sp==null ? '<span class="hint">One year of actuals</span>' : '<span class="hint">—</span>';
+      if (sp!=null && ich?.pct!=null) { const gap = sp - ich.pct;
+        read = gap > 15 ? `<span class="chip pri-high">Grew faster than its driver</span>` : gap < -15 ? `<span class="chip basis-working">Grew slower than its driver</span>` : `<span class="chip pri-ok">Moved with its driver</span>`; }
+      const comp = C.filter(c=>c.hasAct && c.hasBud).map(c=>{ const r = c.rowsByItem[item]; if (!r || (!r.budYTD && !r.actYTD)) return '';
+        return `<span title="${c.y}: ${peso(r.actYTD)} spent vs ${peso(r.budYTD)} budget">${c.y} ${r.budYTD ? compChip(100*r.actYTD/r.budYTD) : '<span class="chip pri-crit">no budget</span>'}</span>`; }).filter(Boolean).join(' ');
+      return { item, vals, sp, y0, y1, ind, ich, read, comp, drv: drvItems.has(item), size: Math.max(...vals.filter(v=>v!=null)) };
+    }).filter(Boolean).sort((a,b)=>(b.drv-a.drv) || (b.size-a.size));
+    const lineTbl = `<div class="card" style="margin-top:14px"><h3>How each expense line behaved against its driver</h3>
+      <p class="hint" style="padding:10px 14px 0;margin:0">Spending is shown as a full-year view so part-years compare fairly. "Driver" is the outside cost behind the line (from the table further down this page); lines without one are compared with inflation. A line that grows much faster than its driver usually reflects more volume, more scope or a coding change — not price.</p>
+      <div class="tbl-wrap"><table class="ledger trend" style="min-width:1050px"><thead><tr><th>Expense line</th><th>Spend ${yrs[0]}–${Y-1}</th><th class="r">Spend change</th><th>Driver over the same years</th><th>Reading</th><th>Actual vs budget by year</th></tr></thead><tbody>
+      ${lineRows.map(l=>`<tr><td class="act" style="font-size:13px">${esc(l.item)}${l.drv?'':'<div class="item" style="text-transform:none">no specific driver</div>'}</td>
+        <td>${spark(l.vals) || `<span class="hint">${short(l.size)} (${l.y0})</span>`}</td>
+        <td class="r num">${l.sp!=null?`${pctTxt(l.sp)}<div class="item" style="text-transform:none">${l.y0}→${l.y1}</div>`:'—'}</td>
+        <td style="font-size:12.5px">${l.ich?`<b>${esc(indDef(l.ind)[1])}</b>: ${esc(l.ich.txt)}`:'—'}</td><td>${l.read}</td><td style="font-size:12px">${l.comp||'—'}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+
+    // 4 — what the history says
+    const ins = [];
+    const recurUnb = {}; withBoth.forEach(c => c.M.rows.forEach(r => { const flag = (!r.budFY && r.actYTD>100000) || (r.budYTD && r.actYTD > 1.5*r.budYTD && r.actYTD-r.budYTD>100000); if (flag) (recurUnb[r.item] ||= []).push(`${c.y}: ${short(r.actYTD)} vs ${r.budYTD?short(r.budYTD):'no'} budget`); }));
+    const ru = Object.entries(recurUnb).filter(([,v])=>v.length>=2).sort((a,b)=>b[1].length-a[1].length);
+    if (ru.length) ins.push(`<div class="ins red"><b>Spent well above budget, or without one, in more than one year</b><ul>${ru.slice(0,5).map(([k,v])=>`<li><b>${esc(k)}</b> — ${esc(v.join(' · '))}</li>`).join('')}</ul><small>Budget these from the actual run-rate for ${Y}.</small></div>`);
+    const recurUnder = {}; withBoth.forEach(c => c.under.forEach(r => { if (r.budYTD-r.actYTD>100000) (recurUnder[r.item] ||= []).push(`${c.y}: used ${Math.round(100*r.actYTD/r.budYTD)}%`); }));
+    const rd = Object.entries(recurUnder).filter(([,v])=>v.length>=2);
+    if (rd.length) ins.push(`<div class="ins"><b>Budget left unused year after year</b><ul>${rd.slice(0,5).map(([k,v])=>`<li><b>${esc(k)}</b> — ${esc(v.join(' · '))}</li>`).join('')}</ul><small>Ask for evidence (plan, quotation) before carrying the same amount into ${Y}.</small></div>`);
+    if (fy.length>=2) { const a = fy[0], b = fy[fy.length-1], g = 100*(b.fullYr-a.fullYr)/a.fullYr, inf = indChange(H,'inflation',a.y,b.y);
+      ins.push(`<div class="ins amber"><b>Plant OPEX ${a.y}→${b.y}: ${pctTxt(g)}</b> (full-year view ${short(a.fullYr)} → ${short(b.fullYr)}).${inf?` Over the same years ${esc(inf.txt)}, so about ${pctTxt(g-inf.pct)} came from more volume, scope or reclassification rather than price.`:''}</div>`); }
+    const dvo = withBoth.filter(c=>c.pctDrv!=null && c.pctOther!=null);
+    if (dvo.length) ins.push(`<div class="ins"><b>Driver-linked lines vs the rest</b><ul>${dvo.map(c=>`<li>${c.y}: driver-linked lines at ${Math.round(c.pctDrv)}% of budget, other lines at ${Math.round(c.pctOther)}%${hv(H,'inflation',c.y)?` (inflation ${Number(hv(H,'inflation',c.y).value).toFixed(1)}%)`:''}</li>`).join('')}</ul><small>When outside costs rise, these lines are the first to break the budget — size them from the outlook, not last year.</small></div>`);
+    const fast = lineRows.filter(l=>/faster/.test(l.read)).slice(0,4);
+    if (fast.length) ins.push(`<div class="ins amber"><b>Grew faster than outside prices</b><ul>${fast.map(l=>`<li><b>${esc(l.item)}</b> ${pctTxt(l.sp)} vs ${esc(indDef(l.ind)[1].toLowerCase())} ${pctTxt(l.ich.pct)} (${l.y0}→${l.y1})</li>`).join('')}</ul><small>Check volume, new scope or a change in how costs are charged.</small></div>`);
+
+    const missing = C.filter(c=>!c.hasAct).map(c=>c.y);
+    box.innerHTML = `<h3 class="sec">Five-year trend and budget compliance</h3>
+      <p class="hint" style="margin:-4px 0 12px">How outside costs moved since ${yrs[0]}, and how the plant spent against its budget in the same years.${missing.length?` No actuals loaded yet for ${missing.join(', ')} — upload them on the Actuals page to complete the picture.`:''}</p>
+      ${ins.length?`<div class="ins-grid">${ins.join('')}</div>`:''}
+      ${indTbl}${compTbl}${lineTbl}`;
+  } catch(e){ console.error(e); box.innerHTML = `<div class="banner amber">The five-year trend could not load: ${esc(e.message||e)}</div>`; }
+}
+async function histSources(k){
+  const H = (await loadHist()).filter(h=>h.key===k), d = indDef(k);
+  modal(`<h3>${esc(d[1])} — basis and sources</h3><table class="ledger"><tbody>${H.map(h=>`<tr><td class="num" style="white-space:nowrap"><b>${h.year}</b></td><td class="num" style="white-space:nowrap">${fmtInd(d,h.value)}</td>
+    <td style="font-size:12.5px">${esc(BASIS_TXT[h.basis]||'')}${h.period?' · '+esc(h.period):''}${h.approx?' · approximate':''}${h.note?'<br>'+esc(h.note):''}<br>${h.source_url?`<a href="${esc(h.source_url)}" target="_blank" rel="noopener">${esc(h.source_title||'Source')}</a>`:esc(h.source_title||'')}</td></tr>`).join('')}</tbody></table>
+    <div class="actions" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="closeModal()">Close</button></div>`);
+}
+async function editHist(k, y){
+  const H = await loadHist(), d = indDef(k), h = hv(H,k,y) || { basis: y >= new Date().getFullYear()+1 ? 'forecast' : 'avg' };
+  modal(`<h3>${esc(d[1])} — ${y}</h3>
+    <div class="g2"><div class="field"><label for="hVal">Value (${esc(d[2])})</label><input class="inp num" id="hVal" type="number" step="any" value="${h.value??''}"></div>
+      <div class="field"><label for="hBasis">Basis</label><select class="inp" id="hBasis">${Object.entries(BASIS_TXT).map(([kk,l])=>`<option value="${kk}" ${h.basis===kk?'selected':''}>${l}</option>`).join('')}</select></div></div>
+    <div class="g2"><div class="field"><label for="hPer">Period covered</label><input class="inp" id="hPer" value="${esc(h.period||'')}" placeholder="e.g. Jan–Sep"></div>
+      <div class="field"><label><input type="checkbox" id="hApprox" ${h.approx?'checked':''}> Approximate</label></div></div>
+    <div class="field"><label for="hNote">Note</label><input class="inp" id="hNote" value="${esc(h.note||'')}"></div>
+    <div class="g2"><div class="field"><label for="hSrc">Source</label><input class="inp" id="hSrc" value="${esc(h.source_title||'')}"></div>
+      <div class="field"><label for="hUrl">Source link</label><input class="inp" id="hUrl" value="${esc(h.source_url||'')}"></div></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="hGo">Save</button></div>`);
+  $('#hGo').onclick = async () => {
+    const v = x => $('#'+x).value.trim() || null;
+    const row = { key:k, year:y, value:v('hVal')==null?null:Number(v('hVal')), basis:$('#hBasis').value, period:v('hPer'), approx:$('#hApprox').checked, note:v('hNote'), source_title:v('hSrc'), source_url:v('hUrl'), updated_by:S.me.id, updated_at:new Date().toISOString() };
+    const r = await sb.from('bgt_indicator_history').upsert(row, { onConflict:'key,year' }); if (r.error) return fail(r.error);
+    delete S.ol.cache.hist; closeModal(); toast('Saved'); renderOutlook();
+  };
+}
 
 /* things to consider — line drawer (OPEX) */
 async function renderConsider(item, prev, dept){

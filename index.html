@@ -664,7 +664,7 @@ function route(){
     if (own && !isReviewer()) S.budgetId = own.id; else S.view = isReviewer() ? 'overview' : 'budget';
   }
   renderNav();
-  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else if (S.view==='capex') renderCapexTracker(); else if (S.view==='records') renderRecords(); else openBudget(S.budgetId);
+  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else if (S.view==='capex') renderCapexTracker(); else if (S.view==='records') renderRecords(); else if (S.view==='analysis') renderAnalysis(); else openBudget(S.budgetId);
 }
 function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.cx.cache = {}; S.rc.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; S._keepY = null; S._nav = true; try { route(); } finally { S._nav = false; } window.scrollTo(0,0); }
 /* Keep the reader's place: when a page re-draws after a save, stay at the same scroll position instead of jumping to the top. */
@@ -689,12 +689,12 @@ function holdScroll(){
 function renderNav(){
   const main = [];
   if (isReviewer()) main.push(`<a class="${S.view==='overview'?'on':''}" onclick="go('overview')">Plant overview</a>`);
-  main.push(`<a class="${S.view==='outlook'?'on':''}" onclick="go('outlook')">Cost outlook</a>`, `<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='records'?'on':''}" onclick="go('records')">Plant records (PO, consumption)</a>`, `<a class="${S.view==='capex'?'on':''}" onclick="go('capex')">CAPEX tracker</a>`, `<a class="${S.view==='perf'?'on':''}" onclick="go('perf')">Sales and plant performance</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
+  main.push(`<a class="${S.view==='outlook'?'on':''}" onclick="go('outlook')">Cost outlook</a>`, `<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='records'?'on':''}" onclick="go('records')">Plant records (PO, consumption)</a>`, `<a class="${S.view==='capex'?'on':''}" onclick="go('capex')">CAPEX tracker</a>`, `<a class="${S.view==='perf'?'on':''}" onclick="go('perf')">Sales and plant performance</a>`, `<a class="${S.view==='analysis'?'on':''}" onclick="go('analysis')">Analysis and scenarios</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
   if (S.me.role==='admin') main.push(`<a class="${S.view==='admin'?'on':''}" onclick="go('admin')">Users and settings</a>`);
   $('#navMain').innerHTML = main.join('');
   const list = isReviewer() ? S.budgets : S.budgets.filter(b=>b.department_id===S.me.department_id);
   $('#deptNavTitle').textContent = isReviewer() ? 'Departments' : 'My department';
-  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="outlook:" ${S.view==='outlook'?'selected':''}>Cost outlook</option><option value="perf:" ${S.view==='perf'?'selected':''}>Sales and plant performance</option><option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="records:" ${S.view==='records'?'selected':''}>Plant records (PO, consumption)</option><option value="capex:" ${S.view==='capex'?'selected':''}>CAPEX tracker</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
+  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="outlook:" ${S.view==='outlook'?'selected':''}>Cost outlook</option><option value="perf:" ${S.view==='perf'?'selected':''}>Sales and plant performance</option><option value="analysis:" ${S.view==='analysis'?'selected':''}>Analysis and scenarios</option><option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="records:" ${S.view==='records'?'selected':''}>Plant records (PO, consumption)</option><option value="capex:" ${S.view==='capex'?'selected':''}>CAPEX tracker</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
     + list.map(b=>`<option value="budget:${b.id}" ${S.view==='budget'&&S.budgetId===b.id?'selected':''}>${esc(deptById(b.department_id)?.name)} — ${STATUS_LABEL[b.status]}</option>`).join('');
   $('#navDepts').innerHTML = list.map(b => `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}"><span>${esc(deptById(b.department_id)?.name)}</span><span class="dot st-${b.status}"></span></a>`).join('') || '<span style="color:#8FA09A;font-size:12px;padding:0 8px">No department assigned</span>';
 }
@@ -1214,6 +1214,9 @@ async function renderAdmin(){
     <p class="hint" style="margin:0 0 8px">Added to every assistant request (drafts, reviews, MD summary). Write facts that change how budgets should be built — how production is targeted, capacity, trade items, contracts.</p>
     <textarea class="inp" id="aiNotes" rows="5" placeholder="Loading…"></textarea>
     <div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="saveAiNotes()">Save</button></div></div></div>
+  <div class="card" style="margin-top:16px"><h3>Costs kept out of plant OPEX</h3><div style="padding:14px">
+    <p class="hint" style="margin:0 0 8px">For costs Accounting books under OPEX that are not plant operations — e.g. products and services bought from Steintek or MSSI and resold to customers at a mark-up. Matching actuals stay on record with the reason, and are netted out of plant OPEX totals, per-board figures and assistant drafts.</p>
+    <div id="exclAdmin"><span class="hint">Loading…</span></div></div></div>
   <div class="card" style="margin-top:16px"><h3>Start a new budget year</h3><div style="padding:14px">
     <p style="margin:0 0 12px;color:var(--muted)">Creates a draft budget for every department. Earlier years stay available in the Budget year selector. Lock a year once Finance has accepted it.</p>
     <div class="row-flex">
@@ -1224,7 +1227,7 @@ async function renderAdmin(){
     <div class="field" style="margin-top:10px"><label style="font-weight:500;color:var(--ink)"><input type="checkbox" id="nyCopy" checked> Copy <b>Recurring / Contractual</b> OPEX lines from <select id="nyFrom" class="inp" style="display:inline-block;width:auto;padding:2px 6px">${S.cycles.map(c=>`<option value="${c.id}">${c.year}</option>`).join('')}</select> as a starting point</label>
       <span class="hint">Copied lines keep their amounts and are marked "Copied from previous year — confirm rate" in Remarks. Activity-based, project and one-time items start empty, per Finance's zero-based approach.</span></div>
     <button class="btn primary" onclick="startYear()">Start budget year</button></div></div>`;
-  loadAiNotes();
+  loadAiNotes(); exclAdmin();
 }
 async function startYear(){
   const year = Number($('#nyYear').value);
@@ -1303,8 +1306,10 @@ async function loadYearData(year, deptId){
   }
   const qa = () => { let q = sb.from('bgt_actuals').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
   const qp = () => { let q = sb.from('bgt_projections').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
-  const [act, proj] = await Promise.all([fetchAll(qa), fetchAll(qp)]);
-  return (S.act.cache[key] = { year, bud, capBud, act, proj, hasCycle:!!cyc, ext, budgetMonths:cyc?.budget_months||null });
+  const [act0, proj] = await Promise.all([fetchAll(qa), fetchAll(qp)]);
+  // costs a rule keeps out of plant OPEX (value-added resale etc.) — kept apart, never summed into OPEX
+  const act = act0.filter(a=>!a.excluded), excl = act0.filter(a=>a.excluded);
+  return (S.act.cache[key] = { year, bud, capBud, act, excl, proj, hasCycle:!!cyc, ext, budgetMonths:cyc?.budget_months||null });
 }
 // a year budgeted for only the first N months (e.g. Q1): extend each department that stops early to 12 months at its average monthly rate (OPEX only)
 function extendPartial(bud, n){
@@ -1367,7 +1372,7 @@ async function renderActuals(){
       S.act.year = (data && data[0]?.year) || new Date().getFullYear();
     }
     const years = [...new Set([...S.cycles.map(c=>c.year), S.act.year])].sort((a,b)=>b-a);
-    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv);
+    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv); S.act.lastD = D;
     S.act.model = M; S.act.data = D;
     const { data:imps } = await sb.from('bgt_imports').select('*').eq('year', Y).order('created_at', { ascending:false });
     const dname = S.act.dept ? deptById(S.act.dept)?.name : 'Whole plant';
@@ -1400,6 +1405,7 @@ async function renderActuals(){
       <div class="stat"><div class="eyebrow">Projected vs budget</div><div class="v" style="color:${varFY>0?'var(--red)':'var(--green)'}">${varFY>0?'+':''}${short(varFY)}</div><div class="s">${varFY>0?'Over':'Under'} budget${M.budFY?' by '+Math.abs(Math.round(100*varFY/M.budFY))+'%':''}</div></div>
     </div>
     ${ins ? `<div class="ins-grid">${ins}</div>` : ''}
+    ${await exclCard(D)}
     <div class="card" style="margin-bottom:16px"><h3>Month by month</h3><div style="padding:14px">
       <div class="mchart">${MONTHS.map((m,i)=>{ const a = i < M.closed; const v = a ? M.monthly.act[i] : M.monthly.proj[i];
         return `<div title="${m}: budget ${peso(M.monthly.bud[i])} · ${a?'actual':'projected'} ${peso(v)}"><i class="${a?'a':'p'} ${a && v>M.monthly.bud[i]*1.1?'over':''}" style="height:${100*v/mx}%"></i><s style="bottom:${100*M.monthly.bud[i]/mx}%"></s></div>`; }).join('')}</div>
@@ -1439,6 +1445,8 @@ function actItem(item){
       </tbody><tfoot><tr><td>Total</td><td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.actYTD)}</td><td class="r num">${peso(r.projFY)}</td></tr></tfoot></table>
       ${!dept && Object.keys(r.depts).length>1 ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Projected by department</h3>${Object.entries(r.depts).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(deptById(d)?.name||'Unassigned')}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
       ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
+      ${(()=>{ const ex = (S.act.lastD?.excl||[]).filter(a=>a.line_item===item && (!dept || a.department_id===dept)); if (!ex.length) return ''; const by = {}; ex.forEach(a=>by[a.partner||'—']=(by[a.partner||'—']||0)+Number(a.amount)); const rules = S.ex.rules||[];
+        return `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Kept out of plant OPEX</h3>${Object.entries(by).map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}<p class="hint" style="margin:4px 0 0">Recorded by Accounting on this line but not included above: ${esc([...new Set(ex.map(a=>rules.find(r=>r.id===a.exclusion_id)?.category).filter(Boolean))].join(', ')||'excluded by rule')}.</p>`; })()}
     </div>
     <footer><span></span><div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveProjection(${JSON.stringify(item).replace(/"/g,'&quot;')})">Save forecast</button>`:''}</div></footer>
   </div>`;
@@ -3078,6 +3086,199 @@ async function saveEquipAssign(){
   const v = { ...(await loadEquipAssign()) }; document.querySelectorAll('select.ea').forEach(s => { if (s.value) v[s.dataset.u] = s.value; else delete v[s.dataset.u]; });
   const r = await sb.from('bgt_settings').upsert({ key:'equipment_assignment', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
   S.rc.ea = v; toast('Saved'); renderRecords();
+}
+
+/* ================= COSTS KEPT OUT OF PLANT OPEX (value-added resale, pass-through) =================
+   Rules live in bgt_cost_exclusions; a DB trigger flags matching actuals (bgt_actuals.excluded).
+   Flagged costs stay recorded and visible here, with the reason, but are netted out of plant OPEX everywhere. */
+S.ex = { rules:null };
+async function loadExclRules(force){ if (S.ex.rules && !force) return S.ex.rules; const { data, error } = await sb.from('bgt_cost_exclusions').select('*').order('created_at'); if (error) throw error; return (S.ex.rules = data||[]); }
+/* Actuals page: what was kept out, by rule, with the reason */
+async function exclCard(D){
+  const ex = D?.excl || []; if (!ex.length) return '';
+  const rules = await loadExclRules().catch(()=>[]), R = id => rules.find(r=>r.id===id);
+  const by = {}; ex.forEach(a => { const k = a.exclusion_id || '?'; const b = (by[k] ||= { amt:0, partners:{}, lines:new Set(), months:new Set(), depts:new Set() }); b.amt += Number(a.amount)||0; b.partners[a.partner||'—'] = (b.partners[a.partner||'—']||0) + (Number(a.amount)||0); b.lines.add(a.line_item); b.months.add(a.month); if (a.department_id) b.depts.add(a.department_id); });
+  const tot = sum(ex.map(a=>Number(a.amount)||0)), mx = Math.max(...ex.map(a=>a.month));
+  return `<div class="card" style="margin-top:16px;border-left:4px solid var(--amber,#b7791f)"><h3>Kept out of plant OPEX — ${short(tot)} (${thru(mx)})</h3>
+    <p class="hint" style="padding:0 14px 8px;margin:0">These costs are recorded in Accounting under OPEX lines but are not plant operations. They stay on record here, with the reason, and are left out of every OPEX total, comparison, per-board figure and assistant draft in the app.${canManageData()?' Rules are set in <a onclick="go(\'admin\')">Users and settings</a>.':''}</p>
+    <div class="tbl-wrap"><table class="ledger"><thead><tr><th>Paid to</th><th>Treated as</th><th>Accounting line</th><th>Department charged</th><th class="r">Amount</th></tr></thead><tbody>
+    ${Object.entries(by).sort((a,b)=>b[1].amt-a[1].amt).map(([k,b])=>{ const r = R(k); return `<tr><td>${Object.keys(b.partners).map(esc).join('<br>')}<div class="item" style="text-transform:none">${esc(r?.note||'')}</div></td><td style="font-size:12.5px">${esc(r?.category||'Excluded')}</td><td style="font-size:12.5px">${[...b.lines].map(esc).join(', ')}</td><td style="font-size:12.5px">${[...b.depts].map(d=>esc(deptById(d)?.name||'')).join(', ')}</td><td class="r num">${peso(b.amt)}</td></tr>`; }).join('')}
+    </tbody><tfoot><tr><td colspan="4">Total kept out</td><td class="r num">${peso(tot)}</td></tr></tfoot></table></div></div>`;
+}
+/* Users and settings: manage the rules */
+async function exclAdmin(){
+  const el = $('#exclAdmin'); if (!el) return;
+  try {
+    const rules = await loadExclRules(true);
+    const { data:tots } = await sb.from('bgt_actuals').select('exclusion_id,year,amount').eq('excluded', true);
+    const t = {}; (tots||[]).forEach(a => { const k = a.exclusion_id+'|'+a.year; t[k] = (t[k]||0) + Number(a.amount); });
+    const yrs = [...new Set((tots||[]).map(a=>a.year))].sort();
+    el.innerHTML = `${rules.length?`<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Partner name contains</th><th>Only these lines</th><th>Treated as</th>${yrs.map(y=>`<th class="r">${y}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
+      ${rules.map(r=>`<tr><td><b>${esc(r.partner_pattern)}</b><div class="item" style="text-transform:none;max-width:420px">${esc(r.note||'')}</div></td><td style="font-size:12.5px">${(r.line_items||[]).map(esc).join(', ')||'All OPEX lines'}</td><td style="font-size:12.5px">${esc(r.category)}</td>
+        ${yrs.map(y=>`<td class="r num">${t[r.id+'|'+y]?short(t[r.id+'|'+y]):''}</td>`).join('')}<td>${r.active?'<span class="chip pri-ok">Active</span>':'<span class="chip">Off</span>'}</td><td><button class="btn ghost sm" onclick="editExclRule('${r.id}')">Edit</button></td></tr>`).join('')}
+    </tbody></table></div>`:'<p class="hint" style="margin:0 0 8px">No rules yet.</p>'}
+    <div style="text-align:right;margin-top:10px"><button class="btn primary" onclick="editExclRule()">Add a rule</button></div>`;
+  } catch(e){ el.innerHTML = `<p class="hint">Could not load the rules: ${esc(e.message||e)}</p>`; }
+}
+function editExclRule(id){
+  const r = id ? (S.ex.rules||[]).find(x=>x.id===id) : { partner_pattern:'', line_items:['OUTSIDE SERVICES'], category:'Value-added resale (cost of sales)', note:'', active:true };
+  const cats = ['Value-added resale (cost of sales)','Pass-through charged to customer','Other company / related party','Head office cost, not plant','Other — see note'];
+  modal(`<h3>${id?'Edit':'Add'} a rule</h3><p>Accounting actuals whose partner name contains the text below are kept out of plant OPEX but stay on record, with this note.</p>
+    <div class="field"><label for="xrP">Partner name contains</label><input class="inp" id="xrP" value="${esc(r.partner_pattern)}" placeholder="e.g. STEINTEK"></div>
+    <div class="field"><label for="xrL">Only for these expense lines</label><select class="inp" id="xrL" multiple size="6">${S.items.opex.map(i=>`<option ${ (r.line_items||[]).includes(i)?'selected':''}>${esc(i)}</option>`).join('')}</select><div class="hint">Leave none selected to apply to every OPEX line. Tip: limit it to Outside Services so genuine plant purchases from the same company (e.g. supplies) stay in OPEX.</div></div>
+    <div class="field"><label for="xrC">Treated as</label><select class="inp" id="xrC">${cats.map(c=>`<option ${c===r.category?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label for="xrN">Reason (shown wherever the cost appears)</label><textarea class="inp" id="xrN" rows="3">${esc(r.note||'')}</textarea></div>
+    <div class="field"><label><input type="checkbox" id="xrA" ${r.active?'checked':''}> Active</label></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="xrGo">Save and apply</button></div>`);
+  $('#xrGo').onclick = async () => {
+    const row = { company_id:S.company.id, partner_pattern:$('#xrP').value.trim(), line_items:[...$('#xrL').selectedOptions].map(o=>o.value), category:$('#xrC').value, note:$('#xrN').value.trim()||null, active:$('#xrA').checked, updated_at:new Date().toISOString() };
+    if (row.partner_pattern.length < 3) { toast('Type at least 3 letters of the partner name.', true); return; }
+    if (!row.note) { toast('Write the reason — it is shown for transparency.', true); return; }
+    try {
+      const q = id ? sb.from('bgt_cost_exclusions').update(row).eq('id', id) : sb.from('bgt_cost_exclusions').insert({ ...row, created_by:S.me.id });
+      const r1 = await q; if (r1.error) throw r1.error;
+      const r2 = await sb.rpc('bgt_apply_exclusions'); if (r2.error) throw r2.error;
+      S.act.cache = {}; S.ex.rules = null; closeModal(); toast(`Saved — ${r2.data||0} actual rows re-checked`); exclAdmin();
+    } catch(e){ fail(e); }
+  };
+}
+
+/* ================= ANALYSIS AND SCENARIOS =================
+   1) Analysis report — the assistant writes a SWOT / environment / sensitivity / risk report from the app's data; saved and downloadable.
+   2) What-if — move volume, diesel, wages, freight, power, ICT, Outside Services and see plant OPEX and OPEX per board.
+   3) Where the money goes — Pareto of expense lines and payees (net of costs kept out of plant OPEX). */
+S.an = { tab:'report', sel:null, wi:null };
+const AN_TABS = [['report','Analysis report'],['whatif','What-if scenarios'],['pareto','Where the money goes']];
+async function renderAnalysis(){
+  mainLoading('Loading analysis…');
+  try {
+    const Y = S.cycle.year;
+    $('#main').innerHTML = `<div class="ph"><div><div class="eyebrow">Budget ${Y} · Pasig Plant</div><h1>Analysis and scenarios</h1>
+      <div class="sub">Different angles on the budget: a written analysis (SWOT, outside drivers, risks), what-if scenarios, and where the money goes.</div></div></div>
+      <div class="tabs" role="tablist" style="margin-bottom:12px">${AN_TABS.map(([k,l])=>`<button role="tab" class="${S.an.tab===k?'on':''}" onclick="S.an.tab='${k}';renderAnalysis()">${l}</button>`).join('')}</div>
+      <div id="anBody"></div>`;
+    $('#anBody').innerHTML = S.an.tab==='report' ? await anReportView(Y) : S.an.tab==='whatif' ? await anWhatIf(Y) : await anPareto(Y);
+    if (S.an.tab==='whatif') anCalc();
+  } catch(e){ fail(e); }
+}
+/* ---------- 1. analysis report ---------- */
+async function anReportView(Y){
+  const { data:reps, error } = await sb.from('bgt_reports').select('id,year,title,focus,model,created_by,created_at,content').eq('year', Y).eq('kind','analysis').order('created_at', { ascending:false }); if (error) throw error;
+  const sel = (reps||[]).find(r=>r.id===S.an.sel) || (reps||[])[0];
+  const can = isReviewer();
+  return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
+      <div class="field" style="margin:0;min-width:260px"><label for="anSel">Saved reports</label><select class="inp" id="anSel" onchange="S.an.sel=this.value;renderAnalysis()">${(reps||[]).map(r=>`<option value="${r.id}" ${sel&&r.id===sel.id?'selected':''}>${new Date(r.created_at).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'})}${r.focus?' — '+esc(r.focus.slice(0,40)):''}</option>`).join('')||'<option>None yet</option>'}</select></div>
+      <span class="grow"></span>${sel?`<button class="btn ghost" onclick="anDownload('${sel.id}')">Download (Word)</button>`:''}${can?'<button class="btn primary" onclick="anGenerate()">Write a new analysis</button>':''}</div>
+    ${sel ? anRender(sel) : `<div class="card"><div class="empty"><b>No analysis for ${Y} yet</b>${can?'Click <b>Write a new analysis</b>. The assistant reads sales and production, yield and rejects, OPEX actuals (net of costs kept out of plant OPEX), budgets, stores withdrawals and the cost outlook, then writes a SWOT, the outside drivers, sensitivities, risks and recommendations. Takes about a minute.':'A reviewer can generate one.'}</div></div>`}`;
+}
+function anRender(rep){
+  const r = rep.content||{}, sw = r.swot||{};
+  const li = a => (a||[]).map(x=>`<li><b>${esc(x.point)}</b>${x.evidence?`<div class="item" style="text-transform:none">${esc(x.evidence)}</div>`:''}</li>`).join('');
+  const box = (t, a, c) => `<div class="card" style="margin:0;border-top:4px solid ${c}"><h3>${t}</h3><ul style="margin:0;padding:6px 14px 12px 32px">${li(a)||'<li>—</li>'}</ul></div>`;
+  const lvl = v => `<span class="chip ${v==='high'?'pri-crit':v==='medium'?'pri-med':'pri-ok'}">${esc(v||'')}</span>`;
+  return `<div class="card"><div style="padding:14px"><div class="eyebrow">Written ${new Date(rep.created_at).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'})} by the assistant${rep.model?' ('+esc(rep.model)+')':''} from the data in the app — check the numbers before sharing.</div><p style="font-size:16px;margin:8px 0 0">${esc(r.headline||'')}</p>
+      ${(r.key_numbers||[]).length?`<div class="kn" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">${r.key_numbers.map(k=>`<div class="stat" style="margin:0"><div class="eyebrow">${esc(k.label)}</div><div class="v" style="font-size:18px">${esc(k.value)}</div>${k.note?`<div class="s">${esc(k.note)}</div>`:''}</div>`).join('')}</div>`:''}</div></div>
+    <h3 class="sec">SWOT</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px">${box('Strengths',sw.strengths,'#2f7d4a')}${box('Weaknesses',sw.weaknesses,'#b42318')}${box('Opportunities',sw.opportunities,'#2563eb')}${box('Threats',sw.threats,'#b7791f')}</div>
+    <div class="card" style="margin-top:16px"><h3>Outside drivers</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Latest</th><th>Effect on the plant budget</th><th>Assumed change</th></tr></thead><tbody>${(r.environment||[]).map(e=>`<tr><td class="act">${esc(e.factor)}</td><td style="font-size:12.5px">${esc(e.latest)}</td><td style="font-size:12.5px">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.assumed_change||'')}</td></tr>`).join('')}</tbody></table></div></div>
+    <div class="card" style="margin-top:16px"><h3>Sensitivities</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Change tested</th><th>Effect per year</th><th>Basis</th></tr></thead><tbody>${(r.sensitivities||[]).map(e=>`<tr><td class="act">${esc(e.driver)}</td><td>${esc(e.change)}</td><td class="num">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.basis)}</td></tr>`).join('')}</tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Try your own numbers in <a onclick="S.an.tab='whatif';renderAnalysis()">What-if scenarios</a>.</p></div>
+    <div class="card" style="margin-top:16px"><h3>Risks</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Response</th></tr></thead><tbody>${(r.risks||[]).map(e=>`<tr><td>${esc(e.risk)}</td><td>${lvl(e.likelihood)}</td><td>${lvl(e.impact)}</td><td style="font-size:12.5px">${esc(e.response)}</td></tr>`).join('')}</tbody></table></div></div>
+    <div class="card" style="margin-top:16px"><h3>Recommendations</h3><ol style="margin:0;padding:10px 14px 14px 34px">${(r.recommendations||[]).map(x=>`<li style="margin:4px 0">${esc(x)}</li>`).join('')}</ol>
+      ${(r.open_questions||[]).length?`<h3 style="margin-top:4px">Open questions</h3><ul style="margin:0;padding:6px 14px 14px 34px">${r.open_questions.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>
+    ${canManageData()?`<p style="text-align:right;margin-top:10px"><a onclick="anDelete('${rep.id}')" style="color:var(--red)">Delete this report</a></p>`:''}`;
+}
+function anGenerate(){
+  modal(`<h3>Write a new analysis — ${S.cycle.year}</h3><p>The assistant uses everything in the app. Add a focus if you want one (optional).</p>
+    <div class="field"><label for="anFocus">Focus</label><textarea class="inp" id="anFocus" rows="3" placeholder="e.g. Logistics costs in the region; whether to keep the boiler running two shifts; risks for the MD presentation"></textarea></div>
+    <div id="anBusy"></div><div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="anGo">Write it</button></div>`);
+  $('#anGo').onclick = async () => {
+    const focus = $('#anFocus').value.trim(); $('#anGo').disabled = true; $('#anBusy').innerHTML = AI_BUSY('Reading the plant data and writing the analysis… about a minute.');
+    try {
+      const out = await aiFull({ mode:'analysis_report', cycle_id:S.cycle.id, text:focus });
+      const ins = await sb.from('bgt_reports').insert({ company_id:S.company.id, year:S.cycle.year, kind:'analysis', title:`Budget ${S.cycle.year} analysis`, focus:focus||null, content:out.result, model:out.model||null, created_by:S.me.id }).select('id').single();
+      if (ins.error) throw ins.error;
+      S.an.sel = ins.data.id; closeModal(); toast('Analysis saved'); renderAnalysis();
+    } catch(e){ $('#anGo').disabled = false; $('#anBusy').innerHTML = ''; fail(e); }
+  };
+}
+async function aiFull(body){ const { data, error } = await sb.functions.invoke('bgt-ai', { body }); if (error) { let m = error.message; try { const j = await error.context.json(); m = j.error || m; } catch(_){} throw new Error(m); } if (data?.error) throw new Error(data.error); return data; }
+async function anDelete(id){ if (!confirm('Delete this analysis report?')) return; const r = await sb.from('bgt_reports').delete().eq('id', id); if (r.error) return fail(r.error); S.an.sel = null; toast('Deleted'); renderAnalysis(); }
+async function anDownload(id){
+  const { data:rep, error } = await sb.from('bgt_reports').select('*').eq('id', id).single(); if (error) return fail(error);
+  const r = rep.content||{}, sw = r.swot||{}, e = esc;
+  const tbl = (h, rows) => `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-size:10pt"><tr>${h.map(x=>`<th style="background:#1f3a2e;color:#fff;text-align:left">${x}</th>`).join('')}</tr>${rows.map(rw=>`<tr>${rw.map(c=>`<td valign="top">${c}</td>`).join('')}</tr>`).join('')}</table>`;
+  const ul = a => `<ul>${(a||[]).map(x=>`<li><b>${e(x.point)}</b> — ${e(x.evidence||'')}</li>`).join('')}</ul>`;
+  const html = `<html><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:11pt}h1{font-size:18pt}h2{font-size:13pt;color:#1f3a2e;margin-top:16pt}</style></head><body>
+    <h1>${e(S.company.name||'WCLI')} — Budget ${rep.year} analysis</h1><p><i>Written ${new Date(rep.created_at).toLocaleDateString('en-PH',{dateStyle:'long'})} by the budget assistant from the data in the budget app${rep.focus?'. Focus: '+e(rep.focus):''}.</i></p>
+    <p><b>${e(r.headline||'')}</b></p>${(r.key_numbers||[]).length?tbl(['Measure','Value','Note'], r.key_numbers.map(k=>[e(k.label),e(k.value),e(k.note||'')])):''}
+    <h2>SWOT</h2>${tbl(['Strengths','Weaknesses'],[[ul(sw.strengths),ul(sw.weaknesses)]])}<br>${tbl(['Opportunities','Threats'],[[ul(sw.opportunities),ul(sw.threats)]])}
+    <h2>Outside drivers</h2>${tbl(['Driver','Latest','Effect on the plant budget','Assumed change'],(r.environment||[]).map(x=>[e(x.factor),e(x.latest),e(x.effect),e(x.assumed_change||'')]))}
+    <h2>Sensitivities</h2>${tbl(['Driver','Change','Effect per year','Basis'],(r.sensitivities||[]).map(x=>[e(x.driver),e(x.change),e(x.effect),e(x.basis)]))}
+    <h2>Risks</h2>${tbl(['Risk','Likelihood','Impact','Response'],(r.risks||[]).map(x=>[e(x.risk),e(x.likelihood),e(x.impact),e(x.response)]))}
+    <h2>Recommendations</h2><ol>${(r.recommendations||[]).map(x=>`<li>${e(x)}</li>`).join('')}</ol>${(r.open_questions||[]).length?`<h2>Open questions</h2><ul>${r.open_questions.map(x=>`<li>${e(x)}</li>`).join('')}</ul>`:''}</body></html>`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+html], { type:'application/msword' })); a.download = `${rep.year} Budget analysis - ${S.company.code}.doc`; a.click(); toast('Downloaded');
+}
+/* ---------- 2. what-if scenarios ---------- */
+// how each expense line responds: share that moves with volume, and the price driver it follows
+const WI_MAP = {
+  'GAS AND OIL':{ vol:0.7, price:'diesel' }, 'SUPPLIES':{ vol:0.6, price:'infl' }, 'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT':{ vol:0.5, price:'fx' },
+  'UTILITIES - ELECTRICITY':{ vol:0.6, price:'power' }, 'UTILITIES - WATER':{ vol:0.3, price:'infl' }, 'CUSTOMER DELIVERY EXPENSES':{ vol:0.8, price:'truck' },
+  'DISTRIBUTOR / DEPOT CHARGES':{ vol:0.8, price:'truck' }, 'TRANSPORTATION':{ vol:0.3, price:'truck' }, 'FREIGHT-IN CHARGES':{ vol:0.5, price:'freight' },
+  'DEMURRAGE AND OTHER CHARGES':{ vol:0.5, price:'freight' }, 'OUTSOURCED LABOR EXPENSES':{ vol:0.3, price:'wage' }, 'SECURITY EXPENSES':{ vol:0, price:'wage' },
+  'OUTSIDE SERVICES':{ vol:0.3, price:'outside' }, 'REPAIRS AND MAINTENANCE - FORKLIFT':{ vol:0.5, price:'fx' }, 'REPAIRS AND MAINTENANCE - DELIVERY VEHICLE':{ vol:0.5, price:'fx' },
+  'SMALL APPLIANCES, TOOLS AND DEVICES':{ vol:0, price:'ict' }, 'IT SOFTWARE/SUBSCRIPTION EXPENSES':{ vol:0, price:'fx' }, 'INTERNET':{ vol:0, price:'infl' }, 'COMMUNICATION':{ vol:0, price:'infl' }
+};
+const WI_KNOBS = [['vol','Boards produced','%',-50,50,1],['diesel','Diesel price','₱/L',50,150,1],['wage','Agency, security and driver wages','%',0,20,0.5],['truck','Trucking rates (on top of fuel and wages)','%',-10,40,1],['freight','Freight and port charges','%',-20,60,1],['power','Electricity rate','%',-10,30,1],['ict','Electronics and ICT prices','%',0,40,1],['fx','Imported parts (peso and freight)','%',-10,30,1],['outside','Outside Services','%',-50,50,1],['infl','General inflation (other lines)','%',0,12,0.5]];
+const WI_PRESETS = { 'Outlook': { vol:0, diesel:95.7, wage:7, truck:3, freight:10, power:5, ict:20, fx:6, outside:5, infl:5 }, 'No change': { vol:0, diesel:95.7, wage:0, truck:0, freight:0, power:0, ict:0, fx:0, outside:0, infl:0 }, 'Fuel spike (₱130/L)': { vol:0, diesel:130, wage:7, truck:15, freight:25, power:12, ict:20, fx:8, outside:5, infl:7 }, 'Volume −15%': { vol:-15, diesel:95.7, wage:7, truck:3, freight:10, power:5, ict:20, fx:6, outside:5, infl:5 }, 'Volume +20%': { vol:20, diesel:95.7, wage:7, truck:3, freight:10, power:5, ict:20, fx:6, outside:5, infl:5 } };
+async function anWhatIf(Y){
+  const B = Y-1, D = await loadYearData(B, null), M = actModel(D, 'budget'), K = await loadKpis(B).catch(()=>[]);
+  const pm = K.filter(k=>k.metric==='production_output' && k.month>0), boards = pm.length ? sum(pm.map(k=>Number(k.value)))*12/pm.length : null;
+  const lines = M.rows.filter(r=>r.projFY>0).map(r=>({ item:r.item, base:r.projFY }));
+  S.an.wi = { Y, B, lines, boards, closed:M.closed, excl:sum((D.excl||[]).map(a=>Number(a.amount)||0)), v:{ ...(S.an.wi?.v || WI_PRESETS['Outlook']) } };
+  const v = S.an.wi.v;
+  return `<div class="banner blue">Base = ${B} plant OPEX full-year view (${M.closed} months actual + projection), net of costs kept out of plant OPEX${S.an.wi.excl?` (${short(S.an.wi.excl)} kept out)`:''}. Boards produced ${B}: ${boards?Math.round(boards).toLocaleString('en-PH')+' (annualised)':'not entered'}. Move the drivers to see ${Y}.</div>
+    <style>@media(max-width:820px){.wi-grid{grid-template-columns:1fr!important}}</style><div style="display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:16px;align-items:start" class="wi-grid">
+      <div class="card" style="margin:0"><h3>Drivers</h3><div style="padding:6px 14px 14px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${Object.keys(WI_PRESETS).map(p=>`<button class="btn ghost sm" onclick="anPreset('${p}')">${esc(p)}</button>`).join('')}</div>
+        ${WI_KNOBS.map(([k,l,u,mn,mx,st])=>`<div class="field" style="margin:0 0 10px"><label for="wi_${k}" style="display:flex;justify-content:space-between"><span>${l}</span><b id="wv_${k}">${v[k]}${u==='%'?'%':' '+u}</b></label><input type="range" id="wi_${k}" min="${mn}" max="${mx}" step="${st}" value="${v[k]}" oninput="S.an.wi.v['${k}']=Number(this.value);anCalc()" style="width:100%"></div>`).join('')}
+        <p class="hint" style="margin:0">"Outlook" uses the cost outlook's assumed changes. Diesel today ≈ ₱95.70/L.</p></div></div>
+      <div id="wiOut"></div></div>`;
+}
+function anPreset(p){ S.an.wi.v = { ...WI_PRESETS[p] }; WI_KNOBS.forEach(([k])=>{ const e = $('#wi_'+k); if (e) e.value = S.an.wi.v[k]; }); anCalc(); }
+function anCalc(){
+  const W = S.an.wi; if (!W) return; const v = W.v, el = $('#wiOut'); if (!el) return;
+  WI_KNOBS.forEach(([k,,u])=>{ const e = $('#wv_'+k); if (e) e.textContent = v[k] + (u==='%'?'%':' '+u); });
+  const pf = { diesel:v.diesel/95.7-1, wage:v.wage/100, truck:0.5*(v.diesel/95.7-1)+0.25*v.wage/100+v.truck/100, freight:v.freight/100, power:v.power/100, ict:v.ict/100, fx:v.fx/100, outside:v.outside/100, infl:v.infl/100 };
+  const rows = W.lines.map(l => { const m = WI_MAP[l.item] || { vol:0, price:'infl' }; const volF = 1 + m.vol*v.vol/100, s = l.base*volF*(1+pf[m.price]); return { ...l, s, m }; }).sort((a,b)=>Math.abs(b.s-b.base)-Math.abs(a.s-a.base));
+  const tb = sum(rows.map(r=>r.base)), ts = sum(rows.map(r=>r.s)), bo = W.boards, bs = bo ? bo*(1+v.vol/100) : null;
+  const drvName = { diesel:'diesel', wage:'wages', truck:'trucking', freight:'freight', power:'electricity', ict:'ICT', fx:'imported parts', outside:'Outside Services', infl:'inflation' };
+  el.innerHTML = `<div class="stats" style="margin-bottom:12px">
+      <div class="stat opex"><div class="eyebrow">Plant OPEX ${W.Y} (scenario)</div><div class="v">${short(ts)}</div><div class="s">${ts>=tb?'+':''}${short(ts-tb)} (${tb?((ts/tb-1)*100).toFixed(1):0}%) vs ${W.B}</div></div>
+      <div class="stat"><div class="eyebrow">${W.B} base</div><div class="v">${short(tb)}</div><div class="s">full-year view</div></div>
+      <div class="stat"><div class="eyebrow">OPEX per board produced</div><div class="v">${bs?peso(ts/bs):'—'}</div><div class="s">${bo?`${W.B}: ${peso(tb/bo)} · ${Math.round(bs).toLocaleString('en-PH')} boards`:'Enter production in Sales and plant performance'}</div></div>
+    </div>
+    <div class="card" style="margin:0"><h3>By expense line</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Expense line</th><th>Moves with</th><th class="r">${W.B} base</th><th class="r">${W.Y} scenario</th><th class="r">Change</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td style="font-size:13px">${esc(r.item)}</td><td style="font-size:12px;color:var(--muted)">${r.m.vol?Math.round(r.m.vol*100)+'% volume · ':''}${drvName[r.m.price]}</td><td class="r num">${short(r.base)}</td><td class="r num">${short(r.s)}</td><td class="r num" style="color:${r.s>r.base+1?'var(--red)':r.s<r.base-1?'var(--green)':'inherit'}">${r.s>=r.base?'+':''}${short(r.s-r.base)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="2">Total</td><td class="r num">${short(tb)}</td><td class="r num">${short(ts)}</td><td class="r num">${ts>=tb?'+':''}${short(ts-tb)}</td></tr></tfoot></table></div>
+    <p class="hint" style="padding:8px 14px 12px;margin:0">"Moves with" shows the assumption: the share of the line that rises and falls with boards produced (e.g. boiler fuel, supplies, power), and the price it follows. Lines not listed follow general inflation. A planning aid — the department budgets remain the source.</p></div>`;
+}
+/* ---------- 3. where the money goes ---------- */
+async function anPareto(Y){
+  const yrs = [...new Set([Y-1, Y-2, Y-3])];
+  const B = S.an.py || Y-1, D = await loadYearData(B, null);
+  const op = (D.act||[]).filter(a=>a.kind!=='capex'), mx = op.length ? Math.max(...op.map(a=>a.month)) : 0;
+  const by = f => { const o = {}; op.forEach(a=>{ const k = f(a)||'—'; o[k] = (o[k]||0) + (Number(a.amount)||0); }); return Object.entries(o).sort((a,b)=>b[1]-a[1]); };
+  const t = sum(op.map(a=>Number(a.amount)||0));
+  const table = (rows, label) => { let c = 0, cut = 0; return `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>${label}</th><th class="r">Amount</th><th class="r">Share</th><th class="r">Cumulative</th><th style="width:30%"></th></tr></thead><tbody>${rows.slice(0,25).map(([k,v])=>{ c += v; const pc = t?100*c/t:0; const top = pc<=80.5 || cut===0; if (pc>80) cut++; return `<tr style="${top?'':'opacity:.7'}"><td style="font-size:13px">${esc(k)}</td><td class="r num">${short(v)}</td><td class="r num">${t?(100*v/t).toFixed(1):0}%</td><td class="r num">${pc.toFixed(0)}%</td><td><div style="height:8px;border-radius:4px;background:var(--line,#e5e5e0)"><div style="height:8px;border-radius:4px;width:${t?Math.min(100,100*v/rows[0][1]):0}%;background:${top?'#1f3a2e':'#9aa59f'}"></div></div></td></tr>`; }).join('')}</tbody></table></div>`; };
+  const lines = by(a=>a.line_item), pay = by(a=>a.partner), n80 = r => { let c = 0; return r.findIndex(([,v])=>(c += v) >= 0.8*t) + 1; };
+  const ex = sum((D.excl||[]).map(a=>Number(a.amount)||0));
+  return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pyY">Year</label><select class="inp" id="pyY" onchange="S.an.py=Number(this.value);renderAnalysis()">${yrs.map(y=>`<option ${y===B?'selected':''}>${y}</option>`).join('')}</select></div><span class="grow"></span><span class="hint">Accounting actuals ${mx?thru(mx):''}, net of costs kept out of plant OPEX${ex?` (${short(ex)})`:''}.</span></div>
+    ${!op.length?`<div class="card"><div class="empty"><b>No actuals for ${B}</b></div></div>`:`
+    <div class="stats"><div class="stat opex"><div class="eyebrow">Plant OPEX ${B} ${thru(mx)}</div><div class="v">${short(t)}</div></div>
+      <div class="stat"><div class="eyebrow">Lines making 80%</div><div class="v">${n80(lines)} of ${lines.length}</div><div class="s">Budget review time goes here first</div></div>
+      <div class="stat"><div class="eyebrow">Payees making 80%</div><div class="v">${n80(pay)} of ${pay.length}</div><div class="s">Where negotiation pays off</div></div>
+      <div class="stat"><div class="eyebrow">Largest payee</div><div class="v" style="font-size:15px;line-height:1.35">${esc(pay[0]?.[0]||'—')}</div><div class="s">${pay[0]?short(pay[0][1])+' · '+(100*pay[0][1]/t).toFixed(0)+'%':''}</div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:16px"><div class="card" style="margin:0"><h3>By expense line</h3>${table(lines,'Expense line')}</div><div class="card" style="margin:0"><h3>By payee</h3>${table(pay,'Paid to')}</div></div>
+    <p class="hint" style="margin-top:8px">Dark bars = the few lines and payees that make up 80% of spending. Start the budget review, contract renegotiation and savings ideas there.</p>`}`;
 }
 
 boot();

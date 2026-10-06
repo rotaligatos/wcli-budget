@@ -980,7 +980,7 @@ function editLine(kind, id){
   liveTotals(kind);
   S._editingId = id || null;
   if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); }
-  else loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.</div>`; }).catch(()=>{});
+  else loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.${(()=>{ const c = $('#f_category')?.value, d = c && o.D.find(x=>x.line_item===c); return d && d.next_year_pct!=null ? `<br><b>${esc(c)}:</b> assume ${Number(d.next_year_pct)>=0?'+':''}${Number(d.next_year_pct)}% vs ${S.cycle.year-1} prices — ${esc(d.rationale||'')}` : ''; })()}</div>`; }).catch(()=>{});
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
 }
 function readMonths(){ const o={}; for(let i=1;i<=12;i++) o['m'+i] = Number($('#m'+i).value)||0; return o; }
@@ -1737,12 +1737,12 @@ async function renderOutlook(){
   try {
     const y = await outlookYear(), o = await loadOutlook(y), ed = canManageData();
     const latest = o.A.reduce((m,a)=>a.as_of && a.as_of>m ? a.as_of : m, '');
-    const cats = [['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['materials','Materials and supply'],['sales','Sales direction'],['custom','Other']];
+    const cats = [['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['logistics','Freight and logistics'],['ict','IT equipment and chips'],['materials','Boards, wood and resin'],['sales','Sales direction'],['custom','Other']];
     const K = await loadKpis(y-1).catch(()=>[]), K2 = await loadKpis(y).catch(()=>[]);
     const ann = (rows, m) => { const a = rows.find(r=>r.metric===m && r.month===0); if (a) return Number(a.value); const v = rows.filter(r=>r.metric===m && r.month>0); return v.length ? sum(v.map(r=>r.value))*12/v.length : null; };
     const sT = ann(K2,'sales_target'), sA = ann(K,'sales_actual'), pT = ann(K2,'production_target'), pA = ann(K,'production_output');
     const avgP = (rows, m) => { const v = rows.filter(r=>r.metric===m && r.month>0); const a0 = rows.find(r=>r.metric===m && r.month===0); return a0 ? Number(a0.value) : v.length ? sum(v.map(r=>r.value))/v.length : null; }, yT2 = avgP(K2,'yield_target_pct'), yA1 = avgP(K,'yield_actual_pct');
-    const items = [...new Set([...S.items.opex])];
+    const items = [...new Set([...S.items.opex])], capItems = S.items.capex || [];
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">Budget ${y} · Pasig Plant</div><h1>Cost outlook</h1>
       <div class="sub">What is happening outside the company that will move our costs — and the change we assume for each expense line.${latest?` Figures as of <b>${latest}</b>.`:''}</div></div>
@@ -1769,6 +1769,12 @@ async function renderOutlook(){
         return `<tr><td class="act" style="font-size:13px">${esc(it)}</td><td>${(d?.driver_keys||[]).map(k=>{const a=assumpByKey(o,k);return a?`<span class="chip basis-working" style="font-size:11px;margin:1px">${esc(a.label.replace(/ \(.*\)$/,''))}</span>`:''}).join('') || '<span class="hint">General inflation</span>'}</td>
           <td class="r">${cell('rest_of_year_pct', d?Number(d.rest_of_year_pct):null)}</td><td class="r">${cell('next_year_pct', d?Number(d.next_year_pct):null)}</td>
           <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
+      <tr class="grp"><td colspan="5" class="act" style="font-weight:600;background:var(--bg2,#f6f6f4)">CAPEX categories — price change for equipment bought in ${y}</td></tr>
+      ${capItems.map(it=>{ const d = o.D.find(x=>x.line_item===it);
+        const cell = (k,v) => ed ? `<input class="inp num drv" data-item="${esc(it)}" data-k="${k}" type="number" step="any" value="${v??''}" placeholder="${k==='next_year_pct'?generalPct(o):0}" style="max-width:80px;margin-left:auto">` : `<span class="num">${v!=null?(v>0?'+':'')+v+'%':'—'}</span>`;
+        return `<tr><td class="act" style="font-size:13px">${esc(it)}</td><td>${(d?.driver_keys||[]).map(k=>{const a=assumpByKey(o,k);return a?`<span class="chip basis-working" style="font-size:11px;margin:1px">${esc(a.label.replace(/ \(.*\)$/,''))}</span>`:''}).join('') || '<span class="hint">General inflation</span>'}</td>
+          <td class="r">${cell('rest_of_year_pct', d?Number(d.rest_of_year_pct):null)}</td><td class="r">${cell('next_year_pct', d?Number(d.next_year_pct):null)}</td>
+          <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveDrivers(${y})">Save changes</button></div>`:''}</div>`;
     renderTrend(y, o);
@@ -1790,7 +1796,7 @@ async function editAssump(id){
   const y = await outlookYear(), o = await loadOutlook(y), a = id ? o.A.find(x=>x.id===id) : { category:'custom' };
   modal(`<h3>${id?'Edit indicator':'Add an indicator'}</h3>
     <div class="g2"><div class="field"><label for="aLbl">Name</label><input class="inp" id="aLbl" value="${esc(a.label||'')}" placeholder="e.g. Resin price, Sales target growth"></div>
-      <div class="field"><label for="aCat">Group</label><select class="inp" id="aCat">${[['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['materials','Materials and supply'],['sales','Sales direction'],['custom','Other']].map(([k,l])=>`<option value="${k}" ${a.category===k?'selected':''}>${l}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="aCat">Group</label><select class="inp" id="aCat">${[['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['logistics','Freight and logistics'],['ict','IT equipment and chips'],['materials','Boards, wood and resin'],['sales','Sales direction'],['custom','Other']].map(([k,l])=>`<option value="${k}" ${a.category===k?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <div class="g2"><div class="field"><label for="aVal">Value</label><input class="inp num" id="aVal" type="number" step="any" value="${a.value??''}"></div>
       <div class="field"><label for="aUnit">Unit</label><input class="inp" id="aUnit" value="${esc(a.unit||'')}" placeholder="%, ₱ per liter, ₱ per US$"></div></div>
     <div class="field"><label for="aTxt">Detail</label><input class="inp" id="aTxt" value="${esc(a.value_text||'')}"></div>

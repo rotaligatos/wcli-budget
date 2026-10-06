@@ -243,6 +243,17 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
 .ref{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px}.ref th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;padding:3px 4px;border-bottom:1px solid var(--line)}
 .ref td{padding:4px;border-bottom:1px solid var(--line)}.ref .r{text-align:right}.ref small{color:var(--faint)}
 .linkbtn{border:0;background:none;color:var(--teal);font-weight:600;cursor:pointer;padding:0;font:inherit;font-size:13px}
+.ol-strip{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--kraft);border-radius:var(--r);padding:8px 14px;margin-bottom:16px;font-size:13px}
+.ol-strip b{font-weight:600;color:var(--muted)} .ol-strip a{color:var(--teal);font-weight:600;cursor:pointer;margin-left:auto}
+h3.sec{font-size:18px;font-stretch:85%;margin:18px 0 8px}
+.ol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.ol-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.ol-card .v{font-family:var(--mono);font-size:22px;font-weight:600}.ol-card .s{font-size:12.5px;color:var(--muted)}
+.ol-card .means{font-size:13px;background:var(--kraft-wash);border-radius:4px;padding:6px 8px;margin-top:4px}.ol-card .means a{color:var(--teal);cursor:pointer;font-weight:600}
+.ol-card .src{font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:6px}.ol-card .src a{color:var(--teal);cursor:pointer}
+.cons .ci{font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line)}.cons .ci a{color:var(--teal)}
+.cons .sug{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:8px;font-size:13px;background:var(--teal-wash);border-radius:4px;padding:8px 10px}.cons .sug small{color:var(--muted)}
+table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left:auto;padding:4px 6px}.kpi tr.calc td{background:var(--surface-2);font-size:12.5px}
 @media (max-width:520px){.g2{grid-template-columns:1fr}.months{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -633,18 +644,18 @@ function route(){
     if (own && !isReviewer()) S.budgetId = own.id; else S.view = isReviewer() ? 'overview' : 'budget';
   }
   renderNav();
-  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else openBudget(S.budgetId);
+  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else if (S.view==='outlook') renderOutlook(); else if (S.view==='perf') renderPerf(); else openBudget(S.budgetId);
 }
-function go(view, id){ S.act.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
+function go(view, id){ S.act.cache = {}; S.ol.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
 function renderNav(){
   const main = [];
   if (isReviewer()) main.push(`<a class="${S.view==='overview'?'on':''}" onclick="go('overview')">Plant overview</a>`);
-  main.push(`<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
+  main.push(`<a class="${S.view==='outlook'?'on':''}" onclick="go('outlook')">Cost outlook</a>`, `<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='perf'?'on':''}" onclick="go('perf')">Sales and plant performance</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
   if (S.me.role==='admin') main.push(`<a class="${S.view==='admin'?'on':''}" onclick="go('admin')">Users and settings</a>`);
   $('#navMain').innerHTML = main.join('');
   const list = isReviewer() ? S.budgets : S.budgets.filter(b=>b.department_id===S.me.department_id);
   $('#deptNavTitle').textContent = isReviewer() ? 'Departments' : 'My department';
-  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
+  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="outlook:" ${S.view==='outlook'?'selected':''}>Cost outlook</option><option value="perf:" ${S.view==='perf'?'selected':''}>Sales and plant performance</option><option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
     + list.map(b=>`<option value="budget:${b.id}" ${S.view==='budget'&&S.budgetId===b.id?'selected':''}>${esc(deptById(b.department_id)?.name)} — ${STATUS_LABEL[b.status]}</option>`).join('');
   $('#navDepts').innerHTML = list.map(b => `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}"><span>${esc(deptById(b.department_id)?.name)}</span><span class="dot st-${b.status}"></span></a>`).join('') || '<span style="color:#8FA09A;font-size:12px;padding:0 8px">No department assigned</span>';
 }
@@ -691,7 +702,7 @@ function renderBudget(){
     const done = curIdx > i;
     const cls = done ? 'done' : (i===curIdx ? (b.status==='returned'?'ret':'cur') : '');
     return `<div class="${cls}"><b>${s[0]}</b><small>${done ? (b[s[1]] ? fmtDate(b[s[1]]) : 'Done') : (i===curIdx ? (b.status==='returned'?'Returned — needs changes':'In progress') : s[2])}</small></div>`; }).join('')}</div>
-  ${lockedBanner()}
+  ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
   ${b.status==='returned' && lastReturn ? `<div class="banner red"><b>Returned by ${esc(userName(lastReturn.actor_id))}:</b> ${esc(lastReturn.note)}</div>` : ''}
   ${S.cycle.due_date && ['draft','returned'].includes(b.status) ? `<div class="banner blue">Due to the Managing Director by <b>${new Date(S.cycle.due_date).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})}</b>. Salaries and benefits are not included — HR prepares those.</div>` : ''}
   <div class="stats">
@@ -709,6 +720,7 @@ function renderBudget(){
     ${[['opex','OPEX',S.opex.length],['capex','CAPEX',S.capex.length],['checks','Checks',checks.length],['activity','Comments and history',S.comments.length+S.events.length]].map(([k,l,n])=>`<button role="tab" class="${S.tab===k?'on':''}" onclick="S.tab='${k}';renderBudget()">${l}<span class="cnt">${n}</span></button>`).join('')}
   </div>
   <div class="panel" id="tabBody"></div>`;
+  if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
   const body = $('#tabBody');
   if (S.tab==='opex') body.innerHTML = renderOpexTable(ed, checks);
   else if (S.tab==='capex') body.innerHTML = renderCapexTable(ed, checks);
@@ -852,6 +864,7 @@ function editLine(kind, id){
       <div class="field"><label for="f_expense_type">Type of expense</label><select class="inp" id="f_expense_type" ${ro}>${opts(L.expense_type.map(x=>x.value), l.expense_type)}</select></div>
     </div>
     <div class="box" style="margin-top:0"><h3>Earlier years for this line item</h3><div id="refPanel"></div></div>
+    <div class="box"><h3>Things to consider for ${S.cycle.year}</h3><div id="considerPanel"><span class="hint">Choose a line item to see cost drivers and a suggested amount.</span></div></div>
     <div class="field"><label for="f_activity">Activity / initiative</label><input class="inp" id="f_activity" value="${esc(l.activity||'')}" placeholder="e.g. Plant electricity, Forklift fuel, Supervisory leadership training" ${ro}></div>
     <div class="field"><label for="f_description">Description / scope</label><textarea class="inp" id="f_description" placeholder="What is included — specific enough for someone outside your department" ${ro}>${esc(l.description||'')}</textarea></div>
     <div class="field"><label for="f_purpose">Business purpose / expected benefit</label><textarea class="inp" id="f_purpose" placeholder="Why the company should incur this cost and what it supports" ${ro}>${esc(l.purpose||'')}</textarea></div>
@@ -874,6 +887,7 @@ function editLine(kind, id){
     </div>
     <div class="field"><label for="f_asset">Asset / project</label><input class="inp" id="f_asset" value="${esc(l.asset||'')}" placeholder="e.g. Warehouse forklift replacement" ${ro}></div>
     <div class="field"><label for="f_description">Detailed description</label><textarea class="inp" id="f_description" placeholder="What will be purchased or built, with key specifications" ${ro}>${esc(l.description||'')}</textarea></div>
+    <div id="capexConsider"></div>
     <div class="field"><label for="f_justification">Business justification</label><textarea class="inp" id="f_justification" placeholder="WHY it is needed, and WHAT happens if it is not done" ${ro}>${esc(l.justification||'')}</textarea></div>
     <div class="g3">
       <div class="field"><label for="f_qty">Quantity</label><input class="inp num" id="f_qty" type="number" step="any" value="${l.qty??''}" ${ro}></div>
@@ -916,7 +930,9 @@ function editLine(kind, id){
   const pri = $('#f_priority'); const ph = () => { const h = L.priority.find(x=>x.value===pri.value); $('#priHint').textContent = h ? h.hint : ''; }; pri.onchange = ph; ph();
   ['c_qty','c_rate','c_times','f_qty','f_unit_cost'].forEach(x => { const e = $('#'+x); if (e) e.oninput = () => liveTotals(kind); });
   liveTotals(kind);
+  S._editingId = id || null;
   if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); }
+  else loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.</div>`; }).catch(()=>{});
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
 }
 function readMonths(){ const o={}; for(let i=1;i<=12;i++) o['m'+i] = Number($('#m'+i).value)||0; return o; }
@@ -1072,7 +1088,7 @@ async function renderOverview(){
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
-    ${lockedBanner()}
+    ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
       <div class="stat capex"><div class="eyebrow">Plant CAPEX</div><div class="v">${short(T.capex)}</div><div class="s">${peso(T.capex)}</div></div>
@@ -1093,6 +1109,7 @@ async function renderOverview(){
           <div style="font-size:12px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:4px"></span>OPEX <span style="display:inline-block;width:10px;height:10px;background:var(--kraft);margin:0 4px 0 12px"></span>CAPEX</div></div></div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Top OPEX line items</h3><div class="bars">${topItems(o).map(([k,v])=>`<div class="bar" style="grid-template-columns:minmax(160px,320px) 1fr 120px"><span style="font-size:12px">${esc(k)}</span><div class="track2"><i style="width:${100*v/(topItems(o)[0]?.[1]||1)}%;background:var(--teal)"></i></div><span class="num" style="text-align:right">${short(v)}</span></div>`).join('') || '<div class="empty">No OPEX lines yet.</div>'}</div></div>`;
+    if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
   } catch(e){ fail(e); }
 }
 function topItems(o){ const m={}; o.forEach(l=>{ const k=l.line_item||'(no line item)'; m[k]=(m[k]||0)+annual(l); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10); }
@@ -1225,7 +1242,7 @@ async function loadYearData(year, deptId){
   const [act, proj] = await Promise.all([fetchAll(qa), fetchAll(qp)]);
   return (S.act.cache[key] = { year, bud, capBud, act, proj, hasCycle:!!cyc });
 }
-function actModel(D, method='budget'){
+function actModel(D, method='budget', drv=null){
   const opexAct = D.act.filter(a=>a.kind!=='capex');
   const closed = opexAct.length ? Math.max(...opexAct.map(a=>a.month)) : 0;
   const cells = {}, z = () => Array(12).fill(0);
@@ -1236,7 +1253,7 @@ function actModel(D, method='budget'){
   const items = {};
   Object.values(cells).forEach(c => {
     const ytd = sum(c.act.slice(0, closed)), rr = closed ? ytd/closed : 0;
-    c.proj = c.bud.map((b,i) => i < closed ? c.act[i] : c.ov[i] != null ? c.ov[i] : method==='runrate' ? rr : b);
+    c.proj = c.bud.map((b,i) => i < closed ? c.act[i] : c.ov[i] != null ? c.ov[i] : method==='runrate' ? rr : method==='outlook' ? rr*(1+(drvPct(drv,c.item,'rest'))/100) : b);
     const r = items[c.item] ||= { item:c.item, bud:z(), act:z(), proj:z(), partners:{}, depts:{}, overrides:0, cells:[] };
     for (let i=0;i<12;i++) { r.bud[i]+=c.bud[i]; r.act[i]+=c.act[i]; r.proj[i]+=c.proj[i]; if (i>=closed && c.ov[i]!=null) r.overrides++; }
     Object.entries(c.partners).forEach(([p,v]) => r.partners[p] = (r.partners[p]||0)+v);
@@ -1270,7 +1287,7 @@ async function renderActuals(){
       S.act.year = (data && data[0]?.year) || new Date().getFullYear();
     }
     const years = [...new Set([...S.cycles.map(c=>c.year), S.act.year])].sort((a,b)=>b-a);
-    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), M = actModel(D, S.act.method);
+    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv);
     S.act.model = M; S.act.data = D;
     const { data:imps } = await sb.from('bgt_imports').select('*').eq('year', Y).order('created_at', { ascending:false });
     const dname = S.act.dept ? deptById(S.act.dept)?.name : 'Whole plant';
@@ -1291,7 +1308,7 @@ async function renderActuals(){
     <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="acYear">Year</label><select class="inp" id="acYear" onchange="S.act.year=Number(this.value);renderActuals()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="acDept">Department</label><select class="inp" id="acDept" onchange="S.act.dept=this.value||null;renderActuals()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===S.act.dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
-      <div class="field" style="margin:0"><label for="acMeth">Project the remaining months using</label><select class="inp" id="acMeth" onchange="S.act.method=this.value;renderActuals()"><option value="budget" ${S.act.method==='budget'?'selected':''}>The budget for those months</option><option value="runrate" ${S.act.method==='runrate'?'selected':''}>Average monthly actual so far (run-rate)</option></select></div>
+      <div class="field" style="margin:0"><label for="acMeth">Project the remaining months using</label><select class="inp" id="acMeth" onchange="S.act.method=this.value;renderActuals()"><option value="budget" ${S.act.method==='budget'?'selected':''}>The budget for those months</option><option value="runrate" ${S.act.method==='runrate'?'selected':''}>Average monthly actual so far (run-rate)</option><option value="outlook" ${S.act.method==='outlook'?'selected':''}>Run-rate adjusted for the cost outlook (fuel, power, wages, peso)</option></select></div>
       <span class="grow"></span><span class="hint" style="max-width:340px">Your own forecasts for a line override this. Click a line to enter them.</span>
     </div>
     ${M.closed ? '' : `<div class="banner blue">No actuals loaded for ${Y} yet.${canManageData()?' Use <b>Import Odoo actuals</b> to upload the monthly Plant OPEX export from Odoo.':' The Head of Plant Operations uploads them from Odoo.'}</div>`}
@@ -1333,7 +1350,7 @@ function actItem(item){
         <div class="stat"><div class="eyebrow">Actual ${thru(M.closed)}</div><div class="v" style="font-size:18px">${short(r.actYTD)}</div></div>
         <div class="stat"><div class="eyebrow">Projected</div><div class="v" style="font-size:18px" id="adProj">${short(r.projFY)}</div></div>
       </div>
-      ${ed ? `<p class="hint" style="margin:0 0 8px">Enter your expected spend for the months still open. Leave blank to use ${S.act.method==='runrate'?'the run-rate':'the budget'}.</p>` : dept ? '' : '<p class="hint" style="margin:0 0 8px">Pick a department at the top to enter forecasts for it.</p>'}
+      ${ed ? `<p class="hint" style="margin:0 0 8px">Enter your expected spend for the months still open. Leave blank to use ${METHOD_TXT[S.act.method]}.</p>` : dept ? '' : '<p class="hint" style="margin:0 0 8px">Pick a department at the top to enter forecasts for it.</p>'}
       <table class="ledger" style="min-width:0"><thead><tr><th>Month</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Projection</th></tr></thead><tbody>
       ${MONTHS.map((m,i)=>{ const closed = i < M.closed;
         return `<tr><td>${m}</td><td class="r num">${peso(r.bud[i])}</td><td class="r num">${closed?peso(r.act[i]):'<span style="color:var(--faint)">—</span>'}</td>
@@ -1358,7 +1375,7 @@ async function exportActuals(){
   try {
     const M = S.act.model, Y = S.act.year, wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Actual vs budget');
     ws.addRow([`${S.company.name} — ${S.act.dept?deptById(S.act.dept)?.name:'Whole plant'} — ${Y} actuals ${thru(M.closed)} and projection`]).font = { bold:true, size:13 };
-    ws.addRow([`Projection: months after ${M.closed?MONTHS[M.closed-1]:'—'} use ${S.act.method==='runrate'?'the year-to-date monthly average':'the budget'}, unless a department forecast was entered.`]);
+    ws.addRow([`Projection: months after ${M.closed?MONTHS[M.closed-1]:'—'} use ${METHOD_TXT[S.act.method]}, unless a department forecast was entered.`]);
     ws.addRow([]);
     const hdr = ws.addRow(['Line item', `Budget ${Y}`, `Budget ${thru(M.closed)}`, `Actual ${thru(M.closed)}`, `Projected ${Y}`, 'Projected vs budget', ...MONTHS.map((m,i)=>`${m} ${i<M.closed?'actual':'proj.'}`)]);
     hdr.font = { bold:true }; hdr.eachCell(c=>{ c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE2EEEC'} }; });
@@ -1483,7 +1500,7 @@ function priceTableHtml(){
   return `<div class="tbl-wrap"><table class="ledger" style="min-width:860px"><thead><tr><th>Item</th><th>Category</th><th class="r">Unit price</th><th>Supplier</th><th>Quotation</th><th>Valid until</th><th>Department</th></tr></thead><tbody>
   ${list.map(p => { const exp = p.valid_until && p.valid_until < today();
     return `<tr class="row" tabindex="0" onclick="editPrice('${p.id}')" onkeydown="if(event.key==='Enter')editPrice('${p.id}')" style="${p.active===false?'opacity:.5':''}">
-    <td><div class="act">${esc(p.item)}</div>${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td style="font-size:12.5px">${esc(p.category||'')}</td>
+    <td><div class="act">${esc(p.item)} ${p.source_type==='market'?'<span class="pri pri-low" style="font-size:10.5px">Market reference</span>':''}</div>${p.source_url?`<div class="item" style="text-transform:none"><a href="${esc(p.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--teal)">Source${p.as_of?' · '+p.as_of:''}</a></div>`:''}${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td style="font-size:12.5px">${esc(p.category||'')}</td>
     <td class="r num">${peso(p.unit_price,2)}<div class="item" style="text-transform:none">per ${esc(p.unit||'unit')}</div></td><td>${esc(p.supplier||'')}</td>
     <td style="font-size:12.5px">${esc(p.quote_ref||'')}${p.quote_date?`<div class="item" style="text-transform:none">${p.quote_date}</div>`:''}</td>
     <td>${p.valid_until?`<span class="pri ${exp?'pri-crit':'pri-ok'}">${exp?'Expired ':''}${p.valid_until}</span>`:''}</td><td style="font-size:12.5px">${esc(p.department_id?deptById(p.department_id)?.name:'All')}</td></tr>`; }).join('')}
@@ -1502,13 +1519,15 @@ function editPrice(id){
       <div class="field"><label for="pRef">Quotation / contract ref</label><input class="inp" id="pRef" value="${esc(p.quote_ref||'')}"></div></div>
     <div class="g2"><div class="field"><label for="pQd">Quotation date</label><input class="inp" id="pQd" type="date" value="${p.quote_date||''}"></div>
       <div class="field"><label for="pVu">Valid until</label><input class="inp" id="pVu" type="date" value="${p.valid_until||''}"></div></div>
+    <div class="g2"><div class="field"><label for="pType">Price type</label><select class="inp" id="pType">${[['quotation','Supplier quotation'],['contract','Contract'],['market','Market reference (published price)']].map(([k,l])=>`<option value="${k}" ${(p.source_type||'quotation')===k?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label for="pUrl">Source link (optional)</label><input class="inp" id="pUrl" value="${esc(p.source_url||'')}" placeholder="https://"></div></div>
     <div class="field"><label for="pNotes">Notes</label><input class="inp" id="pNotes" value="${esc(p.notes||'')}" placeholder="Specs, VAT inclusive/exclusive, minimum order"></div>
     <div class="field"><label><input type="checkbox" id="pAct" ${p.active!==false?'checked':''}> Active (shown in the picker)</label></div>
     <div class="actions" style="justify-content:space-between"><span>${id && canManageData()?`<button class="btn danger" onclick="deletePrice('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="savePrice('${id||''}')">Save</button></span></div>`);
 }
 async function savePrice(id){
   const v = x => $('#'+x).value.trim() || null;
-  const row = { company_id:S.company.id, item:v('pItem'), category:v('pCat'), department_id:v('pDept'), unit_price:Number(v('pPrice'))||0, unit:v('pUnit'), supplier:v('pSup'), quote_ref:v('pRef'), quote_date:v('pQd'), valid_until:v('pVu'), notes:v('pNotes'), active:$('#pAct').checked, updated_by:S.me.id };
+  const row = { company_id:S.company.id, item:v('pItem'), category:v('pCat'), department_id:v('pDept'), unit_price:Number(v('pPrice'))||0, unit:v('pUnit'), supplier:v('pSup'), quote_ref:v('pRef'), quote_date:v('pQd'), valid_until:v('pVu'), notes:v('pNotes'), source_type:$('#pType').value, source_url:v('pUrl'), as_of:v('pQd')||today(), active:$('#pAct').checked, updated_by:S.me.id };
   if (!row.item) { toast('Name the item.', true); return; }
   const r = id ? await sb.from('bgt_price_items').update(row).eq('id', id).select().single() : await sb.from('bgt_price_items').insert(row).select().single();
   if (r.error) return fail(r.error);
@@ -1595,7 +1614,238 @@ async function refreshRef(){
       ${res.map(r=>`<tr><td>${r.y}${r.basis&&r.basis!=='approved'?` <small>${r.basis==='submitted'?'(submitted, not approved)':''}</small>`:''}</td><td class="r num">${r.bud?peso(r.bud):'—'}</td>
         <td class="r num">${r.hasAct?peso(r.act)+` <small>${thru(r.closed)}</small>`:'<small>not loaded</small>'}</td><td class="r num">${r.hasAct&&r.closed<12?peso(r.proj)+' <small>projected</small>':r.hasAct?peso(r.act):'—'}</td></tr>`).join('')}
       </tbody></table><span class="hint">History is a check, not the basis — budget from the ${Y} activity plan, quotation or contract.</span>`;
+    renderConsider(item, res.find(r=>r.y===Y-1), dept);
   } catch(e){ box.innerHTML = '<span class="hint">History not available.</span>'; console.error(e); }
+}
+
+/* ================= COST OUTLOOK ================= */
+const METHOD_TXT = { budget:'the budget', runrate:'the run-rate (average monthly actual so far)', outlook:'the run-rate adjusted for the cost outlook' };
+S.ol = { cache:{} };
+async function loadOutlook(year){
+  if (S.ol.cache[year]) return S.ol.cache[year];
+  const [a, d] = await Promise.all([
+    sb.from('bgt_assumptions').select('*').eq('year', year).order('sort'),
+    sb.from('bgt_cost_drivers').select('*').eq('year', year).order('line_item')
+  ]);
+  if (a.error) throw a.error; if (d.error) throw d.error;
+  return (S.ol.cache[year] = { year, A:a.data||[], D:d.data||[] });
+}
+async function loadDrivers(year){ try { const o = await loadOutlook(year); return o; } catch(e){ console.error(e); return { A:[], D:[] }; } }
+const assumpByKey = (o, k) => (o?.A||[]).find(a=>a.key===k);
+function generalPct(o){ const i = assumpByKey(o,'inflation_2027') || (o?.A||[]).find(a=>/^inflation_\d{4}$/.test(a.key)); return i ? Number(i.value) : 0; }
+function drvPct(o, item, which){
+  const d = (o?.D||[]).find(x=>x.line_item===item);
+  if (which==='rest') return d ? Number(d.rest_of_year_pct)||0 : 0;
+  return d ? Number(d.next_year_pct)||0 : generalPct(o);
+}
+const fmtVal = a => a.value==null ? '' : (a.unit && a.unit.startsWith('₱') ? '₱'+Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + ' ' + a.unit.replace(/^₱\s*/,'') : Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + (a.unit==='%'?'%':a.unit?' '+a.unit:''));
+async function outlookYear(){ // budget year whose outlook applies: the open cycle, else the latest with data
+  const y = S.cycle.year; const o = await loadOutlook(y); if (o.A.length) return y;
+  const { data } = await sb.from('bgt_assumptions').select('year').order('year',{ascending:false}); return data?.[0]?.year || y;
+}
+async function outlookStrip(){
+  try { const y = await outlookYear(), o = await loadOutlook(y); if (!o.A.length) return '';
+    const keys = ['inflation_now','inflation_2027','usdphp','diesel','meralco','min_wage_ncr'];
+    const items = keys.map(k=>assumpByKey(o,k)).filter(Boolean);
+    return `<div class="ol-strip"><span class="eyebrow">Cost outlook for ${y}</span>${items.map(a=>`<span title="${esc(a.value_text||'')}"><b>${esc(a.label.replace(/ \(.*\)$/,''))}</b> ${fmtVal(a)}</span>`).join('')}<a onclick="go('outlook')">What it means for the budget →</a></div>`;
+  } catch(e){ return ''; }
+}
+async function renderOutlook(){
+  $('#main').innerHTML = '<div class="loading">Loading outlook…</div>';
+  try {
+    const y = await outlookYear(), o = await loadOutlook(y), ed = canManageData();
+    const latest = o.A.reduce((m,a)=>a.as_of && a.as_of>m ? a.as_of : m, '');
+    const cats = [['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['materials','Materials and supply'],['sales','Sales direction'],['custom','Other']];
+    const K = await loadKpis(y-1).catch(()=>[]), K2 = await loadKpis(y).catch(()=>[]);
+    const ann = (rows, m) => { const a = rows.find(r=>r.metric===m && r.month===0); if (a) return Number(a.value); const v = rows.filter(r=>r.metric===m && r.month>0); return v.length ? sum(v.map(r=>r.value))*12/v.length : null; };
+    const sT = ann(K2,'sales_target'), sA = ann(K,'sales_actual'), pT = ann(K2,'production_target'), pA = ann(K,'production_output');
+    const items = [...new Set([...S.items.opex])];
+    $('#main').innerHTML = `
+    <div class="ph"><div><div class="eyebrow">Budget ${y} · Pasig Plant</div><h1>Cost outlook</h1>
+      <div class="sub">What is happening outside the company that will move our costs — and the change we assume for each expense line.${latest?` Figures as of <b>${latest}</b>.`:''}</div></div>
+      <div class="actions">${ed?'<button class="btn primary" onclick="editAssump()">Add an indicator</button>':''}</div></div>
+    ${!o.A.length ? `<div class="banner blue">No outlook recorded for ${y} yet.</div>` : ''}
+    ${cats.map(([c,l])=>{ const list = o.A.filter(a=>(a.category||'custom')===c); if (!list.length) return '';
+      return `<h3 class="sec">${l}</h3><div class="ol-grid">${list.map(a=>`<div class="ol-card">
+        <div class="eyebrow">${esc(a.label)}</div>
+        ${a.value!=null?`<div class="v">${fmtVal(a)}</div>`:''}
+        ${a.value_text?`<div class="s">${esc(a.value_text)}</div>`:''}
+        ${a.outlook?`<div class="means"><b>For the budget:</b> ${esc(a.outlook)}</div>`:''}
+        <div class="src">${a.source_url?`<a href="${esc(a.source_url)}" target="_blank" rel="noopener">${esc(a.source_title||'Source')}</a>`:esc(a.source_title||'')}${a.as_of?` · ${a.as_of}`:''}${ed?` · <a onclick="editAssump('${a.id}')">Edit</a>`:''}</div></div>`).join('')}</div>`; }).join('')}
+    <h3 class="sec">Sales and production direction</h3>
+    <div class="ol-grid">
+      <div class="ol-card"><div class="eyebrow">Sales target ${y}</div><div class="v">${sT!=null?short(sT):'—'}</div><div class="s">${sA!=null?`${y-1} actual (full-year rate): ${short(sA)}${sT!=null&&sA?` (${sT>=sA?'+':''}${Math.round(100*(sT-sA)/sA)}%)`:''}`:`No ${y-1} sales recorded yet.`}</div><div class="means">Volume-driven costs (power, boiler fuel, supplies, delivery, agency helpers) should move with sales and production.</div></div>
+      <div class="ol-card"><div class="eyebrow">Production plan ${y}</div><div class="v">${pT!=null?Number(pT).toLocaleString('en-PH')+' sheets':'—'}</div><div class="s">${pA!=null?`${y-1} output (full-year rate): ${Math.round(pA).toLocaleString('en-PH')} sheets${pT!=null&&pA?` (${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}%)`:''}`:`No ${y-1} production recorded yet.`}</div><div class="means"><a onclick="go('perf')">Enter or upload sales and plant performance →</a></div></div>
+    </div>
+    <div class="card" style="margin-top:18px"><h3>Assumed cost change by expense line</h3>
+      <p class="hint" style="padding:10px 14px 0;margin:0">"Rest of ${y-1}" adjusts the current-year projection (Actuals page, outlook method). "${y} vs ${y-1}" is the suggested change shown to departments when they budget the line. Lines not listed use general inflation (${generalPct(o)}%).</p>
+      <div class="tbl-wrap"><table class="ledger" style="min-width:820px"><thead><tr><th>Expense line</th><th>Driven by</th><th class="r">Rest of ${y-1}</th><th class="r">${y} vs ${y-1}</th><th>Why</th></tr></thead><tbody>
+      ${items.map(it=>{ const d = o.D.find(x=>x.line_item===it);
+        const cell = (k,v) => ed ? `<input class="inp num drv" data-item="${esc(it)}" data-k="${k}" type="number" step="any" value="${v??''}" placeholder="${k==='next_year_pct'?generalPct(o):0}" style="max-width:80px;margin-left:auto">` : `<span class="num">${v!=null?(v>0?'+':'')+v+'%':'—'}</span>`;
+        return `<tr><td class="act" style="font-size:13px">${esc(it)}</td><td>${(d?.driver_keys||[]).map(k=>{const a=assumpByKey(o,k);return a?`<span class="chip basis-working" style="font-size:11px;margin:1px">${esc(a.label.replace(/ \(.*\)$/,''))}</span>`:''}).join('') || '<span class="hint">General inflation</span>'}</td>
+          <td class="r">${cell('rest_of_year_pct', d?Number(d.rest_of_year_pct):null)}</td><td class="r">${cell('next_year_pct', d?Number(d.next_year_pct):null)}</td>
+          <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
+      </tbody></table></div>
+      ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveDrivers(${y})">Save changes</button></div>`:''}</div>`;
+  } catch(e){ fail(e); }
+}
+async function saveDrivers(y){
+  const o = await loadOutlook(y), rows = {};
+  document.querySelectorAll('.drv').forEach(e => { const it = e.dataset.item; (rows[it] ||= { item:it })[e.dataset.k] = e.value.trim(); });
+  const ups = [];
+  Object.values(rows).forEach(r => { const d = o.D.find(x=>x.line_item===r.item);
+    const changed = !d ? (r.rest_of_year_pct!=='' || r.next_year_pct!=='' || r.rationale!=='') :
+      (String(r.rest_of_year_pct)!==String(Number(d.rest_of_year_pct)) || String(r.next_year_pct)!==String(Number(d.next_year_pct)) || (r.rationale||'')!==(d.rationale||''));
+    if (changed) ups.push({ company_id:S.company.id, year:y, line_item:r.item, driver_keys:d?.driver_keys||[], rest_of_year_pct:Number(r.rest_of_year_pct)||0, next_year_pct:r.next_year_pct===''?generalPct(o):Number(r.next_year_pct), rationale:r.rationale||null, updated_by:S.me.id }); });
+  if (!ups.length) { toast('No changes'); return; }
+  const r = await sb.from('bgt_cost_drivers').upsert(ups, { onConflict:'company_id,year,line_item' }); if (r.error) return fail(r.error);
+  S.ol.cache = {}; toast(`${ups.length} line${ups.length>1?'s':''} saved`); renderOutlook();
+}
+async function editAssump(id){
+  const y = await outlookYear(), o = await loadOutlook(y), a = id ? o.A.find(x=>x.id===id) : { category:'custom' };
+  modal(`<h3>${id?'Edit indicator':'Add an indicator'}</h3>
+    <div class="g2"><div class="field"><label for="aLbl">Name</label><input class="inp" id="aLbl" value="${esc(a.label||'')}" placeholder="e.g. Resin price, Sales target growth"></div>
+      <div class="field"><label for="aCat">Group</label><select class="inp" id="aCat">${[['macro','Economy'],['energy','Fuel and power'],['labor','Labor'],['materials','Materials and supply'],['sales','Sales direction'],['custom','Other']].map(([k,l])=>`<option value="${k}" ${a.category===k?'selected':''}>${l}</option>`).join('')}</select></div></div>
+    <div class="g2"><div class="field"><label for="aVal">Value</label><input class="inp num" id="aVal" type="number" step="any" value="${a.value??''}"></div>
+      <div class="field"><label for="aUnit">Unit</label><input class="inp" id="aUnit" value="${esc(a.unit||'')}" placeholder="%, ₱ per liter, ₱ per US$"></div></div>
+    <div class="field"><label for="aTxt">Detail</label><input class="inp" id="aTxt" value="${esc(a.value_text||'')}"></div>
+    <div class="field"><label for="aOut">What it means for the budget</label><textarea class="inp" id="aOut">${esc(a.outlook||'')}</textarea></div>
+    <div class="g2"><div class="field"><label for="aSrc">Source</label><input class="inp" id="aSrc" value="${esc(a.source_title||'')}"></div>
+      <div class="field"><label for="aUrl">Source link</label><input class="inp" id="aUrl" value="${esc(a.source_url||'')}"></div></div>
+    <div class="field"><label for="aAsOf">As of</label><input class="inp" id="aAsOf" type="date" value="${a.as_of||today()}" style="max-width:180px"></div>
+    <div class="actions" style="justify-content:space-between"><span>${id?`<button class="btn danger" onclick="delAssump('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="aGo">Save</button></span></div>`);
+  $('#aGo').onclick = async () => {
+    const v = x => $('#'+x).value.trim() || null;
+    const row = { company_id:S.company.id, year:y, category:$('#aCat').value, label:v('aLbl'), value:v('aVal')==null?null:Number(v('aVal')), unit:v('aUnit'), value_text:v('aTxt'), outlook:v('aOut'), source_title:v('aSrc'), source_url:v('aUrl'), as_of:v('aAsOf'), updated_by:S.me.id };
+    if (!row.label) { toast('Name the indicator.', true); return; }
+    const r = id ? await sb.from('bgt_assumptions').update(row).eq('id', id) : await sb.from('bgt_assumptions').insert({ ...row, key:'custom_'+Date.now(), sort:100+o.A.length });
+    if (r.error) return fail(r.error); S.ol.cache = {}; closeModal(); toast('Saved'); renderOutlook();
+  };
+}
+async function delAssump(id){ const r = await sb.from('bgt_assumptions').delete().eq('id', id); if (r.error) return fail(r.error); S.ol.cache = {}; closeModal(); toast('Deleted'); renderOutlook(); }
+
+/* things to consider — line drawer (OPEX) */
+async function renderConsider(item, prev, dept){
+  const box = $('#considerPanel'); if (!box) return;
+  try {
+    const Y = S.cycle.year, o = await loadOutlook(Y);
+    if ($('#f_line_item')?.value !== item) return;
+    const d = o.D.find(x=>x.line_item===item), pct = drvPct(o, item, 'next'), drivers = (d?.driver_keys||[]).map(k=>assumpByKey(o,k)).filter(Boolean);
+    const base = prev && prev.hasAct ? prev.proj : prev?.bud || 0, sug = Math.round(base * (1+pct/100));
+    const others = sum(S.opex.filter(l=>l.line_item===item && l.id!==S._editingId).map(annual));
+    const K1 = await loadKpis(Y-1).catch(()=>[]), K2 = await loadKpis(Y).catch(()=>[]);
+    const ann = (rows, m) => { const a = rows.find(r=>r.metric===m && r.month===0); if (a) return Number(a.value); const v = rows.filter(r=>r.metric===m && r.month>0); return v.length ? sum(v.map(r=>r.value))*12/v.length : null; };
+    const pT = ann(K2,'production_target'), pA = ann(K1,'production_output') ?? ann(K1,'production_target');
+    const volItem = /ELECTRICITY|GAS AND OIL|SUPPLIES|DELIVERY|OUTSOURCED|FORKLIFT|MACHINERY|DEPOT|FREIGHT/.test(item);
+    const prices = (await loadPrices().catch(()=>[])).filter(p=>p.active!==false && p.category===item).slice(0,4);
+    S._sug = { item, sug, base, pct, others, Y };
+    box.innerHTML = `
+      <div class="cons">
+        ${drivers.length ? drivers.map(a=>`<div class="ci"><b>${esc(a.label)}: ${fmtVal(a)}</b> — ${esc(a.outlook||a.value_text||'')} ${a.source_url?`<a href="${esc(a.source_url)}" target="_blank" rel="noopener">Source</a>`:''}</div>`).join('')
+          : `<div class="ci"><b>General inflation ${generalPct(o)}% in ${Y}</b> (BSP baseline). No specific cost driver recorded for this line.</div>`}
+        ${d?.rationale ? `<div class="ci">${esc(d.rationale)}</div>` : ''}
+        ${volItem && pT!=null && pA ? `<div class="ci"><b>Production plan ${Y}: ${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}% vs ${Y-1}.</b> This cost moves with volume — scale it accordingly.</div>` : ''}
+        ${prices.length ? `<div class="ci"><b>Price list:</b> ${prices.map(p=>`${esc(p.item)} ${peso(p.unit_price,2)}/${esc(p.unit||'unit')}${p.source_type==='market'?' (market)':''}`).join(' · ')}</div>` : ''}
+        ${base ? `<div class="sug"><div><b>Suggested ${Y} for ${esc(deptById(dept)?.name)} · ${esc(item)}: ${peso(sug)}</b><br><small>${Y-1} ${prev.hasAct?'full-year view':'budget'} ${peso(base)} × ${pct>=0?'+':''}${pct}%. Other ${Y} lines on this item: ${peso(others)}.</small></div>
+          ${canEdit(budgetById(S.budgetId)) ? `<button type="button" class="btn" onclick="applySuggestion()">Use for this line</button>` : ''}</div>` : ''}
+      </div>`;
+  } catch(e){ console.error(e); box.innerHTML = ''; }
+}
+async function applySuggestion(){
+  const s = S._sug; if (!s) return;
+  const amt = Math.max(0, s.sug - s.others);
+  if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
+  const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);
+  const pat = r && sum(r.proj) ? r.proj.map(v=>v/sum(r.proj)) : Array(12).fill(1/12);
+  let left = amt; pat.forEach((p,i)=>{ const v = i<11 ? Math.round(amt*p*100)/100 : Math.round(left*100)/100; left -= v; $('#m'+(i+1)).value = v || ''; });
+  const note = `Suggested from ${s.Y-1} full-year view ${peso(s.base)} ${s.pct>=0?'+':''}${s.pct}% (cost outlook) — confirm against plan/quotation.`;
+  const rem = $('#f_remarks'); if (rem && !rem.value.includes('Suggested from')) rem.value = (rem.value ? rem.value.trim()+' ' : '') + note;
+  liveTotals('opex'); toast('Months filled with the suggestion — adjust as needed');
+}
+
+/* ================= SALES & PLANT PERFORMANCE ================= */
+const KPI_DEFS = [
+  ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
+  ['volume_sold','Volume sold','sheets','num'],['production_target','Production target','sheets','num'],['production_output','Production output','sheets','num'],
+  ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
+];
+S.pf = { year:null };
+async function loadKpis(year){ const k = 'k'+year; if (S.ol.cache[k]) return S.ol.cache[k]; const { data, error } = await sb.from('bgt_kpis').select('*').eq('year', year); if (error) throw error; return (S.ol.cache[k] = data||[]); }
+async function renderPerf(){
+  $('#main').innerHTML = '<div class="loading">Loading performance…</div>';
+  try {
+    if (!S.pf.year) S.pf.year = S.act.year || new Date().getFullYear();
+    const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData();
+    const D = await loadYearData(Y, null).catch(()=>null), M = D ? actModel(D,'budget') : null;
+    const g = (m, mo) => { const r = K.find(x=>x.metric===m && x.month===mo); return r ? Number(r.value) : null; };
+    const tot = m => { const a = g(m,0); if (a!=null) return a; const v = MONTHS.map((_,i)=>g(m,i+1)).filter(x=>x!=null); return v.length ? (KPI_DEFS.find(d=>d[0]===m)[3]==='pct' ? sum(v)/v.length : sum(v)) : null; };
+    const opexM = M ? M.monthly.act : Array(12).fill(0), closed = M?.closed||0;
+    const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
+    const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
+    const salesY = ytd('sales_actual'), prodY = ytd('production_output'), opexY = sum(opexM.slice(0,closed));
+    const years = [...new Set([...S.cycles.map(c=>c.year), Y, new Date().getFullYear()])].sort((a,b)=>b-a);
+    $('#main').innerHTML = `
+    <div class="ph"><div><div class="eyebrow">${Y} · Pasig Plant</div><h1>Sales and plant performance</h1>
+      <div class="sub">Sales targets and results, production volume and plant measures, set against plant OPEX. Fill in what is available — every figure helps size volume-driven costs.</div></div>
+      <div class="actions">${ed?'<button class="btn" onclick="importKpiDialog()">Import Excel</button>':''}<button class="btn ghost" onclick="exportKpiTemplate()">Download ${ed?'template / ':''}data</button></div></div>
+    <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pfYear">Year</label><select class="inp" id="pfYear" onchange="S.pf.year=Number(this.value);renderPerf()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
+      <span class="grow"></span><span class="hint">${ed?'Type values directly in the table, then Save. Use the Year column for annual targets.':'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
+    <div class="stats">
+      <div class="stat"><div class="eyebrow">Sales ${thru(closed)}</div><div class="v">${salesY!=null?short(salesY):'—'}</div><div class="s">${tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>
+      <div class="stat"><div class="eyebrow">Production ${thru(closed)}</div><div class="v">${prodY!=null?Number(prodY).toLocaleString('en-PH'):'—'}</div><div class="s">sheets${tot('production_target')!=null?` · target ${Number(tot('production_target')).toLocaleString('en-PH')}`:''}</div></div>
+      <div class="stat opex"><div class="eyebrow">Plant OPEX per sheet</div><div class="v">${prodY?peso(opexY/prodY,2):'—'}</div><div class="s">${prodY?`${short(opexY)} OPEX ÷ ${Number(prodY).toLocaleString('en-PH')} sheets`:'Needs production output'}</div></div>
+      <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${salesY?(100*opexY/salesY).toFixed(1)+'%':'—'}</div><div class="s">${salesY?`${thru(closed)}`:'Needs sales actual'}</div></div>
+    </div>
+    <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
+      ${KPI_DEFS.map(([k,l,u,t])=>`<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
+        return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
+      <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${short(opexY)}</td></tr>
+      <tr class="calc"><td class="act">OPEX per sheet produced</td>${opexM.map((v,i)=>{ const p = g('production_output',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${prodY?peso(opexY/prodY,2):''}</td></tr>
+      <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${salesY?(100*opexY/salesY).toFixed(1)+'%':''}</td></tr>
+      </tbody></table></div>
+      ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
+    <p class="hint" style="margin-top:10px">Peso per sheet is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
+  } catch(e){ fail(e); }
+}
+async function saveKpis(Y){
+  const K = await loadKpis(Y), ups = [], dels = [];
+  document.querySelectorAll('.kv').forEach(e => { const k = e.dataset.k, m = Number(e.dataset.m), ex = K.find(x=>x.metric===k && x.month===m), v = e.value.trim();
+    if (v==='') { if (ex) dels.push(ex.id); } else if (!ex || Number(ex.value)!==Number(v)) ups.push({ company_id:S.company.id, year:Y, month:m, metric:k, value:Number(v), updated_by:S.me.id }); });
+  try {
+    if (ups.length) { const r = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (r.error) throw r.error; }
+    if (dels.length) { const r = await sb.from('bgt_kpis').delete().in('id', dels); if (r.error) throw r.error; }
+    delete S.ol.cache['k'+Y]; toast(ups.length+dels.length ? 'Figures saved' : 'No changes'); renderPerf();
+  } catch(e){ fail(e); }
+}
+async function exportKpiTemplate(){
+  const Y = S.pf.year, K = await loadKpis(Y), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`${Y} performance`);
+  const h = ws.addRow(['Measure', 'Code', ...MONTHS, 'Year']); h.font = { bold:true };
+  KPI_DEFS.forEach(([k,l,u]) => ws.addRow([`${l} (${u})`, k, ...[...MONTHS.map((_,i)=>i+1),0].map(m=>{ const r = K.find(x=>x.metric===k && x.month===m); return r ? Number(r.value) : null; })]));
+  ws.getColumn(1).width = 34; ws.getColumn(2).width = 18; for (let i=3;i<=15;i++){ ws.getColumn(i).width = 14; ws.getColumn(i).numFmt = '#,##0.##'; }
+  ws.addRow([]); ws.addRow(['Keep the Code column. "Year" is for annual targets or totals.']);
+  download(await wb.xlsx.writeBuffer(), `${Y} Sales and plant performance - ${S.company.code}.xlsx`); toast('Downloaded');
+}
+function importKpiDialog(){
+  modal(`<h3>Import performance figures</h3><p>Use the file from "Download template / data" (columns Code, Jan–Dec, Year). Values replace what is there for the same measure and month.</p>
+    <div class="field"><input type="file" id="kfFile" accept=".xlsx" class="inp"></div><p id="kfMsg"></p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="kfGo">Import</button></div>`);
+  $('#kfGo').onclick = async () => {
+    const f = $('#kfFile').files[0]; if (!f) { toast('Choose a file first.', true); return; }
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0], Y = S.pf.year;
+      const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : v;
+      const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), ci = head.indexOf('code');
+      if (ci<1) { $('#kfMsg').textContent = 'No "Code" column found in the first row.'; return; }
+      const codes = KPI_DEFS.map(d=>d[0]), ups = [];
+      for (let r=2; r<=ws.rowCount; r++) { const row = ws.getRow(r), code = String(cv(row.getCell(ci).value)||'').trim(); if (!codes.includes(code)) continue;
+        for (let m=0; m<=12; m++) { const col = m===0 ? head.indexOf('year') : head.indexOf(MONTHS[m-1].toLowerCase()); if (col<1) continue;
+          const v = cv(row.getCell(col).value); if (v==null || v==='' || isNaN(Number(v))) continue;
+          ups.push({ company_id:S.company.id, year:Y, month:m, metric:code, value:Number(v), updated_by:S.me.id }); } }
+      if (!ups.length) { $('#kfMsg').textContent = 'No figures found.'; return; }
+      const res = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (res.error) throw res.error;
+      delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
+    } catch(e){ fail(e); }
+  };
 }
 
 boot();

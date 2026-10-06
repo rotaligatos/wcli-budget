@@ -111,6 +111,27 @@ async function plantRecordsText(db: SupabaseClient, deptId: string, year: number
     Object.entries(byLine).sort((a, b) => b[1].a - a[1].a).slice(0, 25).map(([k, v]) => `- ${k}: ${peso(v.a)} — top items: ${Object.entries(v.items).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([i, a]) => `${i} ${peso(a)}`).join('; ')}`).join('\n') : 'No PO records.') +
     (Object.keys(res).length ? `\nConsumption and utility bills ${year}:\n` + Object.entries(res).map(([k, v]) => `- ${k}: ${Math.round(v.q).toLocaleString('en-PH')} ${v.u} over ${v.n.size} months${v.a ? `, billed ${peso(v.a)}` : ''}${v.a && v.q ? ` (₱${(v.a / v.q).toFixed(2)}/${v.u})` : ''}`).join('\n') : '');
 }
+/* stores withdrawals (WRF) by budget line, last 3 years — what the department actually drew from the stockroom */
+async function storesText(db: SupabaseClient, deptId: string, Y: number) {
+  const rows: any[] = [];
+  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('year,month,rec_date,line_item,section,item,amount,ref_no').eq('kind', 'issue').eq('department_id', deptId).gte('year', Y - 3).lte('year', Y - 1).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  if (!rows.length) return 'No stores withdrawals recorded.';
+  const ys = [...new Set(rows.map(r => r.year))].sort();
+  const out: string[] = [];
+  for (const y of ys) {
+    const r = rows.filter(x => x.year === y), last = Math.max(...r.map(x => x.month)), day = Math.max(...r.filter(x => x.month === last).map(x => Number(String(x.rec_date).slice(8, 10))));
+    const cl = day < 20 ? last - 1 : last, by: Record<string, number> = {};
+    r.filter(x => x.month <= cl).forEach(x => by[x.line_item || 'other'] = (by[x.line_item || 'other'] || 0) + Number(x.amount));
+    const t = sum(Object.values(by));
+    out.push(`- ${y} ${cl === 12 ? 'full year' : `Jan–${M[cl - 1]} (pace ×12/${cl} = ${peso(t / cl * 12)})`}: ${peso(t)} — ` + Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${peso(v)}`).join('; '));
+    const sec: Record<string, number> = {}, it: Record<string, number> = {};
+    r.filter(x => x.section).forEach(x => sec[x.section] = (sec[x.section] || 0) + Number(x.amount));
+    r.filter(x => x.ref_no !== 'SUMMARY' && Number(x.amount) >= 30000).forEach(x => it[x.item] = (it[x.item] || 0) + Number(x.amount));
+    if (Object.keys(sec).length) out.push(`  sections: ${Object.entries(sec).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
+    if (Object.keys(it).length) out.push(`  large single items (one-offs to check): ${Object.entries(it).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}`);
+  }
+  return out.join('\n');
+}
 async function volumeText(db: SupabaseClient, year: number) {
   const { data } = await db.from('bgt_kpis').select('year,month,metric,value').gte('year', year - 4).lte('year', year);
   if (!data?.length) return 'No sales, volume or production figures.';
@@ -142,7 +163,7 @@ async function draftLine(db: SupabaseClient, key: string, p: any) {
   if (error || !b) throw new Error('Budget not found or not allowed');
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year, L = await master(db), o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y);
-  const [pr, kp] = await Promise.all([prices(db, b.department_id), kpiText(db, Y)]);
+  const [pr, kp, sto] = await Promise.all([prices(db, b.department_id), kpiText(db, Y), storesText(db, b.department_id, Y)]);
   const { data:cur } = await db.from(p.kind === 'capex' ? 'bgt_capex_lines' : 'bgt_opex_lines').select('*').eq('budget_id', b.id);
   const curTxt = (cur || []).map((l: any) => `- ${p.kind === 'capex' ? (l.category + ': ' + l.asset) : (l.line_item + ': ' + l.activity)} ${peso(Number(l.annual))}`).join('\n') || '(none yet)';
   const isC = p.kind === 'capex';
@@ -171,7 +192,7 @@ ${outlookText(o)}
 
 PRICE LIST\n${pr}
 
-THIS DEPARTMENT'S HISTORY BY LINE ITEM\n${historyText(h)}
+THIS DEPARTMENT'S HISTORY BY LINE ITEM\n${historyText(h)}\n\nSTORES WITHDRAWALS (WRF, actual use of supplies, fuel and parts)\n${sto}
 
 SALES AND PRODUCTION FIGURES\n${kp}
 
@@ -184,7 +205,7 @@ async function draftBudget(db: SupabaseClient, key: string, p: any) {
   if (error || !b) throw new Error('Budget not found or not allowed');
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year, L = await master(db), o = await outlook(db, Y);
-  const [h, pr, vol, opb, rec] = await Promise.all([deptHistory(db, b.department_id, Y, 3), prices(db, b.department_id), volumeText(db, Y), plantOpexPerBoard(db, Y), plantRecordsText(db, b.department_id, Y - 1)]);
+  const [h, pr, vol, opb, rec, sto] = await Promise.all([deptHistory(db, b.department_id, Y, 3), prices(db, b.department_id), volumeText(db, Y), plantOpexPerBoard(db, Y), plantRecordsText(db, b.department_id, Y - 1), storesText(db, b.department_id, Y)]);
   const [{ data:ol }, { data:cl }] = await Promise.all([db.from('bgt_opex_lines').select('line_item,activity,annual').eq('budget_id', b.id), db.from('bgt_capex_lines').select('category,asset,annual').eq('budget_id', b.id)]);
   // CAPEX deferred into this year for this department and not yet carried over
   let deferred = '(none)';
@@ -223,7 +244,7 @@ async function draftBudget(db: SupabaseClient, key: string, p: any) {
   const system = `You are the budget assistant inside WCLI's budget app. ${COMPANY}
 ${RULES}
 Draft a COMPLETE first version of one department's OPEX budget (and CAPEX only for items deferred into this year or clearly needed replacements) for the manager to review, edit and justify. Method for each recurring expense line:
-1) Reference = last year's full-year view (official Accounting/Odoo actuals annualised; if missing, plant PO records and utility bills; if both missing, the prior budget — remember some prior budgets covered only part of the year).
+1) Reference = last year's full-year view (official Accounting/Odoo actuals annualised; for fuel, supplies and spare-part lines also check stores withdrawals, which show actual use; if missing, plant PO records and utility bills; if all missing, the prior budget — remember some prior budgets covered only part of the year).
 2) Price change = the cost outlook % for that line (general inflation if none).
 3) Volume factor for volume-driven lines = next year's volume ÷ last year's volume (target if given, otherwise the trend). Use the right volume: Production, Engineering/maintenance, QA and production power/fuel follow boards PRODUCED; Warehouse and Logistics (handling, forklifts, packaging, delivery, depot) follow boards SOLD, which include imported trade boards; Admin and IT are mostly fixed. Keep fixed costs (security, rent, insurance, permits, subscriptions, internet) independent of volume. Use consumption per board (kWh, liters) and the latest unit rates when available.
 4) Drop last year's one-off items; keep contracts; flag lines that ran far above or below budget.
@@ -239,6 +260,9 @@ ${phasing || '(no monthly actuals)'}
 
 PLANT RECORDS ${Y - 1} (purchase orders, consumption, utility bills)
 ${rec}
+
+STORES WITHDRAWALS (WRF — supplies, fuel, spare parts drawn from the plant stockroom; best measure of actual use for these lines; Accounting books purchases when billed)
+${sto}
 
 SALES, VOLUME, PRODUCTION AND CAPACITY (plant)
 ${vol}
@@ -266,7 +290,7 @@ async function reviewBudget(db: SupabaseClient, key: string, p: any) {
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year;
   const [{ data:ol }, { data:cl }] = await Promise.all([db.from('bgt_opex_lines').select('*').eq('budget_id', b.id).order('sort'), db.from('bgt_capex_lines').select('*').eq('budget_id', b.id).order('sort')]);
-  const o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y), kp = await kpiText(db, Y);
+  const o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y), kp = await kpiText(db, Y), sto = await storesText(db, b.department_id, Y);
   const mm = (l: any) => M.map((m, i) => Number(l['m' + (i + 1)]) ? `${m} ${Math.round(Number(l['m' + (i + 1)]))}` : '').filter(Boolean).join(', ');
   const lines = (ol || []).map((l: any) => `- [OPEX] ${l.line_item} | ${l.activity} | ${l.expense_type || '?'} | ${l.priority || 'no priority'} | basis: ${l.basis || '?'} | ${peso(Number(l.annual))} | months: ${mm(l)} | purpose: ${(l.purpose || '').slice(0, 160)} | remarks: ${(l.remarks || '').slice(0, 160)}`).join('\n');
   const caps = (cl || []).map((l: any) => `- [CAPEX] ${l.category} | ${l.asset} | qty ${l.qty ?? '?'} × ${l.unit_cost ?? '?'} | ${l.priority || 'no priority'} | ${peso(Number(l.annual))} | months: ${mm(l)} | justification: ${(l.justification || '').slice(0, 200)}`).join('\n');
@@ -287,7 +311,7 @@ TOTALS: OPEX ${peso(sum((ol || []).map((l: any) => Number(l.annual))))}, CAPEX $
 
 BUDGET LINES\n${lines || '(no OPEX lines)'}\n${caps || '(no CAPEX items)'}
 
-HISTORY BY LINE ITEM\n${historyText(h)}
+HISTORY BY LINE ITEM\n${historyText(h)}\n\nSTORES WITHDRAWALS (WRF, actual use of supplies, fuel and parts)\n${sto}
 
 ${outlookText(o)}
 

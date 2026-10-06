@@ -2648,22 +2648,22 @@ async function renderRecords(){
     const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
     if (S.rc.kind!=='po') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
     const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
-    const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption');
+    const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption'), iss = R.filter(r=>r.kind==='issue');
     const list = (S.rc.kind==='po'?po:co).filter(r=>(!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.supplier,r.line_item,r.resource,r.notes]).toLowerCase().includes(S.rc.q.toLowerCase())));
     const years = [...new Set([new Date().getFullYear()+0, new Date().getFullYear()-1, new Date().getFullYear()-2, ...S.cycles.map(c=>c.year), Y])].sort((a,b)=>b-a);
     const poMonths = [...new Set(po.map(r=>r.month))].sort((a,b)=>a-b);
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
       <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
-      <div class="actions">${ed&&S.rc.kind!=='utility'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
+      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
       <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
-    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
-    ${S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    ${S.rc.kind==='issue' ? await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
   } catch(e){ fail(e); }
 }
 async function poView(Y, dept, po, list, poMonths, ed){
@@ -2750,7 +2750,7 @@ const REC_COLS = ['Date','Department code','Type (PO / Consumption)','PO / refer
 async function exportRecords(){
   const Y = S.rc.year, R = await loadRecords(Y, S.rc.dept), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Plant records ${Y}`);
   const h = ws.addRow(REC_COLS); h.font = { bold:true };
-  R.slice().reverse().forEach(r => ws.addRow([new Date(r.rec_date), r.department_id ? deptById(r.department_id)?.code : 'PLANT', r.kind==='po'?'PO':'Consumption', r.ref_no, r.line_item, r.kind==='po'?r.item:r.resource, r.supplier, r.qty!=null?Number(r.qty):null, r.unit, r.unit_price!=null?Number(r.unit_price):null, r.amount!=null?Number(r.amount):null, r.status, r.notes]));
+  R.slice().reverse().forEach(r => ws.addRow([new Date(r.rec_date), r.department_id ? deptById(r.department_id)?.code : 'PLANT', r.kind==='po'?'PO':r.kind==='issue'?'Stores withdrawal':'Consumption', r.ref_no, r.line_item, r.kind==='po'?r.item:r.resource, r.supplier, r.qty!=null?Number(r.qty):null, r.unit, r.unit_price!=null?Number(r.unit_price):null, r.amount!=null?Number(r.amount):null, r.status, r.notes]));
   [12,10,14,16,34,34,26,10,8,12,14,10,30].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(1).numFmt='yyyy-mm-dd'; [10,11].forEach(c=>ws.getColumn(c).numFmt='#,##0.00');
   const g = wb.addWorksheet('Guide');
   [['How to fill'],['Date: PO date or reading date.'],['Department code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')+'; PLANT = whole plant (main electricity/water bill)'],['Type: PO or Consumption.'],['Expense line (PO): one of the budget line items, e.g. SUPPLIES.'],
@@ -2863,6 +2863,145 @@ async function saveUtil(Y){
 document.addEventListener('input', e => { if (!e.target.classList?.contains('ut') || e.target.dataset.k==='ref') return; const m = e.target.dataset.m;
   const q = Number(document.querySelector(`.ut[data-m="${m}"][data-k="q"]`)?.value), a = Number(document.querySelector(`.ut[data-m="${m}"][data-k="a"]`)?.value), c = document.querySelector(`.ut-rate[data-m="${m}"]`);
   if (c) c.textContent = q && a ? peso(a/q,2) : ''; });
+
+/* ================= STORES WITHDRAWALS (WRF/WRS issues from the plant's consumption report) ================= */
+const STORE_DEPT = { 'ADMIN':'ADMIN','ADMIN OFFICE':'ADMIN','ENGINEERING AND MAINTENANCE':'ENG','ENGINEERING':'ENG','LOGISTIC':'LOG','LOGISTICS':'LOG','PPIC':'PPIC','PRODUCTION':'PROD','QA/QC':'QA','Q.A.':'QA','QA':'QA','WAREHOUSE':'WH','IT':'IT' };
+const STORE_MACH = /PRESS|BOILER|MIP|RAW BOARD|EBT|PAPER LAMINATE/;
+const stU = v => String(v??'').replace(/\s+/g,' ').trim().toUpperCase();
+function storeDept(d, sec){ return stU(sec)==='IT SECTION' ? 'IT' : STORE_DEPT[stU(d)] || null; }
+function storeSection(s){ s = stU(s); return ({ 'EBT SECTION':'EBT', 'WORLD URBAN':'WORLD URBAN (ANNEX)', 'PRODUCTION OFFICE':'OFFICE' })[s] || s || 'UNSPECIFIED'; }
+function storeCat(c){ c = stU(c); return ({ 'ENGINE FUEL':'FUEL & LUBRICANT', 'AUTOMOTIVE LUBRICANT':'FUEL & LUBRICANT', 'CLEANING & SANITATION MATERIAL':'CLEANING MATERIAL' })[c] || c || 'UNCATEGORIZED'; }
+/* which budget line a withdrawal belongs to — best fit from store category, section and item */
+function storeLine(cat, sec, item){
+  const c = stU(cat), s = stU(sec), i = stU(item);
+  if (/FUEL|LUBRICANT/.test(c)) return (/DIESEL|GASOLINE|LPG|KEROSENE|BUNKER|FUEL/.test(i) || c==='ENGINE FUEL') ? 'GAS AND OIL' : STORE_MACH.test(s) ? 'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT' : 'GAS AND OIL';
+  if (['SPARE PARTS','REPAIR & MAINTENANCE'].includes(c) || (c==='MATERIAL & SUPPLIES' && /FACILITY|PROJECT|HLYT/.test(s))) {
+    if (/FORKLIFT/.test(s)) return 'REPAIRS AND MAINTENANCE - FORKLIFT';
+    if (/TRUCK/.test(s)) return 'REPAIRS AND MAINTENANCE - DELIVERY VEHICLE';
+    if (/STRADA|MOTORCYCLE|AVANZA/.test(s)) return 'REPAIRS AND MAINTENANCE - COMPANY SERVICE VEHICLES';
+    if (s==='IT SECTION') return 'REPAIRS AND MAINTENANCE - FURNITURE, APPLIANCES AND FIXTURES';
+    if (/FACILITY|HLYT|WORLD URBAN|PLANT 2|PROJECT|OFFICE|BUILDING/.test(s)) return 'REPAIRS AND MAINTENANCE - OFFICE / BUILDING / STRUCTURE';
+    return 'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT';
+  }
+  return 'SUPPLIES';
+}
+async function loadIssues(Y, dept){
+  const k = 'iss|'+Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
+  const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('department_id,month,line_item,section,category,item,qty,amount,ref_no,rec_date,id,unit_price').eq('year', Y).eq('kind','issue'); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
+  return (S.rc.cache[k] = rows);
+}
+async function issueView(Y, dept, iss){
+  const [p1, p2, D] = await Promise.all([loadIssues(Y-1, dept), loadIssues(Y-2, dept), loadYearData(Y, dept).catch(()=>null)]);
+  const ms = [...new Set(iss.map(r=>r.month))].sort((a,b)=>a-b), last = ms.length ? ms[ms.length-1] : 0, n = ms.length;
+  const amt = r => Number(r.amount)||0, tot = a => sum(a.map(amt));
+  const by = (a, f) => { const o = {}; a.forEach(r => { const k = f(r) || '—'; o[k] = (o[k]||0) + amt(r); }); return o; };
+  const summaryOnly = iss.length && iss.every(r=>r.ref_no==='SUMMARY'), anyDetail = iss.some(r=>r.ref_no!=='SUMMARY');
+  // a last month that stops before the 20th is partial: compare and project on complete months only
+  const maxDay = Math.max(0, ...iss.filter(r=>r.month===last).map(r=>Number(String(r.rec_date).slice(8,10))));
+  const partial = last && maxDay < 20, cl = partial ? last-1 : last, isC = r => r.month<=cl;
+  const tY = tot(iss), tYc = tot(iss.filter(isC)), tP = tot(p1), tPsame = tot(p1.filter(isC)), tP2 = tot(p2), rr = cl ? tYc/cl*12 : 0;
+  const pct = (a,b) => b ? `${a>=b?'+':''}${Math.round(100*(a-b)/b)}%` : '—';
+  const span = n ? `${MONTHS[ms[0]-1]}–${MONTHS[last-1]}` : '', cspan = cl ? `Jan–${MONTHS[cl-1]}` : '';
+  if (!iss.length && !p1.length) return `<div class="card"><div class="empty"><b>No stores withdrawals for ${Y}</b>${canManageData()?'Use <b>Import stores report</b> with the plant\'s consumption report (WRF transactions). The app maps each withdrawal to a department and budget line.':'The Head of Plant Operations loads these from the plant\'s consumption report.'}</div></div>`;
+  // by expense line: two years back, last year, this year to date, run-rate, Accounting same months
+  const L0 = by(iss, r=>r.line_item), L1 = by(p1, r=>r.line_item), L2 = by(p2, r=>r.line_item), L1s = by(p1.filter(isC), r=>r.line_item), L0c = by(iss.filter(isC), r=>r.line_item);
+  const acc = {}; (D?.act||[]).filter(a=>a.kind!=='capex' && ms.includes(a.month)).forEach(a => acc[a.line_item] = (acc[a.line_item]||0) + Number(a.amount));
+  const lines = [...new Set([...Object.keys(L0), ...Object.keys(L1), ...Object.keys(L2)])].sort((a,b)=>((L0[b]||0)+(L1[b]||0))-((L0[a]||0)+(L1[a]||0)));
+  const monthly = li => MONTHS.map((_,i)=>sum(iss.filter(r=>r.line_item===li && r.month===i+1).map(amt)));
+  const dRows = !dept ? (()=>{ const a = by(iss, r=>r.department_id), b = by(p1, r=>r.department_id), c = by(p2, r=>r.department_id), bs = by(p1.filter(isC), r=>r.department_id), ac = by(iss.filter(isC), r=>r.department_id);
+    return [...new Set([...Object.keys(a), ...Object.keys(b)])].sort((x,y)=>(a[y]||0)-(a[x]||0)).map(id=>({ id, y:a[id]||0, yc:ac[id]||0, p:b[id]||0, p2:c[id]||0, ps:bs[id]||0 })); })() : [];
+  const secY = by(iss.filter(r=>r.section), r=>r.section), secP = by(p1.filter(r=>r.section), r=>r.section);
+  const topSec = Object.entries(Object.keys(secY).length ? secY : secP).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const items = {}; iss.filter(r=>r.ref_no!=='SUMMARY').forEach(r => { const k = r.item||'—'; (items[k] ||= { a:0, q:0, n:0, sec:new Set() }); items[k].a += amt(r); items[k].q += Number(r.qty)||0; items[k].n++; if (r.section) items[k].sec.add(r.section); });
+  const topItems = Object.entries(items).sort((a,b)=>b[1].a-a[1].a).slice(0,15);
+  const list = iss.filter(r=>r.ref_no!=='SUMMARY' && (!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.line_item,r.section,r.category]).toLowerCase().includes(S.rc.q.toLowerCase())));
+  const big = iss.filter(r=>r.ref_no!=='SUMMARY' && amt(r) >= 50000 && !/DIESEL|GASOLINE|FUEL/i.test(r.item||'')).sort((a,b)=>amt(b)-amt(a)).slice(0,8);
+  const th = `<th class="r">${Y-2}</th><th class="r">${Y-1}</th><th class="r">${Y} ${span}${partial?'*':''}</th><th class="r">${Y-1} ${cspan}</th><th class="r">${Y} ${cspan}</th><th class="r">Change</th><th class="r">${Y} full-year pace</th>`;
+  const z = v => v ? short(v) : '';
+  return `<div class="stats">
+      <div class="stat opex"><div class="eyebrow">Withdrawn from stores ${Y}</div><div class="v">${n?short(tY):'—'}</div><div class="s">${n?span+(partial?` · ${MONTHS[last-1]} to the ${maxDay}${['th','st','nd','rd'][maxDay%10>3||[11,12,13].includes(maxDay)?0:maxDay%10]} only`:` · ${n} month${n===1?'':'s'}`):'No '+Y+' report loaded'}</div></div>
+      <div class="stat"><div class="eyebrow">${cspan||'Same months'} ${Y-1}</div><div class="v">${tPsame?short(tPsame):'—'}</div><div class="s">${tPsame&&cl?`${Y} same months ${short(tYc)} · ${pct(tYc,tPsame)}`:''}</div></div>
+      <div class="stat"><div class="eyebrow">Full year ${Y-1}</div><div class="v">${tP?short(tP):'—'}</div><div class="s">${tP2?`${Y-2}: ${short(tP2)} (${pct(tP,tP2)})`:''}</div></div>
+      <div class="stat"><div class="eyebrow">${Y} full-year pace</div><div class="v">${n?short(rr):'—'}</div><div class="s">${cl?`Average of ${cspan} × 12`:''}</div></div>
+    </div>
+    ${summaryOnly?`<div class="banner blue">Loaded as monthly totals per department and budget line. ${canManageData()?'Import the report file (<b>Import stores report</b>) to see sections, equipment and items — it replaces these totals for the months in the file.':''}</div>`:''}
+    <div class="card"><h3>By budget line</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Budget line</th>${th}<th class="r">Accounting ${Y} ${span}</th></tr></thead><tbody>
+      ${lines.map(li=>`<tr><td style="font-size:13px">${esc(li)}</td><td class="r num">${z(L2[li])}</td><td class="r num">${z(L1[li])}</td><td class="r num">${z(L0[li])}</td><td class="r num">${z(L1s[li])}</td><td class="r num">${z(L0c[li])}</td><td class="r num">${cl&&L1s[li]?pct(L0c[li]||0,L1s[li]):''}</td><td class="r num">${cl&&L0c[li]?short(L0c[li]/cl*12):''}</td><td class="r num">${acc[li]?short(acc[li]):'—'}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td>Total</td><td class="r num">${z(tP2)}</td><td class="r num">${z(tP)}</td><td class="r num">${z(tY)}</td><td class="r num">${z(tPsame)}</td><td class="r num">${z(tYc)}</td><td class="r num">${cl?pct(tYc,tPsame):''}</td><td class="r num">${cl?short(rr):''}</td><td class="r num">${short(sum(lines.map(li=>acc[li]||0)))}</td></tr></tfoot></table></div>
+      <p class="hint" style="padding:8px 14px 12px;margin:0">Stores withdrawals are what departments drew from the plant stockroom (WRF), valued at the stock price. Accounting books the purchase when billed, so the two differ in timing; fuel, spare parts and supplies are where withdrawals are the better measure of actual use. The budget line is the app's best fit from the store category and section.${partial?` * ${MONTHS[last-1]} runs only to the ${maxDay}th, so comparisons and the full-year pace use ${cspan}.`:''}</p></div>
+    ${n?`<div class="card" style="margin-top:16px"><h3>Monthly ${Y}</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1060px;font-size:12.5px"><thead><tr><th>Budget line</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>
+      ${lines.filter(li=>L0[li]).map(li=>{ const m = monthly(li); return `<tr><td style="font-size:12.5px">${esc(li.replace('REPAIRS AND MAINTENANCE','R&M'))}</td>${m.map(v=>`<td class="r num" style="font-size:12.5px">${v?short(v):''}</td>`).join('')}<td class="r num">${short(L0[li])}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`:''}
+    ${dRows.length?`<div class="card" style="margin-top:16px"><h3>By department</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Department</th>${th}</tr></thead><tbody>
+      ${dRows.map(d=>`<tr><td>${esc(recDept(d.id))}</td><td class="r num">${z(d.p2)}</td><td class="r num">${z(d.p)}</td><td class="r num">${z(d.y)}</td><td class="r num">${z(d.ps)}</td><td class="r num">${z(d.yc)}</td><td class="r num">${cl&&d.ps?pct(d.yc,d.ps):''}</td><td class="r num">${cl&&d.yc?short(d.yc/cl*12):''}</td></tr>`).join('')}
+    </tbody></table></div></div>`:''}
+    ${topSec.length?`<div class="card" style="margin-top:16px"><h3>Where it goes — sections and equipment ${Object.keys(secY).length?Y:Y-1}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Section / equipment</th><th class="r">${Object.keys(secY).length?Y+' '+span:Y-1}</th>${Object.keys(secY).length?`<th class="r">${Y-1} full year</th>`:''}</tr></thead><tbody>
+      ${topSec.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${short(v)}</td>${Object.keys(secY).length?`<td class="r num">${secP[k]?short(secP[k]):''}</td>`:''}</tr>`).join('')}</tbody></table></div></div>`:''}
+    ${big.length?`<div class="card" style="margin-top:16px"><h3>Large single withdrawals to review</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Item</th><th>Department / section</th><th class="r">Amount</th></tr></thead><tbody>
+      ${big.map(r=>`<tr><td class="num">${fmtDay(r.rec_date)}</td><td>${esc(r.item||'')}</td><td style="font-size:12.5px">${esc(recDept(r.department_id))} · ${esc(r.section||'')}</td><td class="r num">${peso(r.amount)}</td></tr>`).join('')}
+    </tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Equipment such as laptops or major parts may belong in CAPEX rather than the department's OPEX.</p></div>`:''}
+    ${topItems.length?`<div class="card" style="margin-top:16px"><h3>Top items ${Y}</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Item</th><th class="r">Quantity</th><th class="r">Withdrawals</th><th>Used at</th><th class="r">Amount</th></tr></thead><tbody>
+      ${topItems.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${Math.round(v.q).toLocaleString('en-PH')}</td><td class="r num">${v.n}</td><td style="font-size:12.5px">${esc([...v.sec].slice(0,3).join(', '))}</td><td class="r num">${short(v.a)}</td></tr>`).join('')}
+    </tbody></table></div></div>`:''}
+    ${anyDetail?`<div class="card" style="margin-top:16px"><h3>Withdrawals</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Date</th><th>WRF</th>${!dept?'<th>Department</th>':''}<th>Item</th><th>Section</th><th>Budget line</th><th class="r">Qty × price</th><th class="r">Amount</th></tr></thead><tbody>
+      ${list.slice(0,400).map(r=>`<tr><td class="num" style="white-space:nowrap">${fmtDay(r.rec_date)}</td><td class="num">${esc(r.ref_no||'')}</td>${!dept?`<td style="font-size:12.5px">${esc(recDept(r.department_id))}</td>`:''}<td>${esc(r.item||'')}<div class="item">${esc(r.category||'')}</div></td><td style="font-size:12.5px">${esc(r.section||'')}</td><td style="font-size:12px">${esc((r.line_item||'').replace('REPAIRS AND MAINTENANCE','R&M'))}</td><td class="r num" style="font-size:12.5px">${r.qty!=null?Number(r.qty).toLocaleString('en-PH'):''}${r.unit_price!=null?' × '+peso(r.unit_price,2):''}</td><td class="r num">${peso(r.amount,2)}</td></tr>`).join('')}
+    </tbody><tfoot><tr><td colspan="${dept?6:7}">Total shown${list.length>400?' (first 400 rows listed)':''}</td><td class="r num">${peso(sum(list.map(amt)),2)}</td></tr></tfoot></table></div></div>`:''}`;
+}
+/* read the plant's consumption report (any year's layout): sheets named "transaction…", withdrawal rows only */
+function parseStoresWorkbook(wb){
+  const cv = v => (v && typeof v==='object' && !(v instanceof Date)) ? ('result' in v ? v.result : 'richText' in v ? v.richText.map(t=>t.text).join('') : v.text ?? null) : v;
+  const out = [], skipped = { receipts:0, noDept:{}, noValue:0 };
+  wb.worksheets.filter(ws=>/^transaction/i.test(ws.name.trim()) && !/\(RR\)/i.test(ws.name)).forEach(ws => {
+    let hr = 0, H = [];
+    for (let r=1; r<=Math.min(10, ws.rowCount); r++) { const v = ws.getRow(r).values.map(x=>stU(cv(x))); if (v.includes('DATE') && v.includes('TOTAL')) { hr = r; H = v; break; } }
+    if (!hr) return;
+    const ix = (...n) => { const i = H.findIndex(h=>n.includes(h)); return i>0 ? i : null; };
+    const c = { date:ix('DATE'), inv:ix('INVENTORIABLE ITEM'), non:ix('NON-INVENTORIABLE ITEM'), cat:ix('ITEM CATEGORY'), dept:ix('DEPARTMENT'), sec:ix('SECTION'), inQ:ix('IN'), out:ix('OUT','QUANTITY'), ref:ix('WRF NO.','WRF','WRS NO.','WRS'), price:ix('PRICE'), tot:ix('TOTAL') };
+    for (let r=hr+1; r<=ws.rowCount; r++) {
+      const row = ws.getRow(r), g = k => c[k] ? cv(row.getCell(c[k]).value) : null;
+      let d = g('date'); if (!d) continue;
+      if (typeof d==='number') d = new Date(Math.round((d-25569)*86400000)); else if (!(d instanceof Date)) d = new Date(d);
+      if (isNaN(d)) continue;
+      if (c.inQ && Number(g('inQ')) && !Number(g('out'))) { skipped.receipts++; continue; }
+      const amt = Number(g('tot'))||0; if (!amt) { skipped.noValue++; continue; }
+      const sec = g('sec'), dp = storeDept(g('dept'), sec);
+      if (!dp) { const k = stU(g('dept'))||'(blank)'; skipped.noDept[k] = (skipped.noDept[k]||0) + amt; continue; }
+      const item = String(g('inv')||g('non')||'').trim();
+      out.push({ y:d.getUTCFullYear(), m:d.getUTCMonth()+1, date:`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`, dept:dp,
+        section:storeSection(sec), category:storeCat(g('cat')), line_item:storeLine(g('cat'), sec, item), item, qty:Number(g('out'))||null, unit_price:Number(g('price'))||null, amount:Math.round(amt*100)/100, ref_no:g('ref')!=null?String(g('ref')):null });
+    }
+  });
+  return { rows:out, skipped };
+}
+function importStoresDialog(){
+  modal(`<h3>Import stores report</h3><p>Choose the plant's consumption report (Excel). The app reads the WRF / WRS withdrawal transactions, assigns each to a department and budget line, and <b>replaces</b> what is stored for the months the file covers. Receiving (RR) entries are skipped so nothing is counted twice.</p>
+    <div class="field"><input type="file" id="stFile" accept=".xlsx" class="inp"></div><div id="stMsg"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="stRead">Check file</button><button class="btn primary" id="stGo" disabled>Import</button></div>`);
+  let parsed = null;
+  $('#stRead').onclick = async () => {
+    const f = $('#stFile').files[0]; if (!f) { toast('Choose a file first.', true); return; }
+    $('#stMsg').innerHTML = '<p class="hint">Reading…</p>';
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); parsed = parseStoresWorkbook(wb);
+      if (!parsed.rows.length) { $('#stMsg').innerHTML = '<p>No withdrawal transactions found. The file needs a sheet named "transaction…" with DATE, DEPARTMENT, SECTION, ITEM CATEGORY and TOTAL columns.</p>'; return; }
+      const ys = {}; parsed.rows.forEach(r => { const y = (ys[r.y] ||= { m:new Set(), n:0, a:0 }); y.m.add(r.m); y.n++; y.a += r.amount; });
+      const nd = Object.entries(parsed.skipped.noDept);
+      $('#stMsg').innerHTML = `<table class="ledger"><thead><tr><th>Year</th><th>Months</th><th class="r">Withdrawals</th><th class="r">Amount</th></tr></thead><tbody>${Object.entries(ys).map(([y,v])=>{ const m = [...v.m].sort((a,b)=>a-b); return `<tr><td>${y}</td><td>${MONTHS[m[0]-1]}–${MONTHS[m[m.length-1]-1]}</td><td class="r num">${v.n.toLocaleString('en-PH')}</td><td class="r num">${peso(v.a)}</td></tr>`; }).join('')}</tbody></table>
+        <p class="hint" style="margin-top:8px">${parsed.skipped.receipts?parsed.skipped.receipts+' receiving entries skipped. ':''}${parsed.skipped.noValue?parsed.skipped.noValue+' rows without a peso value skipped. ':''}${nd.length?'<b>Not assigned (unknown department):</b> '+nd.map(([k,v])=>esc(k)+' '+short(v)).join(', '):''}</p>`;
+      parsed.ys = ys; $('#stGo').disabled = false;
+    } catch(e){ fail(e); }
+  };
+  $('#stGo').onclick = async () => {
+    if (!parsed) return; $('#stGo').disabled = true; $('#stMsg').insertAdjacentHTML('beforeend','<p class="hint" id="stProg">Importing…</p>');
+    try {
+      const byCode = Object.fromEntries(S.depts.map(d=>[d.code, d.id]));
+      for (const [y, v] of Object.entries(parsed.ys)) { const r = await sb.rpc('bgt_clear_issues', { p_year:Number(y), p_months:[...v.m] }); if (r.error) throw r.error; }
+      const rows = parsed.rows.filter(r=>byCode[r.dept]).map(r => ({ company_id:S.company.id, department_id:byCode[r.dept], kind:'issue', rec_date:r.date, section:r.section, category:r.category, line_item:r.line_item, item:r.item, qty:r.qty, unit_price:r.unit_price, amount:r.amount, ref_no:r.ref_no }));
+      for (let i=0; i<rows.length; i+=500) { const r = await sb.from('bgt_plant_records').insert(rows.slice(i, i+500)); if (r.error) throw r.error; const p = $('#stProg'); if (p) p.textContent = `Importing… ${Math.min(i+500, rows.length).toLocaleString('en-PH')} of ${rows.length.toLocaleString('en-PH')}`; }
+      S.rc.cache = {}; closeModal(); toast(`${rows.length.toLocaleString('en-PH')} withdrawals imported`); renderRecords();
+    } catch(e){ fail(e); $('#stGo').disabled = false; }
+  };
+}
 
 boot();
 </script>

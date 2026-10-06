@@ -623,7 +623,7 @@ async function loadMaster(){
   S.cycle = (S.cycle && S.cycles.find(c=>c.id===S.cycle.id)) || S.cycles.find(c=>c.status==='open') || S.cycles[0];
   $('#siteName').textContent = (S.site?.name||'') ;
   $('#cycleSel').innerHTML = S.cycles.map(c=>`<option value="${c.id}" ${c.id===S.cycle?.id?'selected':''}>${c.year}${c.status==='locked'?' (locked)':''}</option>`).join('');
-  $('#cycleSel').onchange = async e => { S.cycle = S.cycles.find(c=>c.id===e.target.value); await loadBudgets(); route(); };
+  $('#cycleSel').onchange = e => switchYear(e.target.value);
   $('#meName').textContent = S.me.full_name || S.me.email;
   $('#meRole').textContent = ROLE_LABEL[S.me.role] + (S.me.department_id ? ' · ' + (deptById(S.me.department_id)?.name||'') : '');
   await loadBudgets();
@@ -647,6 +647,7 @@ function canEdit(b){
 }
 function actionsFor(b){
   const r = S.me.role, st = b.status, a = [];
+  if (S.cycle.status==='locked') return a;   // closed reference year: no approval workflow
   if (['draft','returned'].includes(st) && (r==='admin' || (r==='dept_manager' && S.me.department_id===b.department_id))) a.push(['submit','Submit to Plant Head','primary']);
   if (st==='submitted' && ['plant_head','admin'].includes(r)) a.push(['plant_approve','Approve and send to MD','primary'],['return','Return to department','danger']);
   if (st==='plant_approved' && ['md','admin'].includes(r)) a.push(['md_approve','Approve and send to Finance','primary'],['return','Return to department','danger']);
@@ -1242,12 +1243,17 @@ async function saveCycle(){
 }
 
 /* ================= YEAR BASIS ================= */
-const BASIS_LABEL = { working:'In preparation', submitted:'Submitted — not formally approved', approved:'Approved' };
+const BASIS_LABEL = { working:'In preparation', submitted:'Reference year — as submitted', approved:'Reference year — approved' };
 function basisChip(c=S.cycle){ const b = c?.basis || 'working'; return `<span class="chip basis-${b}" title="${esc(c?.basis_note||'')}">${BASIS_LABEL[b]||b}</span>`; }
 function lockedBanner(){
   if (S.cycle.status !== 'locked') return '';
-  return `<div class="banner ${S.cycle.basis==='approved'?'green':'amber'}"><b>${S.cycle.year} budget — ${BASIS_LABEL[S.cycle.basis||'working']}.</b> ${esc(S.cycle.basis_note||'')} This year is locked (read only). Use the export buttons to download it.</div>`;
+  const open = S.cycles.filter(c=>c.status==='open').sort((a,b)=>b.year-a.year)[0];
+  return `<div class="banner ${S.cycle.basis==='approved'?'green':'amber'}"><b>${S.cycle.year} — closed reference year.</b> This is the ${S.cycle.year} budget as it was ${S.cycle.basis==='approved'?'approved':'submitted'} last year, kept so this year's actual spending can be compared against it. There is nothing to submit or approve here.${open?` The ${open.year} budget is prepared in the <b>${open.year}</b> budget year.`:''}
+    ${S.cycle.basis_note?`<div style="font-size:12.5px;margin-top:4px;opacity:.85">Source: ${esc(S.cycle.basis_note)}</div>`:''}
+    ${open?`<div style="margin-top:8px"><button class="btn primary" onclick="switchYear('${open.id}')">Go to the ${open.year} budget</button></div>`:''}</div>`;
 }
+async function switchYear(id){ const dep = budgetById(S.budgetId)?.department_id; S.cycle = S.cycles.find(c=>c.id===id); const sel = $('#cycleSel'); if (sel) sel.value = id; await loadBudgets();
+  if (S.view==='budget') { const cur = S.budgets.find(b=>b.department_id===dep); S.budgetId = cur?.id || null; } route(); window.scrollTo(0,0); }
 const canManageData = () => ['admin','plant_head'].includes(S.me?.role);
 const canEditDept = d => ['admin','plant_head'].includes(S.me.role) || (['preparer','dept_manager'].includes(S.me.role) && S.me.department_id === d);
 const MCOLS = 'budget_id,line_item,category,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12';

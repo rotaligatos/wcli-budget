@@ -1210,6 +1210,10 @@ async function renderAdmin(){
     <div class="field"><label for="cyBm">Budget prepared for</label><select class="inp" id="cyBm">${[[0,'Full year'],[3,'First quarter only'],[6,'First half only'],[9,'First 9 months only']].map(([k,l])=>`<option value="${k}" ${(S.cycle.budget_months||0)===k?'selected':''}>${l}</option>`).join('')}</select><div class="hint" style="font-size:11.5px;max-width:230px">For analysis only: departments whose budget stops early are extended to 12 months at their average monthly rate.</div></div>
     <div class="field"><label for="cySt">Status</label><select class="inp" id="cySt"><option value="open" ${S.cycle.status==='open'?'selected':''}>Open — departments can edit</option><option value="locked" ${S.cycle.status==='locked'?'selected':''}>Locked — read only</option></select></div>
     <button class="btn primary" onclick="saveCycle()">Save settings</button></div></div>
+  <div class="card" style="margin-top:16px"><h3>What the assistant should know about the business</h3><div style="padding:14px">
+    <p class="hint" style="margin:0 0 8px">Added to every assistant request (drafts, reviews, MD summary). Write facts that change how budgets should be built — how production is targeted, capacity, trade items, contracts.</p>
+    <textarea class="inp" id="aiNotes" rows="5" placeholder="Loading…"></textarea>
+    <div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="saveAiNotes()">Save</button></div></div></div>
   <div class="card" style="margin-top:16px"><h3>Start a new budget year</h3><div style="padding:14px">
     <p style="margin:0 0 12px;color:var(--muted)">Creates a draft budget for every department. Earlier years stay available in the Budget year selector. Lock a year once Finance has accepted it.</p>
     <div class="row-flex">
@@ -1220,6 +1224,7 @@ async function renderAdmin(){
     <div class="field" style="margin-top:10px"><label style="font-weight:500;color:var(--ink)"><input type="checkbox" id="nyCopy" checked> Copy <b>Recurring / Contractual</b> OPEX lines from <select id="nyFrom" class="inp" style="display:inline-block;width:auto;padding:2px 6px">${S.cycles.map(c=>`<option value="${c.id}">${c.year}</option>`).join('')}</select> as a starting point</label>
       <span class="hint">Copied lines keep their amounts and are marked "Copied from previous year — confirm rate" in Remarks. Activity-based, project and one-time items start empty, per Finance's zero-based approach.</span></div>
     <button class="btn primary" onclick="startYear()">Start budget year</button></div></div>`;
+  loadAiNotes();
 }
 async function startYear(){
   const year = Number($('#nyYear').value);
@@ -1255,6 +1260,8 @@ async function updUser(id, patch){
   const { error } = await sb.from('bgt_users').update(patch).eq('id', id); if (error) return fail(error);
   Object.assign(S.users.find(u=>u.id===id), patch); toast('Saved');
 }
+async function loadAiNotes(){ const e = $('#aiNotes'); if (!e) return; const { data } = await sb.from('bgt_settings').select('value').eq('key','ai_business_notes').maybeSingle(); e.placeholder = 'e.g. Production is targeted by yield efficiency…'; e.value = typeof data?.value === 'string' ? data.value : ''; }
+async function saveAiNotes(){ const v = $('#aiNotes').value.trim(); const r = await sb.from('bgt_settings').upsert({ key:'ai_business_notes', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error); toast('Saved — the assistant will use this from now on'); }
 async function saveCycle(){
   const patch = { due_date:$('#cyDue').value||null, capex_threshold:Number($('#cyTh').value)||20000, status:$('#cySt').value, basis:$('#cyBa').value, basis_note:$('#cyBn').value.trim()||null, budget_months:Number($('#cyBm').value)||null };
   const { data, error } = await sb.from('bgt_cycles').update(patch).eq('id', S.cycle.id).select().single(); if (error) return fail(error);
@@ -1734,6 +1741,7 @@ async function renderOutlook(){
     const K = await loadKpis(y-1).catch(()=>[]), K2 = await loadKpis(y).catch(()=>[]);
     const ann = (rows, m) => { const a = rows.find(r=>r.metric===m && r.month===0); if (a) return Number(a.value); const v = rows.filter(r=>r.metric===m && r.month>0); return v.length ? sum(v.map(r=>r.value))*12/v.length : null; };
     const sT = ann(K2,'sales_target'), sA = ann(K,'sales_actual'), pT = ann(K2,'production_target'), pA = ann(K,'production_output');
+    const avgP = (rows, m) => { const v = rows.filter(r=>r.metric===m && r.month>0); const a0 = rows.find(r=>r.metric===m && r.month===0); return a0 ? Number(a0.value) : v.length ? sum(v.map(r=>r.value))/v.length : null; }, yT2 = avgP(K2,'yield_target_pct'), yA1 = avgP(K,'yield_actual_pct');
     const items = [...new Set([...S.items.opex])];
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">Budget ${y} · Pasig Plant</div><h1>Cost outlook</h1>
@@ -1751,7 +1759,7 @@ async function renderOutlook(){
     <h3 class="sec">Sales and production direction</h3>
     <div class="ol-grid">
       <div class="ol-card"><div class="eyebrow">Sales target ${y}</div><div class="v">${sT!=null?short(sT):'—'}</div><div class="s">${sA!=null?`${y-1} actual (full-year rate): ${short(sA)}${sT!=null&&sA?` (${sT>=sA?'+':''}${Math.round(100*(sT-sA)/sA)}%)`:''}`:`No ${y-1} sales recorded yet.`}</div><div class="means">Volume-driven costs (power, boiler fuel, supplies, delivery, agency helpers) should move with sales and production.</div></div>
-      <div class="ol-card"><div class="eyebrow">Production plan ${y}</div><div class="v">${pT!=null?Number(pT).toLocaleString('en-PH')+' boards':'—'}</div><div class="s">${pA!=null?`${y-1} output (full-year rate): ${Math.round(pA).toLocaleString('en-PH')} boards${pT!=null&&pA?` (${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}%)`:''}`:`No ${y-1} production recorded yet.`}</div><div class="means"><a onclick="go('perf')">Enter or upload sales and plant performance →</a></div></div>
+      <div class="ol-card"><div class="eyebrow">Production direction ${y}</div><div class="v">${yT2!=null?yT2.toFixed(1)+'% yield':pT!=null?Number(pT).toLocaleString('en-PH')+' boards':'—'}</div><div class="s">Production is targeted by yield efficiency (tact time vs the sales requirement), not by a board count.${pA!=null?` ${y-1} output (full-year rate): ${Math.round(pA).toLocaleString('en-PH')} boards${yA1!=null?` at ${yA1.toFixed(1)}% yield`:''}.`:''}</div><div class="means"><a onclick="go('perf')">Enter or upload sales and plant performance →</a></div></div>
     </div>
     <div class="card" style="margin-top:18px"><h3>Assumed cost change by expense line</h3>
       <p class="hint" style="padding:10px 14px 0;margin:0">"Rest of ${y-1}" adjusts the current-year projection (Actuals page, outlook method). "${y} vs ${y-1}" is the suggested change shown to departments when they budget the line. Lines not listed use general inflation (${generalPct(o)}%).</p>
@@ -2033,7 +2041,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],['capacity_boards','Plant capacity','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (to produce)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 S.pf = { year:null };
@@ -2070,6 +2078,7 @@ async function renderPerf(){
       <div class="stat opex"><div class="eyebrow">Plant OPEX per board ${perLbl}</div><div class="v">${pB?peso(pB.opex/pB.k,2):'—'}</div><div class="s">${pB?`${short(pB.opex)} OPEX ÷ ${Math.round(pB.k).toLocaleString('en-PH')} boards, ${thru(pB.last)}`:closed?'Needs boards sold or produced':`No ${Y} OPEX actuals loaded yet`}</div></div>
       <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':'—'}</div><div class="s">${pS?thru(pS.last):closed?'Needs sales actual':`No ${Y} OPEX actuals loaded yet`}</div></div>
     </div>
+    ${perfYieldStrip(Y, g, tot)}
     ${!closed && (sA||vA) ? `<div class="banner blue">Sales and volume for ${Y} are recorded. Plant OPEX per board and OPEX as % of sales need ${Y} expense actuals${canManageData()?' — upload them on the Actuals page':''}.</div>` : ''}
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
       ${KPI_DEFS.map(([k,l,u,t])=>`<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
@@ -2123,6 +2132,33 @@ function importKpiDialog(){
       const res = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (res.error) throw res.error;
       delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
     } catch(e){ fail(e); }
+  };
+}
+
+/* production is targeted by yield efficiency (tact time vs the sales requirement), not by a board count */
+function perfYieldStrip(Y, g, tot){
+  const yT = tot('yield_target_pct'), yA = tot('yield_actual_pct');
+  const ms = MONTHS.map((_,i)=>i+1).filter(m=>g('production_output',m)!=null);
+  const out = sum(ms.map(m=>g('production_output',m))), cap = sum(ms.map(m=>g('capacity_boards',m) ?? (g('capacity_boards',0)!=null ? g('capacity_boards',0)/12 : 0)));
+  const reqMs = ms.filter(m=>g('production_required',m)!=null), req = sum(reqMs.map(m=>g('production_required',m))), outR = sum(reqMs.map(m=>g('production_output',m)));
+  const basis = (S.ol.cache['cb'+Y] || {}).value_text;
+  if (S.ol.cache['cb'+Y] === undefined) { S.ol.cache['cb'+Y] = null; sb.from('bgt_assumptions').select('*').eq('year', Y).eq('key','capacity_basis').maybeSingle().then(({data})=>{ S.ol.cache['cb'+Y] = data || {}; const e = $('#capBasis'); if (e && data?.value_text) e.textContent = data.value_text; }); }
+  return `<div class="stats" style="margin-top:-4px">
+    <div class="stat"><div class="eyebrow">Production yield efficiency</div><div class="v">${yA!=null?yA.toFixed(1)+'%':'—'}</div><div class="s">${yT!=null?`Target ${yT.toFixed(1)}%${yA!=null?` · ${yA>=yT?'on target':(yA-yT).toFixed(1)+' pts below'}`:''}`:'Enter target and actual (tact time vs sales requirement)'}</div></div>
+    <div class="stat"><div class="eyebrow">Output vs sales requirement</div><div class="v">${req?Math.round(100*outR/req)+'%':'—'}</div><div class="s">${req?`${Math.round(outR).toLocaleString('en-PH')} produced of ${Math.round(req).toLocaleString('en-PH')} required, ${thru(Math.max(...reqMs))}`:'Enter boards required by sales'}</div></div>
+    <div class="stat"><div class="eyebrow">Capacity use</div><div class="v">${cap?Math.round(100*out/cap)+'%':'—'}</div><div class="s">${cap?`${Math.round(out).toLocaleString('en-PH')} of ${Math.round(cap).toLocaleString('en-PH')} boards possible`:'Enter plant capacity'}</div></div>
+    <div class="stat"><div class="eyebrow">Capacity basis</div><div class="v" style="font-size:15px;line-height:1.35" id="capBasis">${esc(basis||'—')}</div><div class="s">${canManageData()?`<a style="cursor:pointer;color:var(--teal)" onclick="editCapBasis(${Y})">Edit</a> · `:''}a fixed monthly volume target applies only at full capacity</div></div>
+  </div>`;
+}
+async function editCapBasis(Y){
+  const { data:a } = await sb.from('bgt_assumptions').select('*').eq('year', Y).eq('key','capacity_basis').maybeSingle();
+  modal(`<h3>Plant capacity basis ${Y}</h3><div class="field"><label for="cbTxt">How capacity is computed</label><input class="inp" id="cbTxt" value="${esc(a?.value_text||'3 shifts × 3 machines × 26 working days × 85% efficiency')}"></div>
+    <div class="field"><label for="cbVal">Capacity (boards per month)</label><input class="inp num" id="cbVal" type="number" value="${a?.value??''}"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="cbGo">Save</button></div>`);
+  $('#cbGo').onclick = async () => {
+    const row = { company_id:S.company.id, year:Y, key:'capacity_basis', category:'perf_note', label:'Plant capacity basis', unit:'boards per month', value:Number($('#cbVal').value)||null, value_text:$('#cbTxt').value.trim(), as_of:today(), sort:900, updated_by:S.me.id };
+    const r = await sb.from('bgt_assumptions').upsert(row, { onConflict:'company_id,year,key' }); if (r.error) return fail(r.error);
+    delete S.ol.cache['cb'+Y]; closeModal(); toast('Saved'); renderPerf();
   };
 }
 

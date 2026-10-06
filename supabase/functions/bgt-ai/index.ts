@@ -88,7 +88,8 @@ async function prices(db: SupabaseClient, deptId?: string) {
   return (data || []).filter((p: any) => !deptId || !p.department_id || p.department_id === deptId)
     .map((p: any) => `- ${p.item} [${p.category || 'any'}]: ₱${p.unit_price}/${p.unit || 'unit'} ${p.supplier ? '— ' + p.supplier : ''}${p.quote_ref ? ' (' + p.quote_ref + ')' : ''}${p.source_type === 'market' ? ' [market reference]' : ''}${p.valid_until ? ' valid until ' + p.valid_until : ''}`).join('\n') || '(price list is empty)';
 }
-const COMPANY = `World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — manufactures laminated boards (melamine/HPL on board) and also trades imported finished boards, mostly laminated plywood from China, Thailand and Vietnam that it does not produce. Boards sold = boards produced + imported trade boards; the cost of the imported boards themselves is cost of sales, not plant OPEX. Departments: Admin (incl. safety/SSHE), Engineering (incl. maintenance), Production, QA/QC, Warehouse, Logistics, PPIC, IT. Currency: Philippine peso.`;
+const BASE_COMPANY = `World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — manufactures laminated boards (melamine/HPL on board) and also trades imported finished boards, mostly laminated plywood from China, Thailand and Vietnam that it does not produce. Boards sold = boards produced + imported trade boards; the cost of the imported boards themselves is cost of sales, not plant OPEX. Departments: Admin (incl. safety/SSHE), Engineering (incl. maintenance), Production, QA/QC, Warehouse, Logistics, PPIC, IT. Currency: Philippine peso.`;
+let COMPANY = BASE_COMPANY;
 const RULES = `Finance budgeting rules:
 - Zero-based: amounts come from the next year's activity plan, contracts, quotations, headcount or usage. History is only a check.
 - Salaries, wages and employee benefits are excluded (HR budgets them). Agency/outsourced labor is OPEX.
@@ -115,9 +116,10 @@ async function volumeText(db: SupabaseClient, year: number) {
   if (!data?.length) return 'No sales, volume or production figures.';
   const ys = [...new Set(data.map((k: any) => k.year))].sort();
   const lines = ys.map(y => { const r = data.filter((k: any) => k.year === y);
-    const f = (m: string) => { const v = r.filter((k: any) => k.metric === m && k.month > 0); const a = r.find((k: any) => k.metric === m && k.month === 0); return a ? { t:Number(a.value), n:12 } : v.length ? { t:sum(v.map((k: any) => Number(k.value))), n:v.length } : null; };
-    const parts = [['sales_actual','sales ₱'],['volume_sold','boards sold'],['production_output','boards produced'],['capacity_boards','capacity boards'],['sales_target','sales target ₱'],['volume_target','volume target boards'],['production_target','production target boards']]
-      .map(([m, l]) => { const x = f(m); return x ? `${l} ${Math.round(x.t).toLocaleString('en-PH')}${x.n < 12 ? ` (${x.n} months)` : ''}` : ''; }).filter(Boolean);
+    const f = (m: string) => { const v = r.filter((k: any) => k.metric === m && k.month > 0); const a = r.find((k: any) => k.metric === m && k.month === 0); const pct = m.endsWith('_pct');
+      return a ? { t:Number(a.value), n:12, pct } : v.length ? { t:pct ? sum(v.map((k: any) => Number(k.value))) / v.length : sum(v.map((k: any) => Number(k.value))), n:v.length, pct } : null; };
+    const parts = [['sales_actual','sales ₱'],['volume_sold','boards sold'],['volume_imported','imported trade boards'],['production_output','boards produced'],['production_required','boards required by sales'],['yield_target_pct','yield efficiency target'],['yield_actual_pct','yield efficiency actual'],['capacity_boards','capacity boards'],['sales_target','sales target ₱'],['volume_target','volume target boards'],['production_target','fixed production plan boards']]
+      .map(([m, l]) => { const x = f(m); return x ? `${l} ${x.pct ? x.t.toFixed(1) + '%' : Math.round(x.t).toLocaleString('en-PH')}${x.n < 12 ? ` (${x.n} months${x.pct ? ' avg' : ''})` : ''}` : ''; }).filter(Boolean);
     return parts.length ? `- ${y}: ${parts.join('; ')}` : ''; }).filter(Boolean);
   return lines.join('\n');
 }
@@ -380,6 +382,9 @@ Deno.serve(async (req) => {
   let key = Deno.env.get('ANTHROPIC_API_KEY') || '';
   if (!key) { const { data:s } = await svc.from('app_settings').select('value').eq('key', 'anthropic_key').maybeSingle(); key = typeof s?.value === 'string' ? s.value : (s?.value?.key || s?.value?.value || ''); }
   if (!key) return json({ error:'The assistant is not configured (no Claude API key).' }, 500);
+  const { data:bn } = await svc.from('bgt_settings').select('value').eq('key', 'ai_business_notes').maybeSingle();
+  const notes = typeof bn?.value === 'string' ? bn.value.trim() : '';
+  COMPANY = BASE_COMPANY + (notes ? `\nBusiness notes from management (follow these): ${notes.slice(0, 3000)}` : '');
   const mode = body.mode;
   let result: any = null, err = '';
   try {

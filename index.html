@@ -224,6 +224,25 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
   .track{grid-template-columns:1fr 1fr}
   .ph h1{font-size:34px}
 }
+.basis-working{background:var(--blue-wash);color:var(--blue)}.basis-submitted{background:var(--amber-wash);color:var(--amber)}.basis-approved{background:var(--green-wash);color:var(--green)}
+.banner.amber{background:var(--amber-wash);border-color:#EBD3A8;color:#6A4509}.banner.green{background:var(--green-wash);border-color:#BFDDC4;color:#1E5129}
+.pri-ok{background:var(--green-wash);color:var(--green)}
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.ins{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:var(--r);padding:10px 14px;font-size:13px}
+.ins.red{border-left-color:var(--red)}.ins.amber{border-left-color:#D9A441}
+.ins ul{margin:6px 0 0;padding-left:18px}.ins li{margin:3px 0}.ins a{color:var(--teal);cursor:pointer;font-weight:600}.ins small{color:var(--faint)}
+.mchart{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:140px;align-items:end}
+.mchart>div{position:relative;height:100%;display:flex;align-items:flex-end}
+.mchart i{display:block;width:100%;background:var(--teal);border-radius:2px 2px 0 0}
+.mchart i.p{background:var(--teal-wash);border:1px dashed var(--teal);border-bottom:0}.mchart i.over{background:var(--red)}
+.mchart s{position:absolute;left:-2px;right:-2px;height:2px;background:var(--ink);text-decoration:none}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}.legend i{display:inline-block;width:12px;height:10px;margin-right:5px;vertical-align:middle}
+.pp-list{max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.pp-list button{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:7px 10px;cursor:pointer;font:inherit}
+.pp-list button:hover{background:var(--teal-wash)}.pp-list small{display:block;color:var(--faint);font-size:11.5px}.pp-list em{color:var(--red);font-style:normal}
+.ref{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px}.ref th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;padding:3px 4px;border-bottom:1px solid var(--line)}
+.ref td{padding:4px;border-bottom:1px solid var(--line)}.ref .r{text-align:right}.ref small{color:var(--faint)}
+.linkbtn{border:0;background:none;color:var(--teal);font-weight:600;cursor:pointer;padding:0;font:inherit;font-size:13px}
 @media (max-width:520px){.g2{grid-template-columns:1fr}.months{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -238,6 +257,7 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
       <div class="field"><label for="passEmail">Work email</label><input class="inp" id="passEmail" type="email" required autocomplete="username" placeholder="name@worldclasslaminate.com.ph"></div>
       <div class="field"><label for="passPw">Password</label><input class="inp" id="passPw" type="password" required autocomplete="current-password"><span class="hint">Same password you use for the other company apps.</span></div>
       <button class="btn primary g-btn" type="submit">Sign in</button>
+      <p style="margin:10px 0 0;text-align:right"><a href="#" id="lnkForgot" style="color:var(--teal);font-size:13px">Forgot password?</a></p>
     </form>
     <div class="or">or</div>
     <button class="btn g-btn" id="btnGoogle">Sign in with Google</button>
@@ -495,6 +515,28 @@ $('#formPass').onsubmit = async e => {
   if (error) { $('#loginMsg').textContent = /invalid/i.test(error.message) ? 'Email or password is incorrect.' : error.message; return; }
   $('#loginMsg').textContent = ''; boot();
 };
+$('#lnkForgot').onclick = async e => {
+  e.preventDefault();
+  if (IS_FILE) { $('#loginMsg').textContent = 'Password reset only works from the published web address. Open the app from its link, then try again.'; return; }
+  const email = $('#passEmail').value.trim();
+  if (!email) { $('#loginMsg').textContent = 'Type your work email above first, then click Forgot password.'; $('#passEmail').focus(); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('#loginMsg').textContent = error ? error.message : `Password reset email sent to ${email}. Open the link in this same browser to set a new password.`;
+};
+function showSetPassword(){
+  modal(`<h3>Set a new password</h3><p>This becomes your password for all the company apps that use this login.</p>
+    <div class="field"><label for="npw1">New password</label><input class="inp" type="password" id="npw1" autocomplete="new-password"></div>
+    <div class="field"><label for="npw2">Repeat new password</label><input class="inp" type="password" id="npw2" autocomplete="new-password"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn primary" id="npwGo">Save password</button></div>`);
+  $('#npwGo').onclick = async () => {
+    const a = $('#npw1').value, b = $('#npw2').value;
+    if (a.length < 8) { toast('Use at least 8 characters.', true); return; }
+    if (a !== b) { toast('The two passwords do not match.', true); return; }
+    const { error } = await sb.auth.updateUser({ password:a });
+    if (error) return fail(error);
+    closeModal(); toast('Password saved'); history.replaceState(null,'',location.pathname);
+  };
+}
 $('#lnkMagic').onclick = e => { e.preventDefault(); $('#formMagic').classList.toggle('hidden'); };
 (async () => { // disable Google when the provider is not enabled in Supabase yet
   try { const r = await fetch(SB_URL + '/auth/v1/settings', { headers:{ apikey:SB_KEY } }); const j = await r.json();
@@ -529,7 +571,10 @@ async function bootInner(){
     show('app'); await loadMaster(); route();
   } catch(e){ fail(e); show('login'); }
 }
-sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' && !S.me && !S._booting) boot(); });
+sb.auth.onAuthStateChange((ev) => {
+  if (ev === 'PASSWORD_RECOVERY') { S._recovery = true; setTimeout(showSetPassword, 300); }
+  if (ev === 'SIGNED_IN' && !S.me && !S._booting) boot();
+});
 
 /* ================= DATA ================= */
 async function loadMaster(){
@@ -588,17 +633,18 @@ function route(){
     if (own && !isReviewer()) S.budgetId = own.id; else S.view = isReviewer() ? 'overview' : 'budget';
   }
   renderNav();
-  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else openBudget(S.budgetId);
+  if (S.view==='overview') renderOverview(); else if (S.view==='admin') renderAdmin(); else if (S.view==='actuals') renderActuals(); else if (S.view==='prices') renderPrices(); else openBudget(S.budgetId);
 }
-function go(view, id){ S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
+function go(view, id){ S.act.cache = {}; S.view = view; if (id) S.budgetId = id; S.tab = view==='budget' && id!==S._lastBudget ? 'opex' : S.tab; S._lastBudget = id; route(); window.scrollTo(0,0); }
 function renderNav(){
   const main = [];
   if (isReviewer()) main.push(`<a class="${S.view==='overview'?'on':''}" onclick="go('overview')">Plant overview</a>`);
+  main.push(`<a class="${S.view==='actuals'?'on':''}" onclick="go('actuals')">Actuals and projection</a>`, `<a class="${S.view==='prices'?'on':''}" onclick="go('prices')">Price list</a>`);
   if (S.me.role==='admin') main.push(`<a class="${S.view==='admin'?'on':''}" onclick="go('admin')">Users and settings</a>`);
   $('#navMain').innerHTML = main.join('');
   const list = isReviewer() ? S.budgets : S.budgets.filter(b=>b.department_id===S.me.department_id);
   $('#deptNavTitle').textContent = isReviewer() ? 'Departments' : 'My department';
-  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
+  $('#navMobile').innerHTML = (isReviewer()?`<option value="overview:" ${S.view==='overview'?'selected':''}>Plant overview</option>`:'') + `<option value="actuals:" ${S.view==='actuals'?'selected':''}>Actuals and projection</option><option value="prices:" ${S.view==='prices'?'selected':''}>Price list</option>` + (S.me.role==='admin'?`<option value="admin:" ${S.view==='admin'?'selected':''}>Users and settings</option>`:'')
     + list.map(b=>`<option value="budget:${b.id}" ${S.view==='budget'&&S.budgetId===b.id?'selected':''}>${esc(deptById(b.department_id)?.name)} — ${STATUS_LABEL[b.status]}</option>`).join('');
   $('#navDepts').innerHTML = list.map(b => `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}"><span>${esc(deptById(b.department_id)?.name)}</span><span class="dot st-${b.status}"></span></a>`).join('') || '<span style="color:#8FA09A;font-size:12px;padding:0 8px">No department assigned</span>';
 }
@@ -634,17 +680,18 @@ function renderBudget(){
   <div class="ph">
     <div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.code)}</div>
       <h1>${esc(d?.name)}</h1>
-      <div class="sub"><span class="chip st-${b.status}">${STATUS_LABEL[b.status]}</span><span>Version ${b.version}</span>${d?.notes?`<span>· ${esc(d.notes)}</span>`:''}${!ed?'<span>· Read only</span>':''}</div></div>
+      <div class="sub">${S.cycle.status==='locked' ? basisChip() : `<span class="chip st-${b.status}">${STATUS_LABEL[b.status]}</span>`}<span>Version ${b.version}</span>${d?.notes?`<span>· ${esc(d.notes)}</span>`:''}${!ed?'<span>· Read only</span>':''}</div></div>
     <div class="actions">
       ${actionsFor(b).map(([a,l,cls])=>`<button class="btn ${cls}" onclick="doAction('${a}')">${l}</button>`).join('')}
       <button class="btn" onclick="exportDept()">Export for Finance</button>
       ${ed?'<button class="btn ghost" onclick="importDialog()">Import Excel</button>':''}
     </div>
   </div>
-  <div class="track" aria-label="Approval progress">${steps.map((s,i)=>{
+  <div class="track ${S.cycle.status==='locked'?'hidden':''}" aria-label="Approval progress">${steps.map((s,i)=>{
     const done = curIdx > i;
     const cls = done ? 'done' : (i===curIdx ? (b.status==='returned'?'ret':'cur') : '');
     return `<div class="${cls}"><b>${s[0]}</b><small>${done ? (b[s[1]] ? fmtDate(b[s[1]]) : 'Done') : (i===curIdx ? (b.status==='returned'?'Returned — needs changes':'In progress') : s[2])}</small></div>`; }).join('')}</div>
+  ${lockedBanner()}
   ${b.status==='returned' && lastReturn ? `<div class="banner red"><b>Returned by ${esc(userName(lastReturn.actor_id))}:</b> ${esc(lastReturn.note)}</div>` : ''}
   ${S.cycle.due_date && ['draft','returned'].includes(b.status) ? `<div class="banner blue">Due to the Managing Director by <b>${new Date(S.cycle.due_date).toLocaleDateString('en-PH',{month:'long',day:'numeric',year:'numeric'})}</b>. Salaries and benefits are not included — HR prepares those.</div>` : ''}
   <div class="stats">
@@ -804,6 +851,7 @@ function editLine(kind, id){
       <div class="field"><label for="f_line_item">Expense line item</label><select class="inp" id="f_line_item" ${ro}>${opts(S.items.opex, l.line_item)}</select></div>
       <div class="field"><label for="f_expense_type">Type of expense</label><select class="inp" id="f_expense_type" ${ro}>${opts(L.expense_type.map(x=>x.value), l.expense_type)}</select></div>
     </div>
+    <div class="box" style="margin-top:0"><h3>Earlier years for this line item</h3><div id="refPanel"></div></div>
     <div class="field"><label for="f_activity">Activity / initiative</label><input class="inp" id="f_activity" value="${esc(l.activity||'')}" placeholder="e.g. Plant electricity, Forklift fuel, Supervisory leadership training" ${ro}></div>
     <div class="field"><label for="f_description">Description / scope</label><textarea class="inp" id="f_description" placeholder="What is included — specific enough for someone outside your department" ${ro}>${esc(l.description||'')}</textarea></div>
     <div class="field"><label for="f_purpose">Business purpose / expected benefit</label><textarea class="inp" id="f_purpose" placeholder="Why the company should incur this cost and what it supports" ${ro}>${esc(l.purpose||'')}</textarea></div>
@@ -811,7 +859,7 @@ function editLine(kind, id){
       <div class="field"><label for="f_basis">Basis of estimate</label><select class="inp" id="f_basis" ${ro}>${opts(L.basis.map(x=>x.value), l.basis)}</select></div>
       <div class="field"><label for="f_priority">Priority</label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
     </div>
-    <div class="box"><h3>Estimate calculator</h3>
+    <div class="box"><h3 style="display:flex;justify-content:space-between;align-items:center">Estimate calculator ${ed?`<button type="button" class="linkbtn" onclick="togglePricePick('opex')">Pick from price list</button>`:''}</h3><div id="pricePick" class="hidden" style="margin-bottom:8px"></div>
       <div class="row-flex">
         <div class="field" style="width:90px"><label for="c_qty">Qty</label><input class="inp num" id="c_qty" type="number" step="any" value="${calc.qty??''}" ${ro}></div>
         <div class="field" style="width:90px"><label for="c_unit">Unit</label><input class="inp" id="c_unit" value="${esc(calc.unit||'')}" placeholder="pcs, kWh, pax" ${ro}></div>
@@ -831,7 +879,8 @@ function editLine(kind, id){
       <div class="field"><label for="f_qty">Quantity</label><input class="inp num" id="f_qty" type="number" step="any" value="${l.qty??''}" ${ro}></div>
       <div class="field"><label for="f_unit_cost">Unit cost (₱)</label><input class="inp num" id="f_unit_cost" type="number" step="any" value="${l.unit_cost??''}" ${ro}></div>
       <div class="field"><label>Qty × unit cost</label><input class="inp num" id="c_total2" readonly></div>
-    </div>`;
+    </div>
+    ${ed?`<div style="margin:-4px 0 12px"><button type="button" class="linkbtn" onclick="togglePricePick('capex')">Pick unit cost from price list</button><div id="pricePick" class="hidden" style="margin-top:6px"></div></div>`:''}`;
   const spread = ed ? `
     <div class="box"><h3>Spread an amount across months</h3>
       <div class="row-flex">
@@ -867,6 +916,7 @@ function editLine(kind, id){
   const pri = $('#f_priority'); const ph = () => { const h = L.priority.find(x=>x.value===pri.value); $('#priHint').textContent = h ? h.hint : ''; }; pri.onchange = ph; ph();
   ['c_qty','c_rate','c_times','f_qty','f_unit_cost'].forEach(x => { const e = $('#'+x); if (e) e.oninput = () => liveTotals(kind); });
   liveTotals(kind);
+  if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); }
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
 }
 function readMonths(){ const o={}; for(let i=1;i<=12;i++) o['m'+i] = Number($('#m'+i).value)||0; return o; }
@@ -1001,8 +1051,13 @@ async function renderOverview(){
   try {
     await loadBudgets();
     const { o, c } = await loadAllLines(); S._all = { o, c };
+    const PY = S.cycle.year - 1, hasPY = S.cycles.some(x=>x.year===PY);
+    const P = hasPY ? await loadYearData(PY, null) : null;
+    const pyOf = d => P ? sum(P.bud.filter(l=>l.department_id===d).map(annual)) + sum(P.capBud.filter(l=>l.department_id===d).map(annual)) : 0;
+    const pyT = P ? sum(P.bud.map(annual)) + sum(P.capBud.map(annual)) : 0;
+    const chg = (now, before) => !before ? '<span style="color:var(--faint)">—</span>' : `<span style="color:${now>before?'var(--red)':'var(--green)'}">${now>=before?'+':''}${Math.round(100*(now-before)/before)}%</span>`;
     const rows = S.budgets.map(b => { const lo = o.filter(x=>x.budget_id===b.id), lc = c.filter(x=>x.budget_id===b.id);
-      return { b, d:deptById(b.department_id), opex:sum(lo.map(annual)), capex:sum(lc.map(annual)), n:lo.length+lc.length,
+      return { b, d:deptById(b.department_id), py:pyOf(b.department_id), opex:sum(lo.map(annual)), capex:sum(lc.map(annual)), n:lo.length+lc.length,
         crit: sum([...lo,...lc].filter(l=>l.priority==='Critical / Mandatory').map(annual)) }; });
     const T = { opex:sum(rows.map(r=>r.opex)), capex:sum(rows.map(r=>r.capex)) };
     const max = Math.max(...rows.map(r=>r.opex+r.capex), 1);
@@ -1015,20 +1070,21 @@ async function renderOverview(){
     const mm = Math.max(...monthly.map((v,i)=>v+capexMonthly[i]), 1);
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
-      <div class="sub">${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department</div></div>
+      <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
+    ${lockedBanner()}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
       <div class="stat capex"><div class="eyebrow">Plant CAPEX</div><div class="v">${short(T.capex)}</div><div class="s">${peso(T.capex)}</div></div>
-      <div class="stat"><div class="eyebrow">Total requested</div><div class="v">${short(T.opex+T.capex)}</div><div class="s">${o.length} OPEX lines · ${c.length} CAPEX items</div></div>
+      <div class="stat"><div class="eyebrow">Total requested</div><div class="v">${short(T.opex+T.capex)}</div><div class="s">${o.length} OPEX lines · ${c.length} CAPEX items${hasPY?` · ${chg(T.opex+T.capex, pyT)} vs ${PY}`:''}</div></div>
       <div class="stat"><div class="eyebrow">Deferrable</div><div class="v">${short(pv[2]+pv[3])}</div><div class="s">Medium + Low priority — first place to cut</div></div>
     </div>
-      <div class="card"><h3>Departments</h3><div class="tbl-wrap"><table class="ledger" style="min-width:640px"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX</th><th class="r">CAPEX</th><th>Share of plant</th><th class="r">Critical</th></tr></thead><tbody>
-        ${rows.map(r=>`<tr class="row" tabindex="0" onclick="go('budget','${r.b.id}')" onkeydown="if(event.key==='Enter')go('budget','${r.b.id}')"><td class="act">${esc(r.d?.name)}<div style="font-size:12px;color:var(--faint);font-weight:400">${r.n} lines · updated ${new Date(r.b.updated_at).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}</div></td><td><span class="chip st-${r.b.status}">${STATUS_LABEL[r.b.status]}</span></td>
+      <div class="card"><h3>Departments</h3><div class="tbl-wrap"><table class="ledger" style="min-width:640px"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX</th><th class="r">CAPEX</th><th>Share of plant</th><th class="r">Critical</th>${hasPY?`<th class="r">${PY} budget</th><th class="r">Change</th>`:''}</tr></thead><tbody>
+        ${rows.map(r=>`<tr class="row" tabindex="0" onclick="go('budget','${r.b.id}')" onkeydown="if(event.key==='Enter')go('budget','${r.b.id}')"><td class="act">${esc(r.d?.name)}<div style="font-size:12px;color:var(--faint);font-weight:400">${r.n} lines · updated ${new Date(r.b.updated_at).toLocaleDateString('en-PH',{month:'short',day:'numeric'})}</div></td><td>${S.cycle.status==='locked'?basisChip():`<span class="chip st-${r.b.status}">${STATUS_LABEL[r.b.status]}</span>`}</td>
           <td class="r num">${peso(r.opex)}</td><td class="r num">${peso(r.capex)}</td>
           <td><div class="track2" style="height:10px;width:160px;display:flex;background:var(--surface-2)"><i style="width:${100*r.opex/max}%;background:var(--teal)"></i><i style="width:${100*r.capex/max}%;background:var(--kraft)"></i></div></td>
-          <td class="r num">${r.opex+r.capex?Math.round(100*r.crit/(r.opex+r.capex)):0}%</td></tr>`).join('')}
-      </tbody><tfoot><tr><td colspan="2">Plant total</td><td class="r num">${peso(T.opex)}</td><td class="r num">${peso(T.capex)}</td><td colspan="2"></td></tr></tfoot></table></div></div>
+          <td class="r num">${r.opex+r.capex?Math.round(100*r.crit/(r.opex+r.capex)):0}%</td>${hasPY?`<td class="r num">${peso(r.py)}</td><td class="r num">${chg(r.opex+r.capex, r.py)}</td>`:''}</tr>`).join('')}
+      </tbody><tfoot><tr><td colspan="2">Plant total</td><td class="r num">${peso(T.opex)}</td><td class="r num">${peso(T.capex)}</td><td colspan="2"></td>${hasPY?`<td class="r num">${peso(pyT)}</td><td class="r num">${chg(T.opex+T.capex, pyT)}</td>`:''}</tr></tfoot></table></div></div>
     <div class="ov-grid">
         <div class="card"><h3>By priority</h3><div class="bars">${prios.map((p,i)=>`<div class="bar"><span>${esc(p.split(' /')[0])}</span><div class="track2"><i style="width:${100*pv[i]/Math.max(...pv,1)}%;background:${pColors[i]}"></i></div><span class="num" style="text-align:right">${short(pv[i])}</span></div>`).join('')}</div></div>
         <div class="card"><h3>Monthly cash need</h3><div style="padding:14px"><div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px">
@@ -1082,6 +1138,8 @@ async function renderAdmin(){
   <div class="card"><h3>Budget year ${S.cycle.year}</h3><div style="padding:14px" class="row-flex">
     <div class="field"><label for="cyDue">Due to MD</label><input class="inp" type="date" id="cyDue" value="${S.cycle.due_date||''}"></div>
     <div class="field"><label for="cyTh">CAPEX threshold per unit (₱)</label><input class="inp num" type="number" id="cyTh" value="${S.cycle.capex_threshold}"></div>
+    <div class="field"><label for="cyBa">Budget standing</label><select class="inp" id="cyBa">${Object.entries(BASIS_LABEL).map(([k,v])=>`<option value="${k}" ${(S.cycle.basis||'working')===k?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="field" style="flex:1;min-width:240px"><label for="cyBn">Note on the budget's source</label><input class="inp" id="cyBn" value="${esc(S.cycle.basis_note||'')}" placeholder="e.g. Approved by MD on 12 Dec; or: department submissions, no formal approval issued"></div>
     <div class="field"><label for="cySt">Status</label><select class="inp" id="cySt"><option value="open" ${S.cycle.status==='open'?'selected':''}>Open — departments can edit</option><option value="locked" ${S.cycle.status==='locked'?'selected':''}>Locked — read only</option></select></div>
     <button class="btn primary" onclick="saveCycle()">Save settings</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Start a new budget year</h3><div style="padding:14px">
@@ -1130,9 +1188,414 @@ async function updUser(id, patch){
   Object.assign(S.users.find(u=>u.id===id), patch); toast('Saved');
 }
 async function saveCycle(){
-  const patch = { due_date:$('#cyDue').value||null, capex_threshold:Number($('#cyTh').value)||20000, status:$('#cySt').value };
+  const patch = { due_date:$('#cyDue').value||null, capex_threshold:Number($('#cyTh').value)||20000, status:$('#cySt').value, basis:$('#cyBa').value, basis_note:$('#cyBn').value.trim()||null };
   const { data, error } = await sb.from('bgt_cycles').update(patch).eq('id', S.cycle.id).select().single(); if (error) return fail(error);
   Object.assign(S.cycle, data); toast('Settings saved'); loadMaster().then(()=>go('admin'));
+}
+
+/* ================= YEAR BASIS ================= */
+const BASIS_LABEL = { working:'In preparation', submitted:'Submitted — not formally approved', approved:'Approved' };
+function basisChip(c=S.cycle){ const b = c?.basis || 'working'; return `<span class="chip basis-${b}" title="${esc(c?.basis_note||'')}">${BASIS_LABEL[b]||b}</span>`; }
+function lockedBanner(){
+  if (S.cycle.status !== 'locked') return '';
+  return `<div class="banner ${S.cycle.basis==='approved'?'green':'amber'}"><b>${S.cycle.year} budget — ${BASIS_LABEL[S.cycle.basis||'working']}.</b> ${esc(S.cycle.basis_note||'')} This year is locked (read only). Use the export buttons to download it.</div>`;
+}
+const canManageData = () => ['admin','plant_head'].includes(S.me?.role);
+const canEditDept = d => ['admin','plant_head'].includes(S.me.role) || (['preparer','dept_manager'].includes(S.me.role) && S.me.department_id === d);
+const MCOLS = 'budget_id,line_item,category,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12';
+
+/* ================= ACTUALS DATA ================= */
+S.act = { dept:null, method:'budget', year:null, cache:{} };
+async function loadYearData(year, deptId){
+  const key = year + '|' + (deptId||'all');
+  if (S.act.cache[key]) return S.act.cache[key];
+  const cyc = S.cycles.find(c=>c.year===year);
+  let bud = [], capBud = [];
+  if (cyc) {
+    const { data:bs, error } = await sb.from('bgt_dept_budgets').select('id,department_id').eq('cycle_id', cyc.id); if (error) throw error;
+    const list = (bs||[]).filter(b=>!deptId || b.department_id===deptId), ids = list.map(b=>b.id), dm = Object.fromEntries(list.map(b=>[b.id,b.department_id]));
+    if (ids.length) {
+      const [o, c] = await Promise.all([fetchAll(()=>sb.from('bgt_opex_lines').select(MCOLS.replace(',category','')).in('budget_id', ids).order('sort')),
+                                        fetchAll(()=>sb.from('bgt_capex_lines').select(MCOLS.replace('line_item,','')).in('budget_id', ids).order('sort'))]);
+      bud = o.map(l=>({...l, department_id:dm[l.budget_id]})); capBud = c.map(l=>({...l, department_id:dm[l.budget_id]}));
+    }
+  }
+  const qa = () => { let q = sb.from('bgt_actuals').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
+  const qp = () => { let q = sb.from('bgt_projections').select('*').eq('year', year); if (deptId) q = q.eq('department_id', deptId); return q.order('month'); };
+  const [act, proj] = await Promise.all([fetchAll(qa), fetchAll(qp)]);
+  return (S.act.cache[key] = { year, bud, capBud, act, proj, hasCycle:!!cyc });
+}
+function actModel(D, method='budget'){
+  const opexAct = D.act.filter(a=>a.kind!=='capex');
+  const closed = opexAct.length ? Math.max(...opexAct.map(a=>a.month)) : 0;
+  const cells = {}, z = () => Array(12).fill(0);
+  const C = (d, it) => cells[d+'|'+it] ||= { dept:d, item:it, bud:z(), act:z(), ov:Array(12).fill(null), partners:{} };
+  D.bud.forEach(l => { const c = C(l.department_id, l.line_item||'(no line item)'); for (let i=0;i<12;i++) c.bud[i] += Number(l['m'+(i+1)])||0; });
+  opexAct.forEach(a => { const c = C(a.department_id, a.line_item||'(unmapped)'); c.act[a.month-1] += Number(a.amount)||0; const p = a.partner||'—'; c.partners[p] = (c.partners[p]||0) + (Number(a.amount)||0); });
+  D.proj.forEach(p => { const c = C(p.department_id, p.line_item); c.ov[p.month-1] = Number(p.amount)||0; });
+  const items = {};
+  Object.values(cells).forEach(c => {
+    const ytd = sum(c.act.slice(0, closed)), rr = closed ? ytd/closed : 0;
+    c.proj = c.bud.map((b,i) => i < closed ? c.act[i] : c.ov[i] != null ? c.ov[i] : method==='runrate' ? rr : b);
+    const r = items[c.item] ||= { item:c.item, bud:z(), act:z(), proj:z(), partners:{}, depts:{}, overrides:0, cells:[] };
+    for (let i=0;i<12;i++) { r.bud[i]+=c.bud[i]; r.act[i]+=c.act[i]; r.proj[i]+=c.proj[i]; if (i>=closed && c.ov[i]!=null) r.overrides++; }
+    Object.entries(c.partners).forEach(([p,v]) => r.partners[p] = (r.partners[p]||0)+v);
+    r.depts[c.dept] = (r.depts[c.dept]||0) + sum(c.proj); r.cells.push(c);
+  });
+  const rows = Object.values(items).map(r => ({ ...r, budFY:sum(r.bud), budYTD:sum(r.bud.slice(0,closed)), actYTD:sum(r.act.slice(0,closed)), projFY:sum(r.proj), inList:S.items.opex.includes(r.item) }))
+    .filter(r => r.budFY || r.actYTD || r.projFY)
+    .sort((a,b) => Math.max(b.budFY,b.projFY) - Math.max(a.budFY,a.projFY));
+  const T = k => sum(rows.map(r=>r[k]));
+  const capAct = D.act.filter(a=>a.kind==='capex');
+  const cap = {}; D.capBud.forEach(l => { const k = l.category||'(no category)'; (cap[k] ||= {bud:0, act:0}).bud += annual(l); });
+  capAct.forEach(a => { const k = a.line_item||'(no category)'; (cap[k] ||= {bud:0, act:0}).act += Number(a.amount)||0; });
+  return { closed, rows, budFY:T('budFY'), budYTD:T('budYTD'), actYTD:T('actYTD'), projFY:T('projFY'), cap,
+    monthly:{ bud:MONTHS.map((_,i)=>sum(rows.map(r=>r.bud[i]))), act:MONTHS.map((_,i)=>sum(rows.map(r=>r.act[i]))), proj:MONTHS.map((_,i)=>sum(rows.map(r=>r.proj[i]))) } };
+}
+const thru = n => n ? (n===1 ? 'Jan' : 'Jan–' + MONTHS[n-1]) : 'no months yet';
+function varPill(r){
+  if (!r.budFY && r.actYTD) return '<span class="pri pri-crit">Not budgeted</span>';
+  if (!r.budYTD) return r.actYTD ? '<span class="pri pri-high">Spent early</span>' : '<span class="pri pri-low">Not started</span>';
+  const p = r.actYTD / r.budYTD;
+  return p > 1.1 ? `<span class="pri pri-crit">Over ${Math.round(100*(p-1))}%</span>` : p < 0.6 ? `<span class="pri pri-low">Under-used</span>` : '<span class="pri pri-ok">On track</span>';
+}
+
+/* ================= ACTUALS VIEW ================= */
+async function renderActuals(){
+  $('#main').innerHTML = '<div class="loading">Loading actuals…</div>';
+  try {
+    if (!isReviewer()) S.act.dept = S.me.department_id;
+    if (!S.act.year) {
+      const { data } = await sb.from('bgt_imports').select('year').order('year', { ascending:false });
+      S.act.year = (data && data[0]?.year) || new Date().getFullYear();
+    }
+    const years = [...new Set([...S.cycles.map(c=>c.year), S.act.year])].sort((a,b)=>b-a);
+    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), M = actModel(D, S.act.method);
+    S.act.model = M; S.act.data = D;
+    const { data:imps } = await sb.from('bgt_imports').select('*').eq('year', Y).order('created_at', { ascending:false });
+    const dname = S.act.dept ? deptById(S.act.dept)?.name : 'Whole plant';
+    const varFY = M.projFY - M.budFY, rr = M.closed ? M.actYTD / M.closed * 12 : 0;
+    const unb = M.rows.filter(r=>!r.budFY && r.actYTD), over = M.rows.filter(r=>r.budYTD && r.actYTD > r.budYTD*1.1).sort((a,b)=>(b.actYTD-b.budYTD)-(a.actYTD-a.budYTD));
+    const under = M.rows.filter(r=>r.budYTD > 50000 && r.actYTD < r.budYTD*0.6).sort((a,b)=>(b.budYTD-b.actYTD)-(a.budYTD-a.actYTD));
+    const mx = Math.max(...M.monthly.bud, ...M.monthly.proj, 1);
+    const insight = (title, list, f, tone) => list.length ? `<div class="ins ${tone}"><b>${title}</b><ul>${list.slice(0,4).map(r=>`<li><a onclick="actItem(${JSON.stringify(r.item).replace(/"/g,'&quot;')})">${esc(r.item)}</a> — ${f(r)}</li>`).join('')}</ul>${list.length>4?`<small>and ${list.length-4} more</small>`:''}</div>` : '';
+    const ins = [
+      insight(`Spent without a budget line: ${short(sum(unb.map(r=>r.actYTD)))}`, unb, r=>`${peso(r.actYTD)} so far. Add it to next year's budget or charge it to the right line.`, 'red'),
+      insight('Ahead of budget', over, r=>`${peso(r.actYTD)} vs ${peso(r.budYTD)} budget for ${thru(M.closed)} (+${peso(r.actYTD-r.budYTD)})`, 'amber'),
+      insight('Spending slower than budget', under, r=>`${peso(r.actYTD)} of ${peso(r.budYTD)} — savings, a delay, or a coding issue?`, 'blue')
+    ].join('');
+    $('#main').innerHTML = `
+    <div class="ph"><div><div class="eyebrow">${Y} · ${esc(dname)} · actuals ${thru(M.closed)}</div><h1>Actuals and projection</h1>
+      <div class="sub">Actual spending from Odoo against the ${Y} budget, with a full-year projection.${D.hasCycle?'':` <b>No ${Y} budget year exists, so budget columns are empty.</b>`}</div></div>
+      <div class="actions">${canManageData()?'<button class="btn primary" onclick="importActualsDialog()">Import Odoo actuals</button>':''}<button class="btn" onclick="exportActuals()">Download Excel</button></div></div>
+    <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)">
+      <div class="field" style="margin:0"><label for="acYear">Year</label><select class="inp" id="acYear" onchange="S.act.year=Number(this.value);renderActuals()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
+      ${isReviewer()?`<div class="field" style="margin:0"><label for="acDept">Department</label><select class="inp" id="acDept" onchange="S.act.dept=this.value||null;renderActuals()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===S.act.dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+      <div class="field" style="margin:0"><label for="acMeth">Project the remaining months using</label><select class="inp" id="acMeth" onchange="S.act.method=this.value;renderActuals()"><option value="budget" ${S.act.method==='budget'?'selected':''}>The budget for those months</option><option value="runrate" ${S.act.method==='runrate'?'selected':''}>Average monthly actual so far (run-rate)</option></select></div>
+      <span class="grow"></span><span class="hint" style="max-width:340px">Your own forecasts for a line override this. Click a line to enter them.</span>
+    </div>
+    ${M.closed ? '' : `<div class="banner blue">No actuals loaded for ${Y} yet.${canManageData()?' Use <b>Import Odoo actuals</b> to upload the monthly Plant OPEX export from Odoo.':' The Head of Plant Operations uploads them from Odoo.'}</div>`}
+    <div class="stats">
+      <div class="stat opex"><div class="eyebrow">${Y} OPEX budget</div><div class="v">${short(M.budFY)}</div><div class="s">${short(M.budYTD)} budgeted for ${thru(M.closed)}</div></div>
+      <div class="stat"><div class="eyebrow">Actual ${thru(M.closed)}</div><div class="v">${short(M.actYTD)}</div><div class="s">${M.budYTD?Math.round(100*M.actYTD/M.budYTD)+'% of budget to date':'—'} · run-rate ${short(rr)}/yr</div></div>
+      <div class="stat"><div class="eyebrow">Projected full year</div><div class="v">${short(M.projFY)}</div><div class="s">${M.closed} actual + ${12-M.closed} projected months</div></div>
+      <div class="stat"><div class="eyebrow">Projected vs budget</div><div class="v" style="color:${varFY>0?'var(--red)':'var(--green)'}">${varFY>0?'+':''}${short(varFY)}</div><div class="s">${varFY>0?'Over':'Under'} budget${M.budFY?' by '+Math.abs(Math.round(100*varFY/M.budFY))+'%':''}</div></div>
+    </div>
+    ${ins ? `<div class="ins-grid">${ins}</div>` : ''}
+    <div class="card" style="margin-bottom:16px"><h3>Month by month</h3><div style="padding:14px">
+      <div class="mchart">${MONTHS.map((m,i)=>{ const a = i < M.closed; const v = a ? M.monthly.act[i] : M.monthly.proj[i];
+        return `<div title="${m}: budget ${peso(M.monthly.bud[i])} · ${a?'actual':'projected'} ${peso(v)}"><i class="${a?'a':'p'} ${a && v>M.monthly.bud[i]*1.1?'over':''}" style="height:${100*v/mx}%"></i><s style="bottom:${100*M.monthly.bud[i]/mx}%"></s></div>`; }).join('')}</div>
+      <div class="ply-lbl" style="gap:4px">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
+      <div class="legend"><span><i style="background:var(--teal)"></i>Actual</span><span><i style="background:var(--teal-wash);border:1px dashed var(--teal)"></i>Projected</span><span><i style="background:var(--ink);height:2px"></i>Budget</span><span><i style="background:var(--red)"></i>Over budget by 10%+</span></div></div></div>
+    <div class="card"><h3>OPEX by line item</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Line item</th><th class="r">Budget ${Y}</th><th class="r">Budget ${thru(M.closed)}</th><th class="r">Actual ${thru(M.closed)}</th><th>Status</th><th class="r">Projected ${Y}</th><th class="r">vs budget</th></tr></thead><tbody>
+      ${M.rows.map(r=>{ const v = r.projFY - r.budFY; return `<tr class="row" tabindex="0" onclick="actItem(this.dataset.k)" onkeydown="if(event.key==='Enter')actItem(this.dataset.k)" data-k="${esc(r.item)}">
+        <td><div class="act">${esc(r.item)}</div>${!r.inList?'<div class="item" style="color:var(--amber)">Not in the budget line-item list</div>':''}${r.overrides?`<div class="item">${r.overrides} month${r.overrides>1?'s':''} forecast by the department</div>`:''}</td>
+        <td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.budYTD)}</td><td class="r num">${peso(r.actYTD)}</td><td>${varPill(r)}</td>
+        <td class="r num">${peso(r.projFY)}</td><td class="r num" style="color:${v>1?'var(--red)':v<-1?'var(--green)':'inherit'}">${v>0?'+':''}${peso(v)}</td></tr>`; }).join('') || '<tr><td colspan="7"><div class="empty">Nothing to show for this year and department.</div></td></tr>'}
+      </tbody><tfoot><tr><td>Total OPEX</td><td class="r num">${peso(M.budFY)}</td><td class="r num">${peso(M.budYTD)}</td><td class="r num">${peso(M.actYTD)}</td><td></td><td class="r num">${peso(M.projFY)}</td><td class="r num">${varFY>0?'+':''}${peso(varFY)}</td></tr></tfoot></table></div></div>
+    ${Object.keys(M.cap).length ? `<div class="card" style="margin-top:16px"><h3>CAPEX — budget vs actual</h3><div class="tbl-wrap"><table class="ledger" style="min-width:520px"><thead><tr><th>Category</th><th class="r">Budget ${Y}</th><th class="r">Actual so far</th><th class="r">Remaining</th></tr></thead><tbody>
+      ${Object.entries(M.cap).sort((a,b)=>b[1].bud-a[1].bud).map(([k,v])=>`<tr><td class="act">${esc(k)}</td><td class="r num">${peso(v.bud)}</td><td class="r num">${peso(v.act)}</td><td class="r num">${peso(v.bud-v.act)}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint" style="padding:0 14px 12px">CAPEX actuals are only shown where Finance has provided them.</p></div>` : ''}
+    ${canManageData() ? `<div class="card" style="margin-top:16px"><h3>Uploaded actuals for ${Y}</h3>${(imps||[]).length ? `<div class="tbl-wrap"><table class="ledger" style="min-width:640px"><thead><tr><th>File</th><th>Months</th><th class="r">Rows</th><th class="r">Total</th><th>Uploaded</th><th></th></tr></thead><tbody>
+      ${imps.map(i=>`<tr><td><div class="act">${esc(i.file_name||'')}</div><div class="item" style="text-transform:none">${esc(i.note||'')}</div></td><td>${i.month_from?MONTHS[i.month_from-1]+'–'+MONTHS[i.month_to-1]:''}</td><td class="r num">${i.rows||0}</td><td class="r num">${peso(i.total)}</td><td style="font-size:12px">${fmtDate(i.created_at)}</td><td><button class="btn ghost" onclick="deleteImport('${i.id}')">Remove</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No uploads yet.</div>'}</div>` : ''}`;
+  } catch(e){ fail(e); }
+}
+function actItem(item){
+  const M = S.act.model, r = M.rows.find(x=>x.item===item); if (!r) return;
+  const Y = S.act.year, dept = S.act.dept, ed = !!dept && canEditDept(dept), c = dept ? r.cells.find(x=>x.dept===dept) : null;
+  const partners = Object.entries(r.partners).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  $('#overlay').innerHTML = `<div class="scrim" onclick="closeDrawer()"></div>
+  <div class="drawer" role="dialog" aria-label="Line item detail">
+    <header><div><div class="eyebrow">${Y} · ${esc(dept?deptById(dept)?.name:'Whole plant')}</div><h2>${esc(item)}</h2></div><button class="btn ghost" onclick="closeDrawer()">Close</button></header>
+    <div class="body">
+      <div class="g3" style="margin-bottom:10px">
+        <div class="stat"><div class="eyebrow">Budget</div><div class="v" style="font-size:18px">${short(r.budFY)}</div></div>
+        <div class="stat"><div class="eyebrow">Actual ${thru(M.closed)}</div><div class="v" style="font-size:18px">${short(r.actYTD)}</div></div>
+        <div class="stat"><div class="eyebrow">Projected</div><div class="v" style="font-size:18px" id="adProj">${short(r.projFY)}</div></div>
+      </div>
+      ${ed ? `<p class="hint" style="margin:0 0 8px">Enter your expected spend for the months still open. Leave blank to use ${S.act.method==='runrate'?'the run-rate':'the budget'}.</p>` : dept ? '' : '<p class="hint" style="margin:0 0 8px">Pick a department at the top to enter forecasts for it.</p>'}
+      <table class="ledger" style="min-width:0"><thead><tr><th>Month</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Projection</th></tr></thead><tbody>
+      ${MONTHS.map((m,i)=>{ const closed = i < M.closed;
+        return `<tr><td>${m}</td><td class="r num">${peso(r.bud[i])}</td><td class="r num">${closed?peso(r.act[i]):'<span style="color:var(--faint)">—</span>'}</td>
+        <td class="r">${closed ? '<span style="color:var(--faint);font-size:12px">closed</span>' : ed ? `<input class="inp num pj" data-m="${i+1}" type="number" step="any" style="max-width:130px;margin-left:auto" value="${c && c.ov[i]!=null ? c.ov[i] : ''}" placeholder="${Math.round(c?c.proj[i]:r.proj[i])}">` : `<span class="num">${peso(r.proj[i])}</span>`}</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.actYTD)}</td><td class="r num">${peso(r.projFY)}</td></tr></tfoot></table>
+      ${!dept && Object.keys(r.depts).length>1 ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Projected by department</h3>${Object.entries(r.depts).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(deptById(d)?.name||'Unassigned')}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
+      ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
+    </div>
+    <footer><span></span><div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveProjection(${JSON.stringify(item).replace(/"/g,'&quot;')})">Save forecast</button>`:''}</div></footer>
+  </div>`;
+}
+async function saveProjection(item){
+  const dept = S.act.dept, Y = S.act.year, ups = [], dels = [];
+  document.querySelectorAll('.pj').forEach(e => { const m = Number(e.dataset.m); if (e.value.trim()==='') dels.push(m); else ups.push({ company_id:S.company.id, department_id:dept, year:Y, line_item:item, month:m, amount:Number(e.value)||0, updated_by:S.me.id }); });
+  try {
+    if (ups.length) { const r = await sb.from('bgt_projections').upsert(ups, { onConflict:'department_id,year,line_item,month' }); if (r.error) throw r.error; }
+    if (dels.length) { const r = await sb.from('bgt_projections').delete().eq('department_id', dept).eq('year', Y).eq('line_item', item).in('month', dels); if (r.error) throw r.error; }
+    S.act.cache = {}; closeDrawer(); toast('Forecast saved'); renderActuals();
+  } catch(e){ fail(e); }
+}
+async function exportActuals(){
+  try {
+    const M = S.act.model, Y = S.act.year, wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Actual vs budget');
+    ws.addRow([`${S.company.name} — ${S.act.dept?deptById(S.act.dept)?.name:'Whole plant'} — ${Y} actuals ${thru(M.closed)} and projection`]).font = { bold:true, size:13 };
+    ws.addRow([`Projection: months after ${M.closed?MONTHS[M.closed-1]:'—'} use ${S.act.method==='runrate'?'the year-to-date monthly average':'the budget'}, unless a department forecast was entered.`]);
+    ws.addRow([]);
+    const hdr = ws.addRow(['Line item', `Budget ${Y}`, `Budget ${thru(M.closed)}`, `Actual ${thru(M.closed)}`, `Projected ${Y}`, 'Projected vs budget', ...MONTHS.map((m,i)=>`${m} ${i<M.closed?'actual':'proj.'}`)]);
+    hdr.font = { bold:true }; hdr.eachCell(c=>{ c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE2EEEC'} }; });
+    M.rows.forEach(r => ws.addRow([r.item, r.budFY, r.budYTD, r.actYTD, r.projFY, r.projFY-r.budFY, ...r.proj]));
+    const t = ws.addRow(['TOTAL', M.budFY, M.budYTD, M.actYTD, M.projFY, M.projFY-M.budFY, ...M.monthly.proj]); t.font = { bold:true };
+    ws.getColumn(1).width = 52; for (let i=2;i<=18;i++){ ws.getColumn(i).width = 15; ws.getColumn(i).numFmt = '#,##0.00;[Red]-#,##0.00'; }
+    ws.views = [{ state:'frozen', xSplit:1, ySplit:4 }];
+    const buf = await wb.xlsx.writeBuffer();
+    download(buf, `${Y} Actual vs Budget - ${S.act.dept?deptById(S.act.dept)?.name.replace(/[\/\\]/g,'-'):'Plant'} - ${S.company.code}.xlsx`); toast('Excel file downloaded');
+  } catch(e){ fail(e); }
+}
+
+/* ================= ODOO ACTUALS IMPORT ================= */
+function importActualsDialog(){
+  modal(`<h3>Import Odoo actuals</h3>
+  <p>Upload the Odoo expense exports (the <b>Plant-… OPEX</b> files). Each sheet needs the columns <i>Date, Budget Expense Item, Analytic Account, Total, Partner</i>. Departments are matched by analytic account; summary/pivot sheets are ignored.</p>
+  <div class="field"><label for="iaFile">Excel files</label><input type="file" id="iaFile" accept=".xlsx" multiple class="inp"></div>
+  <div class="field"><label for="iaYear">Year</label><input class="inp num" id="iaYear" type="number" value="${S.act.year}" style="width:110px"></div>
+  <div class="field"><label><input type="checkbox" id="iaReplace" checked> Replace actuals already loaded for the same departments and months</label></div>
+  <div id="iaMsg"></div>
+  <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="iaPrev">Check files</button><button class="btn primary hidden" id="iaGo">Load actuals</button></div>`);
+  let parsed = null;
+  $('#iaPrev').onclick = async () => {
+    const files = [...$('#iaFile').files]; if (!files.length) { toast('Choose at least one file.', true); return; }
+    try { $('#iaMsg').innerHTML = '<p>Reading…</p>'; parsed = await parseOdooFiles(files, Number($('#iaYear').value));
+      const p = parsed;
+      $('#iaMsg').innerHTML = !p.rows.length ? `<div class="banner red">No expense rows for ${p.year} found. Check that the files are the Odoo detail exports and the year is right.</div>` :
+        `<div class="box"><b>${p.txn} transactions · ${peso(p.total)} · ${MONTHS[p.from-1]}–${MONTHS[p.to-1]} ${p.year}</b>
+        ${Object.entries(p.byDept).map(([d,v])=>`<div class="sumline" style="font-weight:400;margin:4px 0"><span>${esc(deptById(d)?.name)}</span><span class="num">${peso(v)}</span></div>`).join('')}
+        ${p.skipDept ? `<div class="warnline">${p.skipDept} rows skipped — analytic account not linked to a department (${esc([...p.badAnalytic].slice(0,4).join(', '))}).</div>` : ''}
+        ${p.otherYear ? `<div class="hint">${p.otherYear} rows from other years ignored.</div>` : ''}
+        ${p.unmapped.size ? `<div class="warnline">Kept under their Odoo name (not in the budget line-item list): ${esc([...p.unmapped].join(', '))}</div>` : ''}</div>`;
+      $('#iaGo').classList.toggle('hidden', !p.rows.length);
+    } catch(e){ fail(e); }
+  };
+  $('#iaGo').onclick = async () => {
+    const p = parsed; if (!p) return;
+    try {
+      $('#iaGo').disabled = true; $('#iaMsg').insertAdjacentHTML('beforeend','<p>Loading…</p>');
+      if ($('#iaReplace').checked) { const months = []; for (let m=p.from;m<=p.to;m++) months.push(m);
+        const r = await sb.from('bgt_actuals').delete().eq('year', p.year).eq('kind','opex').in('department_id', Object.keys(p.byDept)).in('month', months); if (r.error) throw r.error; }
+      const { data:imp, error } = await sb.from('bgt_imports').insert({ company_id:S.company.id, kind:'opex', year:p.year, file_name:p.files.join(', '), rows:p.txn, total:p.total, month_from:p.from, month_to:p.to, note:`${Object.keys(p.byDept).length} departments`, created_by:S.me.id }).select().single();
+      if (error) throw error;
+      const rows = p.rows.map(r => ({ ...r, company_id:S.company.id, import_id:imp.id }));
+      for (let i=0;i<rows.length;i+=500) { const r = await sb.from('bgt_actuals').insert(rows.slice(i,i+500)); if (r.error) throw r.error; }
+      S.act.cache = {}; S.act.year = p.year; closeModal(); toast(`Loaded ${p.txn} transactions (${short(p.total)})`); renderActuals();
+    } catch(e){ $('#iaGo').disabled = false; fail(e); }
+  };
+}
+async function parseOdooFiles(files, year){
+  const { data:li } = await sb.from('bgt_line_items').select('id,name,kind');
+  const { data:im } = await sb.from('bgt_item_map').select('*');
+  const nameById = Object.fromEntries((li||[]).map(x=>[x.id,x.name]));
+  const itemMap = Object.fromEntries((im||[]).filter(x=>x.scheme==='odoo_item').map(x=>[String(x.source_value).toUpperCase(), nameById[x.line_item_id]]));
+  const analytic = {}; S.depts.forEach(d => (d.odoo_analytic||[]).forEach(a => analytic[String(a).trim().toUpperCase()] = d.id));
+  const cv = v => { if (v==null) return null; if (typeof v==='object' && !(v instanceof Date)) { if ('result' in v) return v.result; if (v.richText) return v.richText.map(x=>x.text).join(''); if (v.text) return v.text; } return v; };
+  const agg = {}, out = { year, files:[], rows:[], txn:0, total:0, byDept:{}, skipDept:0, badAnalytic:new Set(), otherYear:0, unmapped:new Set(), from:12, to:1 };
+  const mapItem = (src, partner, label) => {
+    const up = String(src||'').trim().toUpperCase(); if (!up) return '(NO ITEM)';
+    if (up === 'UTILITIES') { const t = (partner+' '+label).toUpperCase(); return /MERALCO|LIGHT|POWER|ELECTRIC/.test(t) ? 'UTILITIES - ELECTRICITY' : /WATER|MAYNILAD/.test(t) ? 'UTILITIES - WATER' : 'UTILITIES - OTHERS'; }
+    if (S.items.opex.includes(up)) return up;
+    if (itemMap[up]) return itemMap[up];
+    out.unmapped.add(up); return up;
+  };
+  for (const f of files) {
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); out.files.push(f.name);
+    wb.eachSheet(ws => {
+      let hr = 0, col = {};
+      for (let r=1; r<=Math.min(6, ws.rowCount); r++) { const vals = ws.getRow(r).values.map(v=>String(cv(v)||'').trim().toLowerCase());
+        if (vals.includes('date') && vals.some(v=>v.startsWith('budget expense')) && vals.includes('total')) { hr = r;
+          vals.forEach((v,i)=>{ if (v==='date') col.date=i; else if (v.startsWith('budget expense')) col.item=i; else if (v.startsWith('analytic')) col.an=i; else if (v==='total') col.tot=i; else if (v==='partner') col.par=i; else if (v==='label') col.lab=i; }); break; } }
+      if (!hr) return;
+      for (let r=hr+1; r<=ws.rowCount; r++) {
+        const row = ws.getRow(r), g = i => i ? cv(row.getCell(i).value) : null;
+        let d = g(col.date), amt = Number(g(col.tot)); if (!d || !amt) continue;
+        if (!(d instanceof Date)) { d = new Date(d); if (isNaN(d)) continue; }
+        if (d.getUTCFullYear() !== year) { out.otherYear++; continue; }
+        const an = String(g(col.an)||'').trim().toUpperCase(), dept = analytic[an];
+        if (!dept) { out.skipDept++; if (an) out.badAnalytic.add(an); continue; }
+        const month = d.getUTCMonth()+1, partner = String(g(col.par)||'').trim() || null, src = String(g(col.item)||'').trim();
+        const item = mapItem(src, partner||'', String(g(col.lab)||''));
+        const k = [dept, month, item, partner].join('|');
+        const a = agg[k] ||= { department_id:dept, year, month, kind:'opex', line_item:item, source_item:src.toUpperCase(), partner, amount:0, txn_count:0 };
+        a.amount += amt; a.txn_count++; out.txn++; out.total += amt; out.byDept[dept] = (out.byDept[dept]||0) + amt;
+        out.from = Math.min(out.from, month); out.to = Math.max(out.to, month);
+      }
+    });
+  }
+  out.rows = Object.values(agg).map(a => ({ ...a, amount:Math.round(a.amount*100)/100 }));
+  return out;
+}
+async function deleteImport(id){
+  modal(`<h3>Remove this upload?</h3><p>The actuals loaded from this file are removed. Budgets and forecasts are not affected.</p><div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn danger" id="diGo">Remove upload</button></div>`);
+  $('#diGo').onclick = async () => {
+    const a = await sb.from('bgt_actuals').delete().eq('import_id', id); if (a.error) return fail(a.error);
+    const b = await sb.from('bgt_imports').delete().eq('id', id); if (b.error) return fail(b.error);
+    S.act.cache = {}; closeModal(); toast('Upload removed'); renderActuals();
+  };
+}
+
+/* ================= PRICE LIST ================= */
+S.pr = { q:'', cat:'' };
+async function loadPrices(force){ if (!S.prices || force) S.prices = await fetchAll(()=>sb.from('bgt_price_items').select('*').order('item')); return S.prices; }
+const today = () => new Date().toISOString().slice(0,10);
+function priceMatches(p, q){ q = (q||'').toLowerCase(); return !q || [p.item,p.category,p.supplier,p.quote_ref,p.notes].some(v=>String(v||'').toLowerCase().includes(q)); }
+async function renderPrices(){
+  $('#main').innerHTML = '<div class="loading">Loading price list…</div>';
+  try { await loadPrices(true); } catch(e){ return fail(e); }
+  const cats = [...new Set(S.prices.map(p=>p.category).filter(Boolean))].sort();
+  $('#main').innerHTML = `
+  <div class="ph"><div><div class="eyebrow">${esc(S.company.name)}</div><h1>Price list</h1>
+    <div class="sub">Item prices and supplier quotations. Everyone can pick from this list when estimating a budget line, so the same price is used across departments.</div></div>
+    <div class="actions"><button class="btn primary" onclick="editPrice()">Add item price</button><button class="btn" onclick="importPricesDialog()">Import Excel</button><button class="btn ghost" onclick="exportPrices()">Download list / template</button></div></div>
+  <div class="card"><div class="toolbar"><input class="inp" placeholder="Search item, supplier, quote" aria-label="Search prices" value="${esc(S.pr.q)}" oninput="S.pr.q=this.value;$('#prTable').innerHTML=priceTableHtml()">
+    <select class="inp" style="max-width:260px" aria-label="Category" onchange="S.pr.cat=this.value;$('#prTable').innerHTML=priceTableHtml()"><option value="">All categories</option>${cats.map(c=>`<option ${c===S.pr.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <span class="grow"></span><span class="hint">${S.prices.length} items</span></div>
+    <div id="prTable">${priceTableHtml()}</div></div>`;
+}
+function priceTableHtml(){
+  const list = S.prices.filter(p => priceMatches(p, S.pr.q) && (!S.pr.cat || p.category===S.pr.cat));
+  if (!S.prices.length) return `<div class="empty"><b>No prices yet</b>Add item prices one by one, or import a list from Excel (use "Download list / template" for the columns).</div>`;
+  return `<div class="tbl-wrap"><table class="ledger" style="min-width:860px"><thead><tr><th>Item</th><th>Category</th><th class="r">Unit price</th><th>Supplier</th><th>Quotation</th><th>Valid until</th><th>Department</th></tr></thead><tbody>
+  ${list.map(p => { const exp = p.valid_until && p.valid_until < today();
+    return `<tr class="row" tabindex="0" onclick="editPrice('${p.id}')" onkeydown="if(event.key==='Enter')editPrice('${p.id}')" style="${p.active===false?'opacity:.5':''}">
+    <td><div class="act">${esc(p.item)}</div>${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td style="font-size:12.5px">${esc(p.category||'')}</td>
+    <td class="r num">${peso(p.unit_price,2)}<div class="item" style="text-transform:none">per ${esc(p.unit||'unit')}</div></td><td>${esc(p.supplier||'')}</td>
+    <td style="font-size:12.5px">${esc(p.quote_ref||'')}${p.quote_date?`<div class="item" style="text-transform:none">${p.quote_date}</div>`:''}</td>
+    <td>${p.valid_until?`<span class="pri ${exp?'pri-crit':'pri-ok'}">${exp?'Expired ':''}${p.valid_until}</span>`:''}</td><td style="font-size:12.5px">${esc(p.department_id?deptById(p.department_id)?.name:'All')}</td></tr>`; }).join('')}
+  </tbody></table></div>`;
+}
+function editPrice(id){
+  const p = id ? S.prices.find(x=>x.id===id) : { active:true, department_id:S.me.department_id||null };
+  const cats = [...S.items.opex, ...S.items.capex];
+  modal(`<h3>${id?'Edit item price':'Add item price'}</h3>
+    <div class="field"><label for="pItem">Item</label><input class="inp" id="pItem" value="${esc(p.item||'')}" placeholder="e.g. Diesel, Stretch film 500mm, Forklift PMS"></div>
+    <div class="g2"><div class="field"><label for="pCat">Budget line item / category</label><select class="inp" id="pCat">${opts(cats, p.category, 'Any')}</select></div>
+      <div class="field"><label for="pDept">Department</label><select class="inp" id="pDept"><option value="">All departments</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===p.department_id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div></div>
+    <div class="g2"><div class="field"><label for="pPrice">Unit price (₱)</label><input class="inp num" id="pPrice" type="number" step="any" value="${p.unit_price??''}"></div>
+      <div class="field"><label for="pUnit">Per</label><input class="inp" id="pUnit" value="${esc(p.unit||'')}" placeholder="liter, pc, month, pax"></div></div>
+    <div class="g2"><div class="field"><label for="pSup">Supplier</label><input class="inp" id="pSup" value="${esc(p.supplier||'')}"></div>
+      <div class="field"><label for="pRef">Quotation / contract ref</label><input class="inp" id="pRef" value="${esc(p.quote_ref||'')}"></div></div>
+    <div class="g2"><div class="field"><label for="pQd">Quotation date</label><input class="inp" id="pQd" type="date" value="${p.quote_date||''}"></div>
+      <div class="field"><label for="pVu">Valid until</label><input class="inp" id="pVu" type="date" value="${p.valid_until||''}"></div></div>
+    <div class="field"><label for="pNotes">Notes</label><input class="inp" id="pNotes" value="${esc(p.notes||'')}" placeholder="Specs, VAT inclusive/exclusive, minimum order"></div>
+    <div class="field"><label><input type="checkbox" id="pAct" ${p.active!==false?'checked':''}> Active (shown in the picker)</label></div>
+    <div class="actions" style="justify-content:space-between"><span>${id && canManageData()?`<button class="btn danger" onclick="deletePrice('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="savePrice('${id||''}')">Save</button></span></div>`);
+}
+async function savePrice(id){
+  const v = x => $('#'+x).value.trim() || null;
+  const row = { company_id:S.company.id, item:v('pItem'), category:v('pCat'), department_id:v('pDept'), unit_price:Number(v('pPrice'))||0, unit:v('pUnit'), supplier:v('pSup'), quote_ref:v('pRef'), quote_date:v('pQd'), valid_until:v('pVu'), notes:v('pNotes'), active:$('#pAct').checked, updated_by:S.me.id };
+  if (!row.item) { toast('Name the item.', true); return; }
+  const r = id ? await sb.from('bgt_price_items').update(row).eq('id', id).select().single() : await sb.from('bgt_price_items').insert(row).select().single();
+  if (r.error) return fail(r.error);
+  closeModal(); toast('Price saved'); renderPrices();
+}
+async function deletePrice(id){ const r = await sb.from('bgt_price_items').delete().eq('id', id); if (r.error) return fail(r.error); closeModal(); toast('Price deleted'); renderPrices(); }
+const PRICE_COLS = [['item','Item'],['category','Budget line item / category'],['unit','Per (unit)'],['unit_price','Unit price'],['supplier','Supplier'],['quote_ref','Quotation ref'],['quote_date','Quotation date'],['valid_until','Valid until'],['dept','Department code'],['notes','Notes']];
+async function exportPrices(){
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Price list');
+  const h = ws.addRow(PRICE_COLS.map(c=>c[1])); h.font = { bold:true }; h.eachCell(c=>c.fill={ type:'pattern', pattern:'solid', fgColor:{argb:'FFE2EEEC'} });
+  (S.prices||[]).forEach(p => ws.addRow(PRICE_COLS.map(([k]) => k==='dept' ? (p.department_id?deptById(p.department_id)?.code:'') : k==='unit_price' ? Number(p.unit_price) : (p[k]??''))));
+  if (!(S.prices||[]).length) ws.addRow(['Diesel','GAS AND OIL','liter',62.5,'Petron','Q-2026-014','2026-09-15','2026-12-31','PROD','VAT inclusive — sample row, replace']);
+  PRICE_COLS.forEach((_,i)=>ws.getColumn(i+1).width = i===0?40:18); ws.getColumn(4).numFmt = '#,##0.00';
+  ws.addRow([]); ws.addRow([`Department codes: ${S.depts.map(d=>d.code+' = '+d.name).join(' · ')}. Leave blank for all departments.`]);
+  download(await wb.xlsx.writeBuffer(), `Price list - ${S.company.code}.xlsx`); toast('Price list downloaded');
+}
+function importPricesDialog(){
+  modal(`<h3>Import prices from Excel</h3><p>Use the columns from "Download list / template". Rows with the same item and supplier as an existing price are updated.</p>
+    <div class="field"><input type="file" id="ipFile" accept=".xlsx" class="inp"></div><p id="ipMsg"></p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="ipGo">Import</button></div>`);
+  $('#ipGo').onclick = async () => {
+    const f = $('#ipFile').files[0]; if (!f) { toast('Choose a file first.', true); return; }
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
+      const cv = v => { if (v==null) return null; if (v instanceof Date) return v.toISOString().slice(0,10); if (typeof v==='object') { if ('result' in v) return v.result; if (v.richText) return v.richText.map(x=>x.text).join(''); if (v.text) return v.text; } return v; };
+      const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), idx = {};
+      PRICE_COLS.forEach(([k,l]) => { const i = head.indexOf(l.toLowerCase()); if (i>0) idx[k] = i; });
+      if (!idx.item || !idx.unit_price) { $('#ipMsg').textContent = 'The first row must have at least "Item" and "Unit price" headings.'; return; }
+      await loadPrices(true);
+      let ins = 0, upd = 0;
+      for (let r=2; r<=ws.rowCount; r++) {
+        const row = ws.getRow(r), g = k => idx[k] ? cv(row.getCell(idx[k]).value) : null; const item = String(g('item')||'').trim();
+        if (!item || /^department codes/i.test(item)) continue;
+        const dc = String(g('dept')||'').trim().toUpperCase(), dateOf = x => x ? String(x).slice(0,10) : null;
+        const rec = { company_id:S.company.id, item, category:g('category')||null, unit:g('unit')||null, unit_price:Number(g('unit_price'))||0, supplier:g('supplier')||null, quote_ref:g('quote_ref')||null,
+          quote_date:dateOf(g('quote_date')), valid_until:dateOf(g('valid_until')), department_id:S.depts.find(d=>d.code===dc)?.id||null, notes:g('notes')||null, active:true, updated_by:S.me.id };
+        const ex = S.prices.find(p => p.item.toLowerCase()===item.toLowerCase() && (p.supplier||'').toLowerCase()===String(rec.supplier||'').toLowerCase());
+        const res = ex ? await sb.from('bgt_price_items').update(rec).eq('id', ex.id) : await sb.from('bgt_price_items').insert(rec);
+        if (res.error) throw res.error; ex ? upd++ : ins++;
+      }
+      closeModal(); toast(`${ins} added, ${upd} updated`); renderPrices();
+    } catch(e){ fail(e); }
+  };
+}
+/* picker inside the line drawer */
+async function togglePricePick(kind){
+  const box = $('#pricePick'); if (!box) return;
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden'); box.innerHTML = '<div class="hint">Loading…</div>';
+  try { await loadPrices(); } catch(e){ return fail(e); }
+  box.innerHTML = `<input class="inp" id="ppQ" placeholder="Search the price list" aria-label="Search the price list"><div id="ppList" class="pp-list"></div>`;
+  const draw = () => {
+    const b = budgetById(S.budgetId), cat = (kind==='opex' ? $('#f_line_item') : $('#f_category'))?.value, q = $('#ppQ').value;
+    const list = S.prices.filter(p => p.active!==false && (!p.department_id || p.department_id===b.department_id) && priceMatches(p,q))
+      .sort((x,y) => ((y.category===cat)-(x.category===cat)) || x.item.localeCompare(y.item)).slice(0,40);
+    $('#ppList').innerHTML = list.map(p => `<button type="button" onclick="pickPrice('${kind}','${p.id}')"><span><b>${esc(p.item)}</b><small>${esc([p.supplier,p.quote_ref,p.category].filter(Boolean).join(' · '))}${p.valid_until && p.valid_until<today()?' · <em>quote expired</em>':''}</small></span><span class="num">${peso(p.unit_price,2)}/${esc(p.unit||'unit')}</span></button>`).join('')
+      || `<div class="hint" style="padding:8px">No matching prices. Add them on the Price list page.</div>`;
+  };
+  $('#ppQ').oninput = draw; draw(); $('#ppQ').focus();
+}
+function pickPrice(kind, id){
+  const p = S.prices.find(x=>x.id===id); if (!p) return;
+  if (kind==='opex') { $('#c_rate').value = p.unit_price; if (p.unit) $('#c_unit').value = p.unit; if (!$('#c_qty').value) $('#c_qty').value = 1; if (!$('#c_times').value) $('#c_times').value = 1;
+    if ($('#f_basis') && !$('#f_basis').value && p.quote_ref) $('#f_basis').value = 'Supplier Quotation'; }
+  else $('#f_unit_cost').value = p.unit_price;
+  const note = `Price list: ${p.item} @ ${peso(p.unit_price,2)}/${p.unit||'unit'}${p.supplier?' — '+p.supplier:''}${p.quote_ref?' ('+p.quote_ref+')':''}.`;
+  const rem = $('#f_remarks'); if (rem && !rem.value.includes(note)) rem.value = (rem.value ? rem.value.trim()+' ' : '') + note;
+  $('#pricePick').classList.add('hidden'); liveTotals(kind); toast('Price applied — check the quantity');
+}
+
+/* ================= LAST-YEAR REFERENCE (line drawer) ================= */
+async function refreshRef(){
+  const box = $('#refPanel'); if (!box) return;
+  const item = $('#f_line_item')?.value; const b = budgetById(S.budgetId), dept = b.department_id, Y = S.cycle.year;
+  if (!item) { box.innerHTML = '<span class="hint">Choose a line item to see what was budgeted and spent on it in earlier years.</span>'; return; }
+  box.innerHTML = '<span class="hint">Loading history…</span>';
+  try {
+    const years = [Y-1, Y-2, Y-3].filter(y => y >= 2023);
+    const res = [];
+    for (const y of years) { const D = await loadYearData(y, dept), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===item);
+      res.push({ y, closed:M.closed, bud:r?.budFY||0, act:r?.actYTD||0, proj:r?.projFY||0, hasAct:M.closed>0, basis:S.cycles.find(c=>c.year===y)?.basis }); }
+    if ($('#f_line_item')?.value !== item) return;
+    box.innerHTML = `<table class="ref"><thead><tr><th>${esc(deptById(dept)?.name)} · ${esc(item)}</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Full-year view</th></tr></thead><tbody>
+      ${res.map(r=>`<tr><td>${r.y}${r.basis&&r.basis!=='approved'?` <small>${r.basis==='submitted'?'(submitted, not approved)':''}</small>`:''}</td><td class="r num">${r.bud?peso(r.bud):'—'}</td>
+        <td class="r num">${r.hasAct?peso(r.act)+` <small>${thru(r.closed)}</small>`:'<small>not loaded</small>'}</td><td class="r num">${r.hasAct&&r.closed<12?peso(r.proj)+' <small>projected</small>':r.hasAct?peso(r.act):'—'}</td></tr>`).join('')}
+      </tbody></table><span class="hint">History is a check, not the basis — budget from the ${Y} activity plan, quotation or contract.</span>`;
+  } catch(e){ box.innerHTML = '<span class="hint">History not available.</span>'; console.error(e); }
 }
 
 boot();

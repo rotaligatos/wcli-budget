@@ -88,7 +88,7 @@ async function prices(db: SupabaseClient, deptId?: string) {
   return (data || []).filter((p: any) => !deptId || !p.department_id || p.department_id === deptId)
     .map((p: any) => `- ${p.item} [${p.category || 'any'}]: ₱${p.unit_price}/${p.unit || 'unit'} ${p.supplier ? '— ' + p.supplier : ''}${p.quote_ref ? ' (' + p.quote_ref + ')' : ''}${p.source_type === 'market' ? ' [market reference]' : ''}${p.valid_until ? ' valid until ' + p.valid_until : ''}`).join('\n') || '(price list is empty)';
 }
-const COMPANY = `World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — manufactures and distributes laminated boards (melamine/HPL on board). Departments: Admin (incl. safety/SSHE), Engineering (incl. maintenance), Production, QA/QC, Warehouse, Logistics, PPIC, IT. Currency: Philippine peso.`;
+const COMPANY = `World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — manufactures laminated boards (melamine/HPL on board) and also trades imported finished boards, mostly laminated plywood from China, Thailand and Vietnam that it does not produce. Boards sold = boards produced + imported trade boards; the cost of the imported boards themselves is cost of sales, not plant OPEX. Departments: Admin (incl. safety/SSHE), Engineering (incl. maintenance), Production, QA/QC, Warehouse, Logistics, PPIC, IT. Currency: Philippine peso.`;
 const RULES = `Finance budgeting rules:
 - Zero-based: amounts come from the next year's activity plan, contracts, quotations, headcount or usage. History is only a check.
 - Salaries, wages and employee benefits are excluded (HR budgets them). Agency/outsourced labor is OPEX.
@@ -217,13 +217,13 @@ async function draftBudget(db: SupabaseClient, key: string, p: any) {
     gaps:{ type:'array', maxItems:5, items:{ type:'string' }, description:'Missing or doubtful data, one short sentence each' },
     questions:{ type:'array', maxItems:5, items:{ type:'string' }, description:'What the manager must confirm, one short sentence each' },
     volume_assumption:{ type:'string', description:'One or two sentences' },
-    summary:{ type:'string', description:'Max 3 sentences: total, main drivers, biggest changes' } }, required:['lines','gaps','volume_assumption','summary'] } };
+    summary:{ type:'string', description:'Max 3 sentences: main drivers and biggest changes. Do not state a peso total — the app adds up the lines.' } }, required:['lines','gaps','volume_assumption','summary'] } };
   const system = `You are the budget assistant inside WCLI's budget app. ${COMPANY}
 ${RULES}
 Draft a COMPLETE first version of one department's OPEX budget (and CAPEX only for items deferred into this year or clearly needed replacements) for the manager to review, edit and justify. Method for each recurring expense line:
 1) Reference = last year's full-year view (official Accounting/Odoo actuals annualised; if missing, plant PO records and utility bills; if both missing, the prior budget — remember some prior budgets covered only part of the year).
 2) Price change = the cost outlook % for that line (general inflation if none).
-3) Volume factor for volume-driven lines (power, fuel, supplies, delivery, agency/outsourced labor, packaging, R&M of production equipment) = next year's volume target ÷ last year's volume (or the sales/volume trend if there is no target). Keep fixed costs (security, rent, insurance, permits, subscriptions, internet) independent of volume. Use consumption per board (kWh, liters) and the latest unit rates when available.
+3) Volume factor for volume-driven lines = next year's volume ÷ last year's volume (target if given, otherwise the trend). Use the right volume: Production, Engineering/maintenance, QA and production power/fuel follow boards PRODUCED; Warehouse and Logistics (handling, forklifts, packaging, delivery, depot) follow boards SOLD, which include imported trade boards; Admin and IT are mostly fixed. Keep fixed costs (security, rent, insurance, permits, subscriptions, internet) independent of volume. Use consumption per board (kWh, liters) and the latest unit rates when available.
 4) Drop last year's one-off items; keep contracts; flag lines that ran far above or below budget.
 Combine into at most 24 lines by expense line item and activity; keep every text short (the manager adds detail later); skip lines under ₱10,000 a year unless mandatory. Payroll and benefits are excluded. Never invent suppliers or quotation numbers. State the numbers you used in each rationale. Amounts in pesos.`;
   const user = `Department: ${dept!.name}${dept!.notes ? ' (' + dept!.notes + ')' : ''}. Budget year ${Y}. CAPEX threshold ₱${cy!.capex_threshold}/unit.

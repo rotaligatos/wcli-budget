@@ -1843,7 +1843,7 @@ async function yearCompliance(y, drvItems){
   const paired = m => { const v = K.filter(r=>r.metric===m && r.month>0 && r.month<=n && Number(r.value)>0); if (!v.length) return null;
     return { k: sum(v.map(r=>r.value)), opex: sum(v.map(r=>M.monthly.act[r.month-1])), months: v.length }; };
   const pS = n ? paired('sales_actual') : null, pV = n ? paired('volume_sold') : null, salesN = pS?.k ?? null, volN = pV?.k ?? null;
-  const salesFY = kSum('sales_actual', 12), volFY = kSum('volume_sold', 12);
+  const salesFY = kSum('sales_actual', 12), volFY = kSum('volume_sold', 12), prodFY = kSum('production_output', 12), pP2 = n ? paired('production_output') : null;
   const opexAct = D.act.filter(a=>a.kind!=='capex'), budLines = M.rows.filter(r=>r.budYTD>0), unb = M.rows.filter(r=>!r.budFY && r.actYTD>0);
   const ratio = list => { const b = sum(list.map(r=>r.budYTD)); return b ? 100*sum(list.map(r=>r.actYTD))/b : null; };
   const dAct = new Set(opexAct.map(a=>a.department_id)), dBud = new Set(D.bud.map(l=>l.department_id));
@@ -1854,7 +1854,7 @@ async function yearCompliance(y, drvItems){
     pctDrv: ratio(budLines.filter(r=>drvItems.has(r.item))), pctOther: ratio(budLines.filter(r=>!drvItems.has(r.item))),
     noBudDepts: [...dAct].filter(d=>!dBud.has(d)).map(d=>deptById(d)?.name||'?'),
     capBud: sum(D.capBud.map(annual)), capAct: sum(D.act.filter(a=>a.kind==='capex').map(a=>Number(a.amount)||0)),
-    salesN, volN, salesFY, volFY, pV, pS, opexPerBoard: pV ? pV.opex/pV.k : null, opexPctSales: pS ? 100*pS.opex/pS.k : null, ext: D.ext||[], extTxt: extNote(D), fullYr: n ? M.actYTD*12/n : null, rowsByItem: Object.fromEntries(M.rows.map(r=>[r.item, r])) };
+    salesN, volN, salesFY, volFY, prodFY, opexPerProd: pP2 ? pP2.opex/pP2.k : null, pV, pS, opexPerBoard: pV ? pV.opex/pV.k : null, opexPctSales: pS ? 100*pS.opex/pS.k : null, ext: D.ext||[], extTxt: extNote(D), fullYr: n ? M.actYTD*12/n : null, rowsByItem: Object.fromEntries(M.rows.map(r=>[r.item, r])) };
 }
 const compChip = p => p==null ? '<span class="hint">—</span>' : `<span class="chip ${p>110?'pri-crit':p<50?'pri-med':p<90?'basis-working':'pri-ok'}">${Math.round(p)}%</span>`;
 async function renderTrend(Y, o){
@@ -1906,6 +1906,8 @@ async function renderTrend(Y, o){
       ${R('CAPEX budget / actual', c=>c.capBud||c.capAct?`${c.capBud?short(c.capBud):'—'} / ${c.capAct?short(c.capAct):'—'}`:'—')}
       ${R('Sales', c=>c.salesFY!=null?short(c.salesFY):'—', 'full year, or year to date')}
       ${R('Boards sold', c=>c.volFY!=null?Math.round(c.volFY).toLocaleString('en-PH'):'—', 'full year, or year to date')}
+      ${R('Boards produced', c=>c.prodFY!=null?Math.round(c.prodFY).toLocaleString('en-PH'):'—', 'full year, or year to date')}
+      ${R('Plant OPEX per board produced', c=>c.opexPerProd!=null?peso(c.opexPerProd,2):'—', 'months with both figures')}
       ${R('<b>Plant OPEX per board sold</b>', c=>c.opexPerBoard!=null?peso(c.opexPerBoard,2)+(c.pV.months<c.n?`<div class="item" style="text-transform:none">${c.pV.months} months</div>`:''):'—', 'months with both figures')}
       ${R('Plant OPEX as % of sales', c=>c.opexPctSales!=null?c.opexPctSales.toFixed(1)+'%'+(c.pS.months<c.n?`<div class="item" style="text-transform:none">${c.pS.months===4?'Jan–Apr':c.pS.months+' months'}</div>`:''):'—', 'months with both figures')}
       ${R('Inflation that year', c=>{ const h = hv(H,'inflation',c.y); return h?.value!=null?Number(h.value).toFixed(1)+'%':'—'; })}
@@ -2031,7 +2033,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],['capacity_boards','Plant capacity','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_target','Production target','boards','num'],['production_output','Production output','boards','num'],['capacity_boards','Plant capacity','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Reject / rework rate','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 S.pf = { year:null };
@@ -2074,11 +2076,13 @@ async function renderPerf(){
         return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${tot(k)!=null?Math.round(tot(k)):''}"`:''}>`:`<span class="num">${fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`).join('')}
       <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
+      <tr class="calc"><td class="act">Trade share of boards sold<div class="item" style="text-transform:none">imported, or sold − produced</div></td>${MONTHS.map((_,i)=>{ const s0 = g('volume_sold',i+1), im = g('volume_imported',i+1) ?? (s0!=null && g('production_output',i+1)!=null ? Math.max(0, s0 - g('production_output',i+1)) : null); return `<td class="r num">${s0&&im!=null?(100*im/s0).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>g('volume_sold',m) && (g('volume_imported',m)!=null || g('production_output',m)!=null)); if (!ms.length) return ''; const so = sum(ms.map(m=>g('volume_sold',m))), im = sum(ms.map(m=>g('volume_imported',m) ?? Math.max(0, g('volume_sold',m) - g('production_output',m)))); return so?(100*im/so).toFixed(0)+'%':''; })()}</td></tr>
+      ${pP && pV ? `<tr class="calc"><td class="act">OPEX per board sold<div class="item" style="text-transform:none">produced + traded — for warehouse and logistics</div></td>${opexM.map((v,i)=>{ const p = g('volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${peso(pV.opex/pV.k,2)}</td></tr>` : ''}
       <tr class="calc"><td class="act">Capacity utilization<div class="item" style="text-transform:none">output ÷ capacity</div></td>${MONTHS.map((_,i)=>{ const p = g('production_output',i+1) ?? g('volume_sold',i+1), c = g('capacity_boards',i+1) ?? (g('capacity_boards',0)!=null ? g('capacity_boards',0)/12 : null); return `<td class="r num">${p!=null&&c?(100*p/c).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>(g('production_output',m)??g('volume_sold',m))!=null && (g('capacity_boards',m)!=null || g('capacity_boards',0)!=null)); if (!ms.length) return ''; const p = sum(ms.map(m=>g('production_output',m)??g('volume_sold',m))), c = sum(ms.map(m=>g('capacity_boards',m) ?? g('capacity_boards',0)/12)); return c?(100*p/c).toFixed(0)+'%':''; })()}</td></tr>
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
-    <p class="hint" style="margin-top:10px">Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
+    <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
   } catch(e){ fail(e); }
 }
 async function saveKpis(Y){

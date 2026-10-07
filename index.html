@@ -2122,7 +2122,7 @@ async function applySuggestion(){
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
   ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
-  ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
+  ['oee_press1_pct','OEE — Press 1','%','pct'],['oee_press2_pct','OEE — Press 2','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;
 S.pf = { year:null };
@@ -2174,7 +2174,7 @@ async function renderPerf(){
       <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
-    <div class="card" style="margin-top:16px"><h3>Yield and reject rate — year by year</h3>
+    <div class="card" style="margin-top:16px"><h3>Yield, reject rate and OEE — year by year</h3>
       <div id="fiYears" style="padding:4px 14px 12px"><span class="hint">Loading…</span></div></div>
     <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
     fiYearTable(Y);
@@ -2183,8 +2183,8 @@ async function renderPerf(){
 /* yield efficiency and Class B (reject) against target, across years */
 async function fiYearTable(Y){
   const el = document.getElementById('fiYears'); if (!el) return;
-  const keys = ['yield_target_pct','yield_actual_pct','reject_target_pct','reject_pct'];
-  const lbl = { yield_target_pct:'Yield efficiency — target', yield_actual_pct:'Yield efficiency — actual (total production yield)', reject_target_pct:'Class B ratio — target', reject_pct:'Class B ratio (reject)' };
+  const keys = ['yield_target_pct','yield_actual_pct','reject_target_pct','reject_pct','oee_press1_pct','oee_press2_pct'];
+  const lbl = { oee_press1_pct:'OEE — Press 1', oee_press2_pct:'OEE — Press 2', yield_target_pct:'Yield efficiency — target', yield_actual_pct:'Yield efficiency — actual (total production yield)', reject_target_pct:'Class B ratio — target', reject_pct:'Class B ratio (reject)' };
   try {
     const { data, error } = await sb.from('bgt_kpis').select('year,month,metric,value').eq('month',0).in('metric', keys); if (error) throw error;
     const ys = [...new Set((data||[]).map(r=>r.year))].filter(y=>y<=Y).sort().slice(-7);

@@ -2551,6 +2551,9 @@ async function deprModel(Y, deptId=null){
     add('past', a.department_id, deprInYear({ y:a.year, m:a.month, amt:Number(a.amount) }, Number(life), salvageOf(a.line_item, AC), Y)); });
   L.filter(l=>!deptId || l.department_id===deptId).forEach(l => capexEvents(l, L).forEach(ev => {
     if (ev.y < Y && ledgerYears.has(ev.y)) return;            // that year's spending is taken from the ledger instead
+    const st = l.impl_status || 'planned';
+    if (ev.y < Y-1 && !['done','in_progress'].includes(st)) return;   // older years: only items actually implemented (planned-but-never-done items add no depreciation)
+    if (RG.some(a => a.capex_line_id===l.id)) return;           // implemented as a project in the register — depreciation comes from there
     if (ev.y > Y) return;
     const arr = deprInYear(ev, lifeOf(l, AC), salvageOf(l.category, AC), Y); if (!sum(arr)) return;
     add(ev.y===Y ? 'current' : 'past', l.department_id, arr);
@@ -2620,7 +2623,7 @@ function deprCard(D, Y, AC){
   return `<div class="card" style="margin-top:16px"><h3>Depreciation in ${Y} — added to operating cost</h3>
     <div class="stats" style="padding:14px 14px 0;margin:0">
       <div class="stat"><div class="eyebrow">Assets already on the books</div><div class="v">${short(sum(D.existing))}</div><div class="s">${D.existingSrc==='accounting'?'from Accounting'+(D.registerT?` (project register: ${short(D.registerT)})`:''):D.existingSrc==='register'?'from the project register below':'Not entered — ask Accounting for the yearly figure'}</div></div>
-      <div class="stat"><div class="eyebrow">CAPEX of earlier years</div><div class="v">${short(sum(D.past))}</div><div class="s">ledger CAPEX where loaded, otherwise items marked done</div></div>
+      <div class="stat"><div class="eyebrow">CAPEX of earlier years</div><div class="v">${short(sum(D.past))}</div><div class="s">Accounting's CAPEX where loaded; otherwise items marked done or in progress (last year: planned items too)</div></div>
       <div class="stat capex"><div class="eyebrow">New ${Y} CAPEX</div><div class="v">${short(sum(D.current))}</div><div class="s">from the month after purchase${D.pending?` · incl. ${short(D.pending)} pending carry-overs`:''}</div></div>
       <div class="stat opex"><div class="eyebrow">Total depreciation ${Y}</div><div class="v">${short(D.total)}</div><div class="s">${peso(D.total/12)} a month on average</div></div>
     </div>

@@ -827,7 +827,7 @@ function renderCapexTable(ed, checks){
   const locked = S.cycle.status==='locked', b = budgetById(S.budgetId), canSt = b && canSetCapexStatus(b.department_id);
   return tb + `<div id="capexCarry"></div><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th class="r" title="Straight-line depreciation, from the month after purchase">Depreciation<br>${S.cycle.year} / full year</th>${locked?'<th>Status</th>':''}<th></th></tr></thead><tbody>
   ${list.map(l=>{ const d = dp(l); return `<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
-    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}</td>
+    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}</td>
     <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}</td>
     <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${d?(d.life?`${short(d.inYear)} / ${short(d.yr)}`:'<span class="hint">not depreciated</span>'):''}</td>
     ${locked?`<td onclick="event.stopPropagation()">${capexChip(l.impl_status)}${canSt?` <a class="hint" style="cursor:pointer;color:var(--teal)" onclick="S.cx.cache={};capexStatusDialog('${l.id}')">Update</a>`:''}</td>`:''}<td>${flagFor(checks,'capex',l.id)}</td></tr>`; }).join('')}
@@ -964,6 +964,7 @@ function editLine(kind, id){
     </div>
     <div class="field"><label for="f_asset">Asset / project</label><input class="inp" id="f_asset" value="${esc(l.asset||'')}" placeholder="e.g. Warehouse forklift replacement" ${ro}></div>
     <div class="field"><label for="f_description">Detailed description</label><textarea class="inp" id="f_description" placeholder="What will be purchased or built, with key specifications" ${ro}>${esc(l.description||'')}</textarea></div>
+    <div id="simBox"></div>
     <div id="capexConsider"></div>
     <div class="field"><label for="f_justification">Business justification</label><textarea class="inp" id="f_justification" placeholder="WHY it is needed, and WHAT happens if it is not done" ${ro}>${esc(l.justification||'')}</textarea></div>
     <div class="g3">
@@ -1010,7 +1011,8 @@ function editLine(kind, id){
   liveTotals(kind);
   S._editingId = id || null;
   if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); }
-  else loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.${(()=>{ const c = $('#f_category')?.value, d = c && o.D.find(x=>x.line_item===c); return d && d.next_year_pct!=null ? `<br><b>${esc(c)}:</b> assume ${Number(d.next_year_pct)>=0?'+':''}${Number(d.next_year_pct)}% vs ${S.cycle.year-1} prices — ${esc(d.rationale||'')}` : ''; })()}</div>`; }).catch(()=>{});
+  else { S._sim = null; S._simLine = l; const fa = $('#f_asset'); if (fa && !fa.disabled) { fa.addEventListener('change', ()=>cxSimilar()); } cxSimilar(); }
+  if (!isO) loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.${(()=>{ const c = $('#f_category')?.value, d = c && o.D.find(x=>x.line_item===c); return d && d.next_year_pct!=null ? `<br><b>${esc(c)}:</b> assume ${Number(d.next_year_pct)>=0?'+':''}${Number(d.next_year_pct)}% vs ${S.cycle.year-1} prices — ${esc(d.rationale||'')}` : ''; })()}</div>`; }).catch(()=>{});
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
 }
 function readMonths(){ const o={}; for(let i=1;i<=12;i++) o['m'+i] = Number($('#m'+i).value)||0; return o; }
@@ -1050,6 +1052,21 @@ function applySpread(){
   liveTotals($('#f_line_item') ? 'opex' : 'capex');
 }
 function closeDrawer(){ $('#overlay').innerHTML = ''; }
+/* similar CAPEX proposed by another department in the same budget year — ask the manager to align, or to justify why theirs is different */
+async function cxSimilar(){
+  const box = $('#simBox'), fa = $('#f_asset'), b = budgetById(S.budgetId); if (!box || !fa || !b) return;
+  const asset = fa.value.trim(), l = S._simLine || {};
+  if (!asset) { S._sim = { asset, rows:[] }; box.innerHTML = ''; return; }
+  const { data, error } = await sb.rpc('bgt_capex_similar', { p_cycle:S.cycle.id, p_dept:b.department_id, p_asset:asset, p_exclude:S._editingId || null });
+  if (error) { console.error(error); S._sim = { asset, rows:[] }; return; }
+  const rows = data || []; S._sim = { asset, rows };
+  if (!rows.length) { box.innerHTML = ''; return; }
+  const ro = fa.disabled, depts = [...new Set(rows.map(r=>r.department))];
+  box.innerHTML = `<div class="ins amber" style="margin:0 0 12px"><b>Similar project proposed by ${esc(depts.join(' and '))}</b>
+    <ul style="margin:6px 0">${rows.map(r=>`<li>${esc(r.department)}: ${esc(r.asset)}${r.category?` <span class="hint">(${esc(r.category)}, ${esc(STATUS_LABEL[r.status]||r.status)})</span>`:''}</li>`).join('')}</ul>
+    Talk to ${esc(depts.join(' and '))} to check whether one project can serve both departments, so the plant does not buy twice. ${ro?'':'If yours is still needed, explain how it is different — the reviewers will see this.'}</div>
+    <div class="field"><label for="f_simnote">How this differs from ${esc(depts.join(' / '))}'s proposal${ro?'':' (required to save)'}</label><textarea class="inp" id="f_simnote" rows="3" placeholder="e.g. Ours is a 3-ton forklift for the press line; Warehouse's is for loading bay — different capacity and location. Talked to Warehouse on Oct 8." ${ro?'disabled':''}>${esc(l.similar_note||'')}</textarea></div>`;
+}
 async function saveLine(kind, id){
   const isO = kind==='opex', v = x => { const e=$('#'+x); return e ? (e.value.trim()===''?null:e.value.trim()) : null; };
   const row = { budget_id:S.budgetId, ...readMonths(), remarks:v('f_remarks'), priority:v('f_priority'), description:v('f_description') };
@@ -1057,6 +1074,12 @@ async function saveLine(kind, id){
       calc: (v('c_qty')||v('c_rate')||v('c_times')||v('c_unit')) ? { qty:Number(v('c_qty'))||null, unit:v('c_unit'), rate:Number(v('c_rate'))||null, times:Number(v('c_times'))||null } : null });
   else Object.assign(row, { category:v('f_category'), asset:v('f_asset'), justification:v('f_justification'), qty:v('f_qty')==null?null:Number(v('f_qty')), unit_cost:v('f_unit_cost')==null?null:Number(v('f_unit_cost')) });
   if (isO ? !(row.activity||row.line_item) : !(row.asset||row.category)) { toast(isO?'Add at least a line item or activity name.':'Add at least a category or asset name.', true); return; }
+  if (!isO) {
+    if (!S._sim || S._sim.asset !== (row.asset||'')) await cxSimilar();
+    const m = S._sim?.rows || [], note = v('f_simnote');
+    if (m.length && !note) { toast(`A similar project is proposed by ${m[0].department}. Align with them first, or explain how yours is different.`, true); $('#f_simnote')?.focus(); return; }
+    Object.assign(row, m.length ? { similar_to:m[0].line_id, similar_dept:m[0].department, similar_note:note } : { similar_to:null, similar_dept:null, similar_note:null });
+  }
   const table = isO ? 'bgt_opex_lines' : 'bgt_capex_lines', list = isO ? S.opex : S.capex;
   let res;
   if (id) res = await sb.from(table).update(row).eq('id', id).select().single();
@@ -1187,10 +1210,26 @@ async function renderOverview(){
           </div><div class="ply-lbl" style="gap:4px">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:4px"></span>OPEX <span style="display:inline-block;width:10px;height:10px;background:var(--kraft);margin:0 4px 0 12px"></span>CAPEX</div></div>`}</div>
     </div>
+    <div id="ovDup"></div>
     <div class="card" style="margin-top:16px"><h3>Top OPEX line items</h3><div class="bars">${topItems(o).map(([k,v])=>`<div class="bar" style="grid-template-columns:minmax(160px,320px) 1fr 120px"><span style="font-size:12px">${esc(k)}</span><div class="track2"><i style="width:${100*v/(topItems(o)[0]?.[1]||1)}%;background:var(--teal)"></i></div><span class="num" style="text-align:right">${short(v)}</span></div>`).join('') || '<div class="empty">No OPEX lines yet.</div>'}</div></div>`;
     if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
     ovDeprCard(T.opex).then(h=>{ const e=$('#ovDepr'); if (e) e.innerHTML = h; });
+    { const e = $('#ovDup'); if (e) e.innerHTML = ovDupCard(c); }
   } catch(e){ fail(e); }
+}
+/* same CAPEX proposed by two departments — word match mirrors bgt_cx_words in the database */
+const CX_STOP = new Set('new the and for with from replacement replace upgrade upgrading installation install purchase acquisition unit units set sets plant area system project proposed additional improvement repair pcs one two three per use used warehouse admin office sales production building board boards lamination machine machines construction renovation fabrication back size each equipment press quarter work included small large conversion body'.split(' '));
+const cxWords = t => [...new Set(String(t||'').toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length>=3 && !/^[0-9]/.test(x) && !CX_STOP.has(x)).map(x=>x.length>4 && x.endsWith('s') && !x.endsWith('ss') ? x.slice(0,-1) : x))];
+function ovDupCard(c){
+  const dOf = l => budgetById(l.budget_id)?.department_id, W = c.map(l=>({ l, d:dOf(l), w:cxWords(l.asset) })).filter(x=>x.w.length), pairs = [];
+  for (let i=0;i<W.length;i++) for (let j=i+1;j<W.length;j++) { const a = W[i], b = W[j]; if (a.d===b.d) continue;
+    const n = a.w.filter(x=>b.w.includes(x)).length, sc = n / Math.max(1, Math.min(a.w.length, b.w.length)); if (sc>=0.3) pairs.push({ a, b, sc }); }
+  if (!pairs.length) return '';
+  pairs.sort((x,y)=>y.sc-x.sc);
+  const side = (x, o) => `<b>${esc(deptById(x.d)?.name||'')}</b>: ${esc(x.l.asset)} <span class="num">${short(annual(x.l))}</span>${x.l.similar_note?`<div class="hint" style="font-size:12px">Why different: ${esc(x.l.similar_note)}</div>`:''}`;
+  return `<div class="card" style="margin-top:16px;border-left:4px solid var(--amber)"><h3>Possible duplicate CAPEX across departments — ${pairs.length}</h3>
+    <p class="hint" style="padding:0 14px;margin:0 0 6px">Same or similar asset requested by two departments. Check whether one project can serve both before approving.</p>
+    <div class="tbl-wrap"><table class="ledger"><tbody>${pairs.slice(0,12).map(p=>`<tr><td style="font-size:13px;width:50%">${side(p.a)}</td><td style="font-size:13px">${side(p.b)}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function topItems(o){ const m={}; o.forEach(l=>{ const k=l.line_item||'(no line item)'; m[k]=(m[k]||0)+annual(l); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10); }
 async function exportPlant(){
@@ -1984,7 +2023,7 @@ async function renderTrend(Y, o){
       <div class="legend"><span><i class="lb"></i>Budget (full year)</span><span><i class="la"></i>Actual, full-year view (months so far × 12 ÷ months)</span></div>`;
     const R = (label, f, hint='') => `<tr><td class="act" style="font-size:13px">${label}${hint?`<div class="item" style="text-transform:none">${hint}</div>`:''}</td>${C.map(c=>`<td class="r num">${c.err?'error':f(c)}</td>`).join('')}</tr>`;
     const none = c => !c.hasAct && !c.hasBud;
-    const compTbl = `<div class="card" style="margin-top:14px"><h3>Plant OPEX budget compliance by year</h3>
+    const compTbl = `<div class="card" style="margin-top:14px"><h3>${OPX()} OPEX budget compliance by year</h3>
       <div style="padding:12px 14px 4px">${chart}</div>
       <div class="tbl-wrap"><table class="ledger trend" style="min-width:860px"><thead><tr><th>Measure</th>${C.map(c=>`<th class="r">${c.y}</th>`).join('')}</tr></thead><tbody>
       ${R('Months with actuals', c=>none(c)?'—':c.hasAct?thru(c.n):'none')}
@@ -2000,12 +2039,12 @@ async function renderTrend(Y, o){
       ${R('Lines tied to an outside driver', c=>c.hasBud&&c.hasAct?compChip(c.pctDrv):'—', 'fuel, power, wages, FX-linked')}
       ${R('All other lines', c=>c.hasBud&&c.hasAct?compChip(c.pctOther):'—')}
       ${R('CAPEX budget / actual', c=>c.capBud||c.capAct?`${c.capBud?short(c.capBud):'—'} / ${c.capAct?short(c.capAct):'—'}`:'—')}
-      ${R('Sales', c=>c.salesFY!=null?short(c.salesFY):'—', 'full year, or year to date')}
+      ${isReviewer()?R('Sales', c=>c.salesFY!=null?short(c.salesFY):'—', 'full year, or year to date'):''}
       ${R('Boards sold', c=>c.volFY!=null?Math.round(c.volFY).toLocaleString('en-PH'):'—', 'full year, or year to date')}
       ${R('Boards produced', c=>c.prodFY!=null?Math.round(c.prodFY).toLocaleString('en-PH'):'—', 'full year, or year to date')}
-      ${R('Plant OPEX per board produced', c=>c.opexPerProd!=null?peso(c.opexPerProd,2):'—', 'months with both figures')}
-      ${R('<b>Plant OPEX per board sold</b>', c=>c.opexPerBoard!=null?peso(c.opexPerBoard,2)+(c.pV.months<c.n?`<div class="item" style="text-transform:none">${c.pV.months} months</div>`:''):'—', 'months with both figures')}
-      ${R('Plant OPEX as % of sales', c=>c.opexPctSales!=null?c.opexPctSales.toFixed(1)+'%'+(c.pS.months<c.n?`<div class="item" style="text-transform:none">${c.pS.months===4?'Jan–Apr':c.pS.months+' months'}</div>`:''):'—', 'months with both figures')}
+      ${R(`${OPX()} OPEX per board produced`, c=>c.opexPerProd!=null?peso(c.opexPerProd,2):'—', 'months with both figures')}
+      ${R(`<b>${OPX()} OPEX per board sold</b>`, c=>c.opexPerBoard!=null?peso(c.opexPerBoard,2)+(c.pV.months<c.n?`<div class="item" style="text-transform:none">${c.pV.months} months</div>`:''):'—', 'months with both figures')}
+      ${!isReviewer()?'':R('Plant OPEX as % of sales', c=>c.opexPctSales!=null?c.opexPctSales.toFixed(1)+'%'+(c.pS.months<c.n?`<div class="item" style="text-transform:none">${c.pS.months===4?'Jan–Apr':c.pS.months+' months'}</div>`:''):'—', 'months with both figures')}
       ${R('Inflation that year', c=>{ const h = hv(H,'inflation',c.y); return h?.value!=null?Number(h.value).toFixed(1)+'%':'—'; })}
       ${R('Diesel that year', c=>{ const h = hv(H,'diesel',c.y); return h?.value!=null?'₱'+Number(h.value).toFixed(2):'—'; })}
       </tbody></table></div>
@@ -2046,10 +2085,10 @@ async function renderTrend(Y, o){
     const rd = Object.entries(recurUnder).filter(([,v])=>v.length>=2);
     if (rd.length) ins.push(`<div class="ins"><b>Budget left unused year after year</b><ul>${rd.slice(0,5).map(([k,v])=>`<li><b>${esc(k)}</b> — ${esc(v.join(' · '))}</li>`).join('')}</ul><small>Ask for evidence (plan, quotation) before carrying the same amount into ${Y}.</small></div>`);
     if (fy.length>=2) { const a = fy[0], b = fy[fy.length-1], g = 100*(b.fullYr-a.fullYr)/a.fullYr, inf = indChange(H,'inflation',a.y,b.y);
-      ins.push(`<div class="ins amber"><b>Plant OPEX ${a.y}→${b.y}: ${pctTxt(g)}</b> (full-year view ${short(a.fullYr)} → ${short(b.fullYr)}).${inf?` Over the same years ${esc(inf.txt)}, so about ${pctTxt(g-inf.pct)} came from more volume, scope or reclassification rather than price.`:''}</div>`); }
+      ins.push(`<div class="ins amber"><b>${OPX()} OPEX ${a.y}→${b.y}: ${pctTxt(g)}</b> (full-year view ${short(a.fullYr)} → ${short(b.fullYr)}).${inf?` Over the same years ${esc(inf.txt)}, so about ${pctTxt(g-inf.pct)} came from more volume, scope or reclassification rather than price.`:''}</div>`); }
     const pb = C.filter(c=>c.opexPerBoard!=null);
     if (pb.length>=2) { const a = pb[0], b = pb[pb.length-1], g = 100*(b.opexPerBoard-a.opexPerBoard)/a.opexPerBoard, vg = a.pV && b.pV ? 100*((b.pV.k/b.pV.months)-(a.pV.k/a.pV.months))/(a.pV.k/a.pV.months) : null;
-      ins.push(`<div class="ins ${g>15?'red':'amber'}"><b>Plant OPEX per board sold: ${peso(a.opexPerBoard,2)} (${a.y}) → ${peso(b.opexPerBoard,2)} (${b.y}), ${pctTxt(g)}</b>${vg!=null?` Boards sold per month ${pctTxt(vg)} over the same years — ${vg<0&&g>0?'fixed plant costs are spread over fewer boards':'cost is tracking volume'}.`:''}</div>`); }
+      ins.push(`<div class="ins ${g>15?'red':'amber'}"><b>${OPX()} OPEX per board sold: ${peso(a.opexPerBoard,2)} (${a.y}) → ${peso(b.opexPerBoard,2)} (${b.y}), ${pctTxt(g)}</b>${vg!=null?` Boards sold per month ${pctTxt(vg)} over the same years — ${vg<0&&g>0?'fixed plant costs are spread over fewer boards':'cost is tracking volume'}.`:''}</div>`); }
     const dvo = withBoth.filter(c=>c.pctDrv!=null && c.pctOther!=null);
     if (dvo.length) ins.push(`<div class="ins"><b>Driver-linked lines vs the rest</b><ul>${dvo.map(c=>`<li>${c.y}: driver-linked lines at ${Math.round(c.pctDrv)}% of budget, other lines at ${Math.round(c.pctOther)}%${hv(H,'inflation',c.y)?` (inflation ${Number(hv(H,'inflation',c.y).value).toFixed(1)}%)`:''}</li>`).join('')}</ul><small>When outside costs rise, these lines are the first to break the budget — size them from the outlook, not last year.</small></div>`);
     const fast = lineRows.filter(l=>/faster/.test(l.read)).slice(0,4);
@@ -2139,7 +2178,7 @@ async function renderPerf(){
   mainLoading('Loading performance…');
   try {
     if (!S.pf.year) S.pf.year = S.act.year || new Date().getFullYear();
-    const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData();
+    const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData(), rv = isReviewer();
     const D = await loadYearData(Y, null).catch(()=>null), M = D ? actModel(D,'budget') : null;
     const g = (m, mo) => { const r = K.find(x=>x.metric===m && x.month===mo); return r ? Number(r.value) : null; };
     const tot = m => { const a = g(m,0); if (a!=null) return a; const v = MONTHS.map((_,i)=>g(m,i+1)).filter(x=>x!=null); return v.length ? ((ALL_KPI().find(d=>d[0]===m)||[])[3]==='pct' ? sum(v)/v.length : sum(v)) : null; };
@@ -2165,21 +2204,21 @@ async function renderPerf(){
     <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pfYear">Year</label><select class="inp" id="pfYear" onchange="S.pf.year=Number(this.value);renderPerf()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       <span class="grow"></span><span class="hint">${ed?'Type values directly in the table, then Save. Use the Year column for annual targets.':'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
     <div class="stats">
-      <div class="stat"><div class="eyebrow">Sales ${sA?thru(sA.last):''}</div><div class="v">${sA?short(sA.sum):'—'}</div><div class="s">${sT?`Target same months ${short(sT)} · ${Math.round(100*sA.sum/sT)}% reached`:tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>
+      ${!rv?'':`<div class="stat"><div class="eyebrow">Sales ${sA?thru(sA.last):''}</div><div class="v">${sA?short(sA.sum):'—'}</div><div class="s">${sT?`Target same months ${short(sT)} · ${Math.round(100*sA.sum/sT)}% reached`:tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>`}
       <div class="stat"><div class="eyebrow">Boards sold ${vA?thru(vA.last):''}</div><div class="v">${vA?Math.round(vA.sum).toLocaleString('en-PH'):'—'}</div><div class="s">${vT?`Target same months ${Math.round(vT).toLocaleString('en-PH')} · ${Math.round(100*vA.sum/vT)}% reached`:sA&&vA?`Average ${peso(sA.sum/vA.sum)} per board`:''}${pA?` · produced ${Math.round(pA.sum).toLocaleString('en-PH')}`:''}</div></div>
-      <div class="stat opex"><div class="eyebrow">Plant OPEX per board ${perLbl}</div><div class="v">${pB?peso(pB.opex/pB.k,2):'—'}</div><div class="s">${pB?`${short(pB.opex)} OPEX ÷ ${Math.round(pB.k).toLocaleString('en-PH')} boards, ${thru(pB.last)}`:closed?'Needs boards sold or produced':`No ${Y} OPEX actuals loaded yet`}</div></div>
-      <div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':'—'}</div><div class="s">${pS?thru(pS.last):closed?'Needs sales actual':`No ${Y} OPEX actuals loaded yet`}</div></div>
+      <div class="stat opex"><div class="eyebrow">${OPX()} OPEX per board ${perLbl}</div><div class="v">${pB?peso(pB.opex/pB.k,2):'—'}</div><div class="s">${pB?`${short(pB.opex)} OPEX ÷ ${Math.round(pB.k).toLocaleString('en-PH')} boards, ${thru(pB.last)}`:closed?'Needs boards sold or produced':`No ${Y} OPEX actuals loaded yet`}</div></div>
+      ${!rv?'':`<div class="stat"><div class="eyebrow">Plant OPEX as % of sales</div><div class="v">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':'—'}</div><div class="s">${pS?thru(pS.last):closed?'Needs sales actual':`No ${Y} OPEX actuals loaded yet`}</div></div>`}
     </div>
     ${perfYieldStrip(Y, g, tot)}
     ${!closed && (sA||vA) ? `<div class="banner blue">Sales and volume for ${Y} are recorded. Plant OPEX per board and OPEX as % of sales need ${Y} expense actuals${canManageData()?' — upload them on the Actuals page':''}.</div>` : ''}
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
-      ${KPI_DEFS.map(kRow).join('')}
-      <tr class="calc"><td class="act">Plant OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
+      ${KPI_DEFS.filter(d=>rv||!d[0].startsWith('sales_')).map(kRow).join('')}
+      <tr class="calc"><td class="act">${OPX()} OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
       <tr class="calc"><td class="act">Trade share of boards sold<div class="item" style="text-transform:none">imported, or sold − produced</div></td>${MONTHS.map((_,i)=>{ const s0 = g('volume_sold',i+1), im = g('volume_imported',i+1) ?? (s0!=null && g('production_output',i+1)!=null ? Math.max(0, s0 - g('production_output',i+1)) : null); return `<td class="r num">${s0&&im!=null?(100*im/s0).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>g('volume_sold',m) && (g('volume_imported',m)!=null || g('production_output',m)!=null)); if (!ms.length) return ''; const so = sum(ms.map(m=>g('volume_sold',m))), im = sum(ms.map(m=>g('volume_imported',m) ?? Math.max(0, g('volume_sold',m) - g('production_output',m)))); return so?(100*im/so).toFixed(0)+'%':''; })()}</td></tr>
       ${pP && pV ? `<tr class="calc"><td class="act">OPEX per board sold<div class="item" style="text-transform:none">produced + traded — for warehouse and logistics</div></td>${opexM.map((v,i)=>{ const p = g('volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${peso(pV.opex/pV.k,2)}</td></tr>` : ''}
       <tr class="calc"><td class="act">Capacity utilization<div class="item" style="text-transform:none">output ÷ capacity</div></td>${MONTHS.map((_,i)=>{ const p = g('production_output',i+1) ?? g('volume_sold',i+1), c = g('capacity_boards',i+1) ?? (g('capacity_boards',0)!=null ? g('capacity_boards',0)/12 : null); return `<td class="r num">${p!=null&&c?(100*p/c).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>(g('production_output',m)??g('volume_sold',m))!=null && (g('capacity_boards',m)!=null || g('capacity_boards',0)!=null)); if (!ms.length) return ''; const p = sum(ms.map(m=>g('production_output',m)??g('volume_sold',m))), c = sum(ms.map(m=>g('capacity_boards',m) ?? g('capacity_boards',0)/12)); return c?(100*p/c).toFixed(0)+'%':''; })()}</td></tr>
-      <tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>
+      ${!rv?'':`<tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>`}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
     <div class="card" style="margin-top:16px"><h3>Yield, reject rate and OEE — year by year</h3>
@@ -3334,16 +3373,20 @@ function editExclRule(id){
    2) What-if — move volume, diesel, wages, freight, power, ICT, Outside Services and see plant OPEX and OPEX per board.
    3) Where the money goes — Pareto of expense lines and payees (net of costs kept out of plant OPEX). */
 S.an = { tab:'report', sel:null, wi:null };
-const AN_TABS = [['report','Analysis report'],['whatif','What-if scenarios'],['pareto','Where the money goes']];
+const AN_TABS = () => isReviewer() ? [['report','Plant analysis'],['dept','Department analysis'],['whatif','What-if scenarios'],['pareto','Where the money goes']] : [['dept','Department analysis'],['whatif','What-if scenarios'],['pareto','Where the money goes']];
+// whose OPEX the page shows: reviewers see the plant, managers only their own department
+const OPX = () => isReviewer() ? 'Plant' : (deptById(S.me?.department_id)?.name || 'Department');
+const anCanAns = rep => isReviewer() || (!!rep.department_id && rep.department_id === S.me.department_id && ['dept_manager','preparer'].includes(S.me.role));
 async function renderAnalysis(){
   mainLoading('Loading analysis…');
   try {
     const Y = S.cycle.year;
+    if (!isReviewer() && S.an.tab==='report') S.an.tab = 'dept';
     $('#main').innerHTML = `<div class="ph"><div><div class="eyebrow">Budget ${Y} · Pasig Plant</div><h1>Analysis and scenarios</h1>
-      <div class="sub">Different angles on the budget: a written analysis (SWOT, outside drivers, risks), what-if scenarios, and where the money goes.</div></div></div>
-      <div class="tabs" role="tablist" style="margin-bottom:12px">${AN_TABS.map(([k,l])=>`<button role="tab" class="${S.an.tab===k?'on':''}" onclick="S.an.tab='${k}';renderAnalysis()">${l}</button>`).join('')}</div>
+      <div class="sub">${isReviewer()?'Different angles on the budget: a written analysis of the plant and of each department, what-if scenarios, and where the money goes.':'Your department in detail, with a short view of the plant so you can relate your work to its direction; what-if scenarios and where the money goes.'}</div></div></div>
+      <div class="tabs" role="tablist" style="margin-bottom:12px">${AN_TABS().map(([k,l])=>`<button role="tab" class="${S.an.tab===k?'on':''}" onclick="S.an.tab='${k}';renderAnalysis()">${l}</button>`).join('')}</div>
       <div id="anBody"></div>`;
-    $('#anBody').innerHTML = S.an.tab==='report' ? await anReportView(Y) : S.an.tab==='whatif' ? await anWhatIf(Y) : await anPareto(Y);
+    $('#anBody').innerHTML = S.an.tab==='report' ? await anReportView(Y) : S.an.tab==='dept' ? await anDeptView(Y) : S.an.tab==='whatif' ? await anWhatIf(Y) : await anPareto(Y);
     if (S.an.tab==='whatif') anCalc();
   } catch(e){ fail(e); }
 }
@@ -3365,14 +3408,16 @@ function anRender(rep){
   const lvl = v => `<span class="chip ${v==='high'?'pri-crit':v==='medium'?'pri-med':'pri-ok'}">${esc(v||'')}</span>`;
   return `<div class="card"><div style="padding:14px"><div class="eyebrow">Written ${new Date(rep.created_at).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'})} by the assistant${rep.model?' ('+esc(rep.model)+')':''} from the data in the app — check the numbers before sharing.</div><p style="font-size:16px;margin:8px 0 0">${esc(r.headline||'')}</p>
       ${(r.key_numbers||[]).length?`<div class="kn" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">${r.key_numbers.map(k=>`<div class="stat" style="margin:0"><div class="eyebrow">${esc(k.label)}</div><div class="v" style="font-size:18px">${esc(k.value)}</div>${k.note?`<div class="s">${esc(k.note)}</div>`:''}</div>`).join('')}</div>`:''}</div></div>
-    <h3 class="sec">SWOT</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px">${box('Strengths',sw.strengths,'#2f7d4a')}${box('Weaknesses',sw.weaknesses,'#b42318')}${box('Opportunities',sw.opportunities,'#2563eb')}${box('Threats',sw.threats,'#b7791f')}</div>
-    <div class="card" style="margin-top:16px"><h3>Outside drivers</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Latest</th><th>Effect on the plant budget</th><th>Assumed change</th></tr></thead><tbody>${(r.environment||[]).map(e=>`<tr><td class="act">${esc(e.factor)}</td><td style="font-size:12.5px">${esc(e.latest)}</td><td style="font-size:12.5px">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.assumed_change||'')}</td></tr>`).join('')}</tbody></table></div></div>
-    <div class="card" style="margin-top:16px"><h3>Sensitivities</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Change tested</th><th>Effect per year</th><th>Basis</th></tr></thead><tbody>${(r.sensitivities||[]).map(e=>`<tr><td class="act">${esc(e.driver)}</td><td>${esc(e.change)}</td><td class="num">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.basis)}</td></tr>`).join('')}</tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Try your own numbers in <a onclick="S.an.tab='whatif';renderAnalysis()">What-if scenarios</a>.</p></div>
-    <div class="card" style="margin-top:16px"><h3>Risks</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Response</th></tr></thead><tbody>${(r.risks||[]).map(e=>`<tr><td>${esc(e.risk)}</td><td>${lvl(e.likelihood)}</td><td>${lvl(e.impact)}</td><td style="font-size:12.5px">${esc(e.response)}</td></tr>`).join('')}</tbody></table></div></div>
+    ${(r.plant_context||[]).length?`<div class="card" style="margin-top:16px;border-left:4px solid var(--teal)"><h3>The plant's direction</h3><ul style="margin:0;padding:6px 14px 12px 32px">${li(r.plant_context)}</ul></div>`:''}
+    <h3 class="sec">${rep.department_id?'SWOT — '+esc(deptById(rep.department_id)?.name||'department'):'SWOT'}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px">${box('Strengths',sw.strengths,'#2f7d4a')}${box('Weaknesses',sw.weaknesses,'#b42318')}${box('Opportunities',sw.opportunities,'#2563eb')}${box('Threats',sw.threats,'#b7791f')}</div>
+    ${(r.cost_drivers||[]).length?`<div class="card" style="margin-top:16px"><h3>Cost drivers</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Expense line</th><th>Trend</th><th>What moves it</th><th>Action</th></tr></thead><tbody>${r.cost_drivers.map(e=>`<tr><td class="act">${esc(e.line)}</td><td style="font-size:12.5px">${esc(e.trend)}</td><td style="font-size:12.5px">${esc(e.driver)}</td><td style="font-size:12.5px">${esc(e.action||'')}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+    ${(r.environment||[]).length?`<div class="card" style="margin-top:16px"><h3>Outside drivers</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Latest</th><th>Effect on the plant budget</th><th>Assumed change</th></tr></thead><tbody>${(r.environment||[]).map(e=>`<tr><td class="act">${esc(e.factor)}</td><td style="font-size:12.5px">${esc(e.latest)}</td><td style="font-size:12.5px">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.assumed_change||'')}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+    ${(r.sensitivities||[]).length?`<div class="card" style="margin-top:16px"><h3>Sensitivities</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Change tested</th><th>Effect per year</th><th>Basis</th></tr></thead><tbody>${(r.sensitivities||[]).map(e=>`<tr><td class="act">${esc(e.driver)}</td><td>${esc(e.change)}</td><td class="num">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.basis)}</td></tr>`).join('')}</tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Try your own numbers in <a onclick="S.an.tab='whatif';renderAnalysis()">What-if scenarios</a>.</p></div>`:''}
+    ${(r.risks||[]).length?`<div class="card" style="margin-top:16px"><h3>Risks</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Response</th></tr></thead><tbody>${(r.risks||[]).map(e=>`<tr><td>${esc(e.risk)}</td><td>${lvl(e.likelihood)}</td><td>${lvl(e.impact)}</td><td style="font-size:12.5px">${esc(e.response)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
     <div class="card" style="margin-top:16px"><h3>Recommendations</h3><ol style="margin:0;padding:10px 14px 14px 34px">${(r.recommendations||[]).map(x=>`<li style="margin:4px 0">${esc(x)}</li>`).join('')}</ol>
       ${(r.open_questions||[]).length?`<h3 style="margin-top:4px">Open questions</h3><p class="hint" style="padding:0 14px;margin:6px 0">Answer them here — the assistant reads your answers in every report, draft and review from now on.</p><ol style="margin:0;padding:6px 14px 14px 34px">${r.open_questions.map((x,i)=>{ const a = (S.an.ans||[]).find(z=>z.source_id===rep.id && z.q_index===i);
-        return `<li style="margin:0 0 12px"><div>${esc(x)}</div>${a?`<div class="ins blue" style="margin:6px 0 0"><b>Answer</b> <span class="hint">· ${esc(S.users?.find?.(u=>u.id===a.answered_by)?.full_name||'')} ${fmtDate(a.answered_at)}</span><br>${esc(a.answer)}${isReviewer()?` <a style="cursor:pointer;color:var(--teal);font-size:12.5px" onclick="anAnswer('${rep.id}',${i})">Edit</a>`:''}</div>`:isReviewer()?`<button class="btn ghost" style="margin-top:4px" onclick="anAnswer('${rep.id}',${i})">Answer</button>`:''}</li>`; }).join('')}</ol>`:''}</div>
-    ${canManageData()?`<p style="text-align:right;margin-top:10px"><a onclick="anDelete('${rep.id}')" style="color:var(--red)">Delete this report</a></p>`:''}`;
+        return `<li style="margin:0 0 12px"><div>${esc(x)}</div>${a?`<div class="ins blue" style="margin:6px 0 0"><b>Answer</b> <span class="hint">· ${esc(S.users?.find?.(u=>u.id===a.answered_by)?.full_name||'')} ${fmtDate(a.answered_at)}</span><br>${esc(a.answer)}${anCanAns(rep)?` <a style="cursor:pointer;color:var(--teal);font-size:12.5px" onclick="anAnswer('${rep.id}',${i})">Edit</a>`:''}</div>`:anCanAns(rep)?`<button class="btn ghost" style="margin-top:4px" onclick="anAnswer('${rep.id}',${i})">Answer</button>`:''}</li>`; }).join('')}</ol>`:''}</div>
+    ${canManageData()||(rep.department_id&&anCanAns(rep))?`<p style="text-align:right;margin-top:10px"><a onclick="anDelete('${rep.id}')" style="color:var(--red)">Delete this report</a></p>`:''}`;
 }
 function anGenerate(){
   modal(`<h3>Write a new analysis — ${S.cycle.year}</h3><p>The assistant uses everything in the app. Add a focus if you want one (optional).</p>
@@ -3396,14 +3441,47 @@ async function anDownload(id){
   const tbl = (h, rows) => `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-size:10pt"><tr>${h.map(x=>`<th style="background:#1f3a2e;color:#fff;text-align:left">${x}</th>`).join('')}</tr>${rows.map(rw=>`<tr>${rw.map(c=>`<td valign="top">${c}</td>`).join('')}</tr>`).join('')}</table>`;
   const ul = a => `<ul>${(a||[]).map(x=>`<li><b>${e(x.point)}</b> — ${e(x.evidence||'')}</li>`).join('')}</ul>`;
   const html = `<html><head><meta charset="utf-8"><style>body{font-family:Arial;font-size:11pt}h1{font-size:18pt}h2{font-size:13pt;color:#1f3a2e;margin-top:16pt}</style></head><body>
-    <h1>${e(S.company.name||'WCLI')} — Budget ${rep.year} analysis</h1><p><i>Written ${new Date(rep.created_at).toLocaleDateString('en-PH',{dateStyle:'long'})} by the budget assistant from the data in the budget app${rep.focus?'. Focus: '+e(rep.focus):''}.</i></p>
+    <h1>${e(S.company.name||'WCLI')} — ${rep.department_id?e(deptById(rep.department_id)?.name||'Department')+' — ':''}Budget ${rep.year} analysis</h1><p><i>Written ${new Date(rep.created_at).toLocaleDateString('en-PH',{dateStyle:'long'})} by the budget assistant from the data in the budget app${rep.focus?'. Focus: '+e(rep.focus):''}.</i></p>
     <p><b>${e(r.headline||'')}</b></p>${(r.key_numbers||[]).length?tbl(['Measure','Value','Note'], r.key_numbers.map(k=>[e(k.label),e(k.value),e(k.note||'')])):''}
+    ${(r.plant_context||[]).length?`<h2>The plant's direction</h2>${ul(r.plant_context)}`:''}
     <h2>SWOT</h2>${tbl(['Strengths','Weaknesses'],[[ul(sw.strengths),ul(sw.weaknesses)]])}<br>${tbl(['Opportunities','Threats'],[[ul(sw.opportunities),ul(sw.threats)]])}
-    <h2>Outside drivers</h2>${tbl(['Driver','Latest','Effect on the plant budget','Assumed change'],(r.environment||[]).map(x=>[e(x.factor),e(x.latest),e(x.effect),e(x.assumed_change||'')]))}
-    <h2>Sensitivities</h2>${tbl(['Driver','Change','Effect per year','Basis'],(r.sensitivities||[]).map(x=>[e(x.driver),e(x.change),e(x.effect),e(x.basis)]))}
+    ${(r.cost_drivers||[]).length?`<h2>Cost drivers</h2>${tbl(['Expense line','Trend','What moves it','Action'],r.cost_drivers.map(x=>[e(x.line),e(x.trend),e(x.driver),e(x.action||'')]))}`:''}
+    ${(r.environment||[]).length?`<h2>Outside drivers</h2>${tbl(['Driver','Latest','Effect on the plant budget','Assumed change'],r.environment.map(x=>[e(x.factor),e(x.latest),e(x.effect),e(x.assumed_change||'')]))}`:''}
+    ${(r.sensitivities||[]).length?`<h2>Sensitivities</h2>${tbl(['Driver','Change','Effect per year','Basis'],r.sensitivities.map(x=>[e(x.driver),e(x.change),e(x.effect),e(x.basis)]))}`:''}
     <h2>Risks</h2>${tbl(['Risk','Likelihood','Impact','Response'],(r.risks||[]).map(x=>[e(x.risk),e(x.likelihood),e(x.impact),e(x.response)]))}
     <h2>Recommendations</h2><ol>${(r.recommendations||[]).map(x=>`<li>${e(x)}</li>`).join('')}</ol>${(r.open_questions||[]).length?`<h2>Open questions</h2><ul>${r.open_questions.map((x,qi)=>`<li>${e(x)}${(()=>{ const a=(S.an.ans||[]).find(z=>z.source_id===rep.id && z.q_index===qi); return a?`<br><i>Answer: ${e(a.answer)}</i>`:''; })()}</li>`).join('')}</ul>`:''}</body></html>`;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+html], { type:'application/msword' })); a.download = `${rep.year} Budget analysis - ${S.company.code}.doc`; a.click(); toast('Downloaded');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+html], { type:'application/msword' })); a.download = `${rep.year} ${rep.department_id?(deptById(rep.department_id)?.name||'Department')+' ':''}analysis - ${S.company.code}.doc`; a.click(); toast('Downloaded');
+}
+/* ---------- 1b. department analysis (department in detail + a light plant view) ---------- */
+async function anDeptView(Y){
+  if (!isReviewer()) S.an.dept = S.me.department_id;
+  else if (!S.an.dept) S.an.dept = S.depts[0]?.id;
+  const dept = S.an.dept;
+  if (!dept) return `<div class="card"><div class="empty"><b>No department on your account</b>Ask the Head of Plant Operations to set your department.</div></div>`;
+  { const { data } = await sb.from('bgt_answers').select('*').eq('source','analysis_report'); S.an.ans = data||[]; }
+  const { data:reps, error } = await sb.from('bgt_reports').select('id,year,title,focus,model,created_by,created_at,content,department_id').eq('year', Y).eq('kind','dept_analysis').eq('department_id', dept).order('created_at', { ascending:false }); if (error) throw error;
+  const sel = (reps||[]).find(r=>r.id===S.an.sel) || (reps||[])[0];
+  const can = isReviewer() || (dept===S.me.department_id && ['dept_manager','preparer'].includes(S.me.role)), dn = deptById(dept)?.name || 'Department';
+  return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
+      ${isReviewer()?`<div class="field" style="margin:0"><label for="anDept">Department</label><select class="inp" id="anDept" onchange="S.an.dept=this.value;S.an.sel=null;renderAnalysis()">${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+      <div class="field" style="margin:0;min-width:240px"><label for="anSel">Saved reports — ${esc(dn)}</label><select class="inp" id="anSel" onchange="S.an.sel=this.value;renderAnalysis()">${(reps||[]).map(r=>`<option value="${r.id}" ${sel&&r.id===sel.id?'selected':''}>${new Date(r.created_at).toLocaleString('en-PH',{dateStyle:'medium',timeStyle:'short'})}${r.focus?' — '+esc(r.focus.slice(0,40)):''}</option>`).join('')||'<option>None yet</option>'}</select></div>
+      <span class="grow"></span>${sel?`<button class="btn ghost" onclick="anDownload('${sel.id}')">Download (Word)</button>`:''}${can?`<button class="btn primary" onclick="anDeptGenerate()">Write a new analysis</button>`:''}</div>
+    ${sel ? anRender(sel) : `<div class="card"><div class="empty"><b>No ${esc(dn)} analysis for ${Y} yet</b>${can?`Click <b>Write a new analysis</b>. The assistant reads ${esc(dn)}'s budgets, Accounting actuals, stores withdrawals, purchase records and gap remarks, plus the plant's volume, capacity, yield, Class B and OEE, then writes where the department stands, its cost drivers, risks and actions. Takes about a minute.`:''}</div></div>`}`;
+}
+function anDeptGenerate(){
+  const dn = deptById(S.an.dept)?.name || 'Department';
+  modal(`<h3>Write a ${esc(dn)} analysis — ${S.cycle.year}</h3><p>The assistant looks at the department in detail and the plant's direction (volume, capacity, quality). Add a focus if you want one (optional).</p>
+    <div class="field"><label for="anFocus">Focus</label><textarea class="inp" id="anFocus" rows="3" placeholder="e.g. Spare parts spending; how to bring repairs back within budget; what to prioritise if the plant runs a third shift"></textarea></div>
+    <div id="anBusy"></div><div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="anGo">Write it</button></div>`);
+  $('#anGo').onclick = async () => {
+    const focus = $('#anFocus').value.trim(); $('#anGo').disabled = true; $('#anBusy').innerHTML = AI_BUSY('Reading the department\'s data and writing the analysis… about a minute.');
+    try {
+      const out = await aiFull({ mode:'dept_analysis', cycle_id:S.cycle.id, department_id:S.an.dept, text:focus });
+      const ins = await sb.from('bgt_reports').insert({ company_id:S.company.id, year:S.cycle.year, kind:'dept_analysis', department_id:S.an.dept, title:`${dn} — budget ${S.cycle.year} analysis`, focus:focus||null, content:out.result, model:out.model||null, created_by:S.me.id }).select('id').single();
+      if (ins.error) throw ins.error;
+      S.an.sel = ins.data.id; closeModal(); toast('Analysis saved'); renderAnalysis();
+    } catch(e){ $('#anGo').disabled = false; $('#anBusy').innerHTML = ''; fail(e); }
+  };
 }
 /* ---------- 2. what-if scenarios ---------- */
 // how each expense line responds: share that moves with volume, and the price driver it follows
@@ -3423,7 +3501,7 @@ async function anWhatIf(Y){
   const lines = M.rows.filter(r=>r.projFY>0).map(r=>({ item:r.item, base:r.projFY }));
   S.an.wi = { Y, B, lines, boards, closed:M.closed, excl:sum((D.excl||[]).map(a=>Number(a.amount)||0)), v:{ ...(S.an.wi?.v || WI_PRESETS['Outlook']) } };
   const v = S.an.wi.v;
-  return `<div class="banner blue">Base = ${B} plant OPEX full-year view (${M.closed} months actual + projection), net of costs kept out of plant OPEX${S.an.wi.excl?` (${short(S.an.wi.excl)} kept out)`:''}. Boards produced ${B}: ${boards?Math.round(boards).toLocaleString('en-PH')+' (annualised)':'not entered'}. Move the drivers to see ${Y}.</div>
+  return `<div class="banner blue">Base = ${B} ${OPX()} OPEX full-year view (${M.closed} months actual + projection), net of costs kept out of plant OPEX${S.an.wi.excl?` (${short(S.an.wi.excl)} kept out)`:''}. Boards produced ${B}: ${boards?Math.round(boards).toLocaleString('en-PH')+' (annualised)':'not entered'}. Move the drivers to see ${Y}.</div>
     <style>@media(max-width:820px){.wi-grid{grid-template-columns:1fr!important}}</style><div style="display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:16px;align-items:start" class="wi-grid">
       <div class="card" style="margin:0"><h3>Drivers</h3><div style="padding:6px 14px 14px">
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${Object.keys(WI_PRESETS).map(p=>`<button class="btn ghost sm" onclick="anPreset('${p}')">${esc(p)}</button>`).join('')}</div>
@@ -3440,7 +3518,7 @@ function anCalc(){
   const tb = sum(rows.map(r=>r.base)), ts = sum(rows.map(r=>r.s)), bo = W.boards, bs = bo ? bo*(1+v.vol/100) : null;
   const drvName = { diesel:'diesel', wage:'wages', truck:'trucking', freight:'freight', power:'electricity', ict:'ICT', fx:'imported parts', outside:'Outside Services', infl:'inflation' };
   el.innerHTML = `<div class="stats" style="margin-bottom:12px">
-      <div class="stat opex"><div class="eyebrow">Plant OPEX ${W.Y} (scenario)</div><div class="v">${short(ts)}</div><div class="s">${ts>=tb?'+':''}${short(ts-tb)} (${tb?((ts/tb-1)*100).toFixed(1):0}%) vs ${W.B}</div></div>
+      <div class="stat opex"><div class="eyebrow">${OPX()} OPEX ${W.Y} (scenario)</div><div class="v">${short(ts)}</div><div class="s">${ts>=tb?'+':''}${short(ts-tb)} (${tb?((ts/tb-1)*100).toFixed(1):0}%) vs ${W.B}</div></div>
       <div class="stat"><div class="eyebrow">${W.B} base</div><div class="v">${short(tb)}</div><div class="s">full-year view</div></div>
       <div class="stat"><div class="eyebrow">OPEX per board produced</div><div class="v">${bs?peso(ts/bs):'—'}</div><div class="s">${bo?`${W.B}: ${peso(tb/bo)} · ${Math.round(bs).toLocaleString('en-PH')} boards`:'Enter production in Sales and plant performance'}</div></div>
     </div>
@@ -3461,7 +3539,7 @@ async function anPareto(Y){
   const ex = sum((D.excl||[]).map(a=>Number(a.amount)||0));
   return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pyY">Year</label><select class="inp" id="pyY" onchange="S.an.py=Number(this.value);renderAnalysis()">${yrs.map(y=>`<option ${y===B?'selected':''}>${y}</option>`).join('')}</select></div><span class="grow"></span><span class="hint">Accounting actuals ${mx?thru(mx):''}, net of costs kept out of plant OPEX${ex?` (${short(ex)})`:''}.</span></div>
     ${!op.length?`<div class="card"><div class="empty"><b>No actuals for ${B}</b></div></div>`:`
-    <div class="stats"><div class="stat opex"><div class="eyebrow">Plant OPEX ${B} ${thru(mx)}</div><div class="v">${short(t)}</div></div>
+    <div class="stats"><div class="stat opex"><div class="eyebrow">${OPX()} OPEX ${B} ${thru(mx)}</div><div class="v">${short(t)}</div></div>
       <div class="stat"><div class="eyebrow">Lines making 80%</div><div class="v">${n80(lines)} of ${lines.length}</div><div class="s">Budget review time goes here first</div></div>
       <div class="stat"><div class="eyebrow">Payees making 80%</div><div class="v">${n80(pay)} of ${pay.length}</div><div class="s">Where negotiation pays off</div></div>
       <div class="stat"><div class="eyebrow">Largest payee</div><div class="v" style="font-size:15px;line-height:1.35">${esc(pay[0]?.[0]||'—')}</div><div class="s">${pay[0]?short(pay[0][1])+' · '+(100*pay[0][1]/t).toFixed(0)+'%':''}</div></div></div>
@@ -3471,7 +3549,7 @@ async function anPareto(Y){
 
 function anAnswer(repId, i){
   const sel = $('#anSel'); 
-  sb.from('bgt_reports').select('year,content').eq('id', repId).single().then(({ data:rep, error }) => {
+  sb.from('bgt_reports').select('year,content,department_id').eq('id', repId).single().then(({ data:rep, error }) => {
     if (error) return fail(error);
     const q = (rep.content?.open_questions||[])[i], a = (S.an.ans||[]).find(z=>z.source_id===repId && z.q_index===i);
     modal(`<h3>Answer</h3><p style="margin-top:0">${esc(q||'')}</p>
@@ -3480,7 +3558,7 @@ function anAnswer(repId, i){
       <div class="actions" style="justify-content:space-between;margin-top:12px"><span>${a?`<button class="btn ghost" onclick="anAnswerDel('${a.id}')">Remove answer</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="anAGo">Save</button></span></div>`);
     $('#anAGo').onclick = async () => {
       const t = $('#anA').value.trim(); if (!t) { toast('Write an answer first.', true); return; }
-      const row = { company_id:S.company.id, year:rep.year, source:'analysis_report', source_id:repId, q_index:i, question:q, answer:t, use_for_ai:$('#anAI').checked, answered_by:S.me.id, answered_at:new Date().toISOString() };
+      const row = { company_id:S.company.id, year:rep.year, source:'analysis_report', source_id:repId, department_id:rep.department_id||null, q_index:i, question:q, answer:t, use_for_ai:$('#anAI').checked, answered_by:S.me.id, answered_at:new Date().toISOString() };
       const r = await sb.from('bgt_answers').upsert(row, { onConflict:'source_id,q_index' }); if (r.error) return fail(r.error);
       closeModal(); toast('Answer saved'); renderAnalysis();
     };

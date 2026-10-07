@@ -555,7 +555,15 @@ function priPill(p){ return p ? `<span class="pri ${PRI_CLASS[p]||'pri-med'}">${
 function opts(list, cur, blank='Select…'){ return `<option value="">${blank}</option>` + list.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('') + (cur && !list.includes(cur) ? `<option selected>${esc(cur)}</option>` : ''); }
 function b64ToBuf(b64){ const s=atob(b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u.buffer; }
 function download(buf, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); }
-async function fetchAll(q){ const out=[]; for(let from=0;;from+=1000){ const {data,error}=await q().range(from,from+999); if(error) throw error; out.push(...data); if(data.length<1000) break; } return out; }
+async function fetchAll(q){
+  // first page, then the rest four pages at a time (large tables load in a fraction of the time)
+  const first = await q().range(0, 999); if (first.error) throw first.error; const out = [...first.data]; if (first.data.length < 1000) return out;
+  for (let from = 1000;; from += 4000) {
+    const pages = await Promise.all([0,1,2,3].map(i => q().range(from + i*1000, from + i*1000 + 999)));
+    let done = false; for (const p of pages) { if (p.error) throw p.error; out.push(...p.data); if (p.data.length < 1000) { done = true; break; } }
+    if (done) return out;
+  }
+}
 
 /* ================= AUTH ================= */
 const IS_FILE = location.protocol === 'file:';
@@ -2847,8 +2855,8 @@ async function renderRecords(){
       <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
-    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="S.rc.kind='${k}';renderRecords()">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
-    ${S.rc.kind==='issue' ? await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}`;
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    <div id="rcBody">${S.rc.kind==='issue' ? await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}</div>`;
   } catch(e){ fail(e); }
 }
 async function poView(Y, dept, po, list, poMonths, ed){
@@ -3257,6 +3265,13 @@ async function saveEquipAssign(){
   const v = { ...(await loadEquipAssign()) }; document.querySelectorAll('select.ea').forEach(s => { if (s.value) v[s.dataset.u] = s.value; else delete v[s.dataset.u]; });
   const r = await sb.from('bgt_settings').upsert({ key:'equipment_assignment', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
   S.rc.ea = v; toast('Saved'); renderRecords();
+}
+
+function rcTab(k, btn){
+  S.rc.kind = k;
+  document.querySelectorAll('.tabs button[role=tab]').forEach(b => b.classList.toggle('on', b===btn));
+  const body = $('#rcBody'); if (body) body.innerHTML = '<div class="loading">Loading…</div>';
+  renderRecords();
 }
 
 /* ================= COSTS KEPT OUT OF PLANT OPEX (value-added resale, pass-through) =================

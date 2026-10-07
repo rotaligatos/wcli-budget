@@ -1,5 +1,5 @@
 // bgt-ai — Budget assistant for the WCLI budget app.
-// Modes: draft_line, draft_budget, review_budget, review_plant, price_lookup.
+// Modes: draft_line, draft_budget, review_budget, review_plant, analysis_report, price_lookup.
 // Data is read with the caller's own permissions (RLS). Nothing is written to budgets here —
 // the app shows suggestions and the user decides. Every call is logged to bgt_ai_log.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -96,7 +96,8 @@ const RULES = `Finance budgeting rules:
 - CAPEX = unit cost at or above the CAPEX threshold AND useful life over one year; otherwise OPEX.
 - Spread amounts to the months they will actually be incurred or paid — not all in January.
 - Priority: Critical / Mandatory (stops operations or compliance/safety), High, Medium (can be deferred), Low / Discretionary.
-- Fuel, lubricants and other consumables are always OPEX and recurring (boilers, trucks, forklifts) — never CAPEX and never a one-off. Boiler diesel is issued in bulk, so judge it over a year or several months, as pesos or liters per board produced.`;
+- Fuel, lubricants and other consumables are always OPEX and recurring (boilers, trucks, forklifts) — never CAPEX and never a one-off. Boiler diesel is issued in bulk, so judge it over a year or several months, as pesos or liters per board produced.
+- Accounting (Odoo) is the official record. Budget each cost under the line item where Accounting books it. GAP REMARKS from managers explain past differences between budget and Accounting (wrong line, other department, timing, unplanned, one-off) — use them so the new budget closes those gaps: move amounts to Accounting's line, budget recurring unplanned costs, drop one-offs.`;
 
 async function plantRecordsText(db: SupabaseClient, deptId: string, year: number) {
   const rows: any[] = [];
@@ -178,13 +179,26 @@ async function plantOpexPerBoard(db: SupabaseClient, year: number) {
   return out.join('\n') || '(not enough data)';
 }
 
+/* gap remarks: why budget and Accounting differ, written by managers. Accounting is the official record. */
+const GAP_CAUSE: Record<string, string> = { acct_other_line:'Accounting booked it under another line', budget_other_line:'budgeted under another line', other_dept:'charged to / budgeted by another department', timing:'timing (different month or year)', unplanned:'not planned (new or unexpected need)', deferred:'cancelled, deferred or not needed', one_off:'one-time item', price_volume:'price or volume different from plan', other:'other' };
+const GAP_ACT: Record<string, string> = { align:'next budget should follow Accounting\'s line', fix_coding:'Accounting to correct the coding', adjust:'adjust the amount next budget', none:'no change needed' };
+async function gapText(db: SupabaseClient, deptId: string | null, Y: number) {
+  let q = db.from('bgt_gap_remarks').select('year,department_id,line_item,gap_type,cause,related_line,action,remark,budget_amt,actual_amt,months_closed').gte('year', Y - 3).lte('year', Y - 1);
+  if (deptId) q = q.or(`department_id.eq.${deptId},department_id.is.null`);
+  const { data } = await q.order('year', { ascending:false });
+  if (!data?.length) return '(none)';
+  const { data:ds } = await db.from('bgt_departments').select('id,name');
+  const nm = (id: string) => (ds || []).find((d: any) => d.id === id)?.name || 'Whole plant';
+  return data.map((g: any) => `- ${g.year} ${deptId ? '' : nm(g.department_id) + ' '}${g.line_item}${g.gap_type ? ` [${g.gap_type.replace('_', ' ')}${g.budget_amt != null ? `: budget ${peso(Number(g.budget_amt))} vs Accounting ${peso(Number(g.actual_amt))}${g.months_closed ? ` Jan–${M[g.months_closed - 1]}` : ''}` : ''}]` : ''} — ${GAP_CAUSE[g.cause] || g.cause}${g.related_line ? ` (other line: ${g.related_line})` : ''}: ${g.remark}${g.action ? ` → ${GAP_ACT[g.action] || g.action}` : ''}`).join('\n');
+}
+
 /* ---------- modes ---------- */
 async function draftLine(db: SupabaseClient, key: string, p: any) {
   const { data:b, error } = await db.from('bgt_dept_budgets').select('id,department_id,cycle_id').eq('id', p.budget_id).single();
   if (error || !b) throw new Error('Budget not found or not allowed');
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year, L = await master(db), o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y);
-  const [pr, kp, sto] = await Promise.all([prices(db, b.department_id), kpiText(db, Y), storesText(db, b.department_id, Y)]);
+  const [pr, kp, sto, gap] = await Promise.all([prices(db, b.department_id), kpiText(db, Y), storesText(db, b.department_id, Y), gapText(db, b.department_id, Y)]);
   const { data:cur } = await db.from(p.kind === 'capex' ? 'bgt_capex_lines' : 'bgt_opex_lines').select('*').eq('budget_id', b.id);
   const curTxt = (cur || []).map((l: any) => `- ${p.kind === 'capex' ? (l.category + ': ' + l.asset) : (l.line_item + ': ' + l.activity)} ${peso(Number(l.annual))}`).join('\n') || '(none yet)';
   const isC = p.kind === 'capex';
@@ -215,6 +229,8 @@ PRICE LIST\n${pr}
 
 THIS DEPARTMENT'S HISTORY BY LINE ITEM\n${historyText(h)}\n\nSTORES WITHDRAWALS (WRF, actual use of supplies, fuel and parts)\n${sto}
 
+GAP REMARKS (why past budget and Accounting differed)\n${gap}
+
 SALES AND PRODUCTION FIGURES\n${kp}
 
 ALREADY IN THE ${Y} ${isC ? 'CAPEX' : 'OPEX'} BUDGET OF THIS DEPARTMENT (avoid duplicates)\n${curTxt}`;
@@ -226,7 +242,7 @@ async function draftBudget(db: SupabaseClient, key: string, p: any) {
   if (error || !b) throw new Error('Budget not found or not allowed');
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year, L = await master(db), o = await outlook(db, Y);
-  const [h, pr, vol, opb, rec, sto] = await Promise.all([deptHistory(db, b.department_id, Y, 3), prices(db, b.department_id), volumeText(db, Y), plantOpexPerBoard(db, Y), plantRecordsText(db, b.department_id, Y - 1), storesText(db, b.department_id, Y)]);
+  const [h, pr, vol, opb, rec, sto, gap] = await Promise.all([deptHistory(db, b.department_id, Y, 3), prices(db, b.department_id), volumeText(db, Y), plantOpexPerBoard(db, Y), plantRecordsText(db, b.department_id, Y - 1), storesText(db, b.department_id, Y), gapText(db, b.department_id, Y)]);
   const [{ data:ol }, { data:cl }] = await Promise.all([db.from('bgt_opex_lines').select('line_item,activity,annual').eq('budget_id', b.id), db.from('bgt_capex_lines').select('category,asset,annual').eq('budget_id', b.id)]);
   // CAPEX deferred into this year for this department and not yet carried over
   let deferred = '(none)';
@@ -285,6 +301,9 @@ ${rec}
 STORES WITHDRAWALS (WRF — supplies, fuel, spare parts drawn from the plant stockroom; best measure of actual use for these lines; Accounting books purchases when billed)
 ${sto}
 
+GAP REMARKS (managers' explanations of past budget vs Accounting differences — follow them)
+${gap}
+
 SALES, VOLUME, PRODUCTION AND CAPACITY (plant)
 ${vol}
 
@@ -311,7 +330,7 @@ async function reviewBudget(db: SupabaseClient, key: string, p: any) {
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year;
   const [{ data:ol }, { data:cl }] = await Promise.all([db.from('bgt_opex_lines').select('*').eq('budget_id', b.id).order('sort'), db.from('bgt_capex_lines').select('*').eq('budget_id', b.id).order('sort')]);
-  const o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y), kp = await kpiText(db, Y), sto = await storesText(db, b.department_id, Y);
+  const o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y), kp = await kpiText(db, Y), sto = await storesText(db, b.department_id, Y), gap = await gapText(db, b.department_id, Y);
   const mm = (l: any) => M.map((m, i) => Number(l['m' + (i + 1)]) ? `${m} ${Math.round(Number(l['m' + (i + 1)]))}` : '').filter(Boolean).join(', ');
   const lines = (ol || []).map((l: any) => `- [OPEX] ${l.line_item} | ${l.activity} | ${l.expense_type || '?'} | ${l.priority || 'no priority'} | basis: ${l.basis || '?'} | ${peso(Number(l.annual))} | months: ${mm(l)} | purpose: ${(l.purpose || '').slice(0, 160)} | remarks: ${(l.remarks || '').slice(0, 160)}`).join('\n');
   const caps = (cl || []).map((l: any) => `- [CAPEX] ${l.category} | ${l.asset} | qty ${l.qty ?? '?'} × ${l.unit_cost ?? '?'} | ${l.priority || 'no priority'} | ${peso(Number(l.annual))} | months: ${mm(l)} | justification: ${(l.justification || '').slice(0, 200)}`).join('\n');
@@ -333,6 +352,8 @@ TOTALS: OPEX ${peso(sum((ol || []).map((l: any) => Number(l.annual))))}, CAPEX $
 BUDGET LINES\n${lines || '(no OPEX lines)'}\n${caps || '(no CAPEX items)'}
 
 HISTORY BY LINE ITEM\n${historyText(h)}\n\nSTORES WITHDRAWALS (WRF, actual use of supplies, fuel and parts)\n${sto}
+
+GAP REMARKS (check the budget closes these gaps)\n${gap}
 
 ${outlookText(o)}
 
@@ -367,13 +388,13 @@ async function reviewPlant(db: SupabaseClient, key: string, p: any) {
     .map(x => `- ${x.i}: ${Y} budget ${peso(x.b)} vs ${Y - 1} actual Jan–${M[closed - 1] || '?'} ${peso(x.a)} (full-year rate ${peso(closed ? x.a / closed * 12 : 0)})`).join('\n');
   const bigCap = [...(cl || [])].sort((a: any, b: any) => Number(b.annual) - Number(a.annual)).slice(0, 15).map((l: any) => `- ${nm((bs || []).find((b: any) => b.id === l.budget_id)?.department_id)}: ${l.asset} (${l.category}, ${l.priority || 'no priority'}) ${peso(Number(l.annual))}`).join('\n');
   const prio: Record<string, number> = {}; [...(ol || []), ...(cl || [])].forEach((l: any) => prio[l.priority || 'none'] = (prio[l.priority || 'none'] || 0) + Number(l.annual));
-  const o = await outlook(db, Y), kp = await kpiText(db, Y);
+  const o = await outlook(db, Y), kp = await kpiText(db, Y), gap = await gapText(db, null, Y);
   const tool = { name:'submit_plant_summary', description:'Plant budget summary for the Managing Director', input_schema:{ type:'object', properties:{
     headline:{ type:'string' }, key_numbers:{ type:'array', items:{ type:'object', properties:{ label:{ type:'string' }, value:{ type:'string' } }, required:['label','value'] } },
     highlights:{ type:'array', items:{ type:'string' } }, risks:{ type:'array', items:{ type:'string' } }, recommendations:{ type:'array', items:{ type:'string' } },
     department_notes:{ type:'array', items:{ type:'object', properties:{ department:{ type:'string' }, note:{ type:'string' } }, required:['department','note'] } } }, required:['headline','key_numbers','highlights','risks','recommendations'] } };
   const system = `You prepare the plant budget summary for the Managing Director of WCLI. ${COMPANY}\n${RULES}\nWrite like a Head of Plant Operations briefing the MD: concise, numbers first, honest about gaps (departments not yet submitted, missing data, unbudgeted spending). Recommend where to cut or defer and where the budget looks too low.`;
-  const user = `Budget year ${Y}.\nDEPARTMENTS\n${deptRows}\n\nBY PRIORITY\n${Object.entries(prio).map(([k, v]) => `- ${k}: ${peso(v)}`).join('\n')}\n\nOPEX BY LINE ITEM vs LAST YEAR'S ACTUAL\n${items}\n\nLARGEST CAPEX\n${bigCap || '(none)'}\n\n${outlookText(o)}\n\nSALES AND PRODUCTION\n${kp}`;
+  const user = `Budget year ${Y}.\nDEPARTMENTS\n${deptRows}\n\nBY PRIORITY\n${Object.entries(prio).map(([k, v]) => `- ${k}: ${peso(v)}`).join('\n')}\n\nOPEX BY LINE ITEM vs LAST YEAR'S ACTUAL\n${items}\n\nLARGEST CAPEX\n${bigCap || '(none)'}\n\nGAP REMARKS (budget vs Accounting)\n${gap}\n\n${outlookText(o)}\n\nSALES AND PRODUCTION\n${kp}`;
   return await claude(key, system, user, tool, 5000);
 }
 
@@ -383,7 +404,7 @@ async function analysisReport(db: SupabaseClient, key: string, p: any) {
   if (!cy) throw new Error('Budget year not found');
   const Y = cy.year;
   const all = async (q: () => any) => { const out: any[] = []; for (let from = 0; ; from += 1000) { const { data } = await q().range(from, from + 999); out.push(...(data || [])); if (!data || data.length < 1000) break; } return out; };
-  const [o, vol, opb, kp] = await Promise.all([outlook(db, Y), volumeText(db, Y), plantOpexPerBoard(db, Y), kpiText(db, Y)]);
+  const [o, vol, opb, kp, gap] = await Promise.all([outlook(db, Y), volumeText(db, Y), plantOpexPerBoard(db, Y), kpiText(db, Y), gapText(db, null, Y)]);
   const { data:ds } = await db.from('bgt_departments').select('id,name');
   const nm = (id: string) => (ds || []).find((d: any) => d.id === id)?.name || '?';
   // actuals net of exclusions, last 3 years
@@ -440,7 +461,7 @@ async function analysisReport(db: SupabaseClient, key: string, p: any) {
     recommendations:{ type:'array', maxItems:7, items:{ type:'string', description:'One sentence, max 25 words' } },
     open_questions:{ type:'array', maxItems:5, items:{ type:'string' } } }, required:['headline','swot','environment','sensitivities','risks','recommendations'] } };
   const system = `You are the plant budget analyst inside WCLI's budget app. ${COMPANY}\n${RULES}\nWrite an analysis to guide the ${Y} plant budget for the Head of Plant Operations and the Managing Director: SWOT, the outside environment (economy, fuel, labor, freight and logistics, IT/chips, materials, demand), sensitivities with peso effects computed from the figures given, risks with responses, and concrete recommendations. Use only the data provided; say when something is missing. Take percentages, changes, capacity use and per-board figures ONLY from COMPUTED FACTS — do not recompute them; for a peso sensitivity multiply a base given in the data by the change and show the base. Costs marked as kept out of plant OPEX are products and services bought from other companies (e.g. Steintek solid surface, MSSI cabinets) and resold to customers at a mark-up — not plant operations and not the imported trade boards; never count them as OPEX. Plain words, numbers first, short items.`;
-  const user = `Budget year ${Y}.${p.text ? `\nFocus requested: "${String(p.text).slice(0, 1000)}"` : ''}\n\nCOMPUTED FACTS (use these numbers as given)\n${facts.join('\n') || '(none)'}\n\nSALES, VOLUME, PRODUCTION AND CAPACITY\n${vol}\n\nQUALITY AND YIELD\n${qual || '(none)'}\n\nPLANT OPEX PER BOARD SOLD\n${opb}\n\nPLANT OPEX ACTUALS (net of costs kept out)\n${actTxt.join('\n\n') || '(none)'}\n\nBUDGETS\n${budTxt.join('\n\n') || '(none)'}\n\nSTORES WITHDRAWALS (plant)\n${stTxt || '(none)'}\n\n${outlookText(o)}\n\nOTHER FIGURES\n${kp}`;
+  const user = `Budget year ${Y}.${p.text ? `\nFocus requested: "${String(p.text).slice(0, 1000)}"` : ''}\n\nCOMPUTED FACTS (use these numbers as given)\n${facts.join('\n') || '(none)'}\n\nSALES, VOLUME, PRODUCTION AND CAPACITY\n${vol}\n\nQUALITY AND YIELD\n${qual || '(none)'}\n\nPLANT OPEX PER BOARD SOLD\n${opb}\n\nPLANT OPEX ACTUALS (net of costs kept out)\n${actTxt.join('\n\n') || '(none)'}\n\nBUDGETS\n${budTxt.join('\n\n') || '(none)'}\n\nSTORES WITHDRAWALS (plant)\n${stTxt || '(none)'}\n\nGAP REMARKS (why budget and Accounting differed)\n${gap}\n\n${outlookText(o)}\n\nOTHER FIGURES\n${kp}`;
   return await claude(key, system, user, tool, 12000);
 }
 

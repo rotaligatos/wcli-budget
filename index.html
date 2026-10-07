@@ -1373,7 +1373,7 @@ async function renderActuals(){
     }
     const years = [...new Set([...S.cycles.map(c=>c.year), S.act.year])].sort((a,b)=>b-a);
     const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv); S.act.lastD = D;
-    S.act.model = M; S.act.data = D;
+    S.act.model = M; S.act.data = D; await loadGaps(Y);
     const { data:imps } = await sb.from('bgt_imports').select('*').eq('year', Y).order('created_at', { ascending:false });
     const dname = S.act.dept ? deptById(S.act.dept)?.name : 'Whole plant';
     const varFY = M.projFY - M.budFY, rr = M.closed ? M.actYTD / M.closed * 12 : 0;
@@ -1406,6 +1406,7 @@ async function renderActuals(){
     </div>
     ${ins ? `<div class="ins-grid">${ins}</div>` : ''}
     ${await exclCard(D)}
+    ${gapCard(M)}
     <div class="card" style="margin-bottom:16px"><h3>Month by month</h3><div style="padding:14px">
       <div class="mchart">${MONTHS.map((m,i)=>{ const a = i < M.closed; const v = a ? M.monthly.act[i] : M.monthly.proj[i];
         return `<div title="${m}: budget ${peso(M.monthly.bud[i])} · ${a?'actual':'projected'} ${peso(v)}"><i class="${a?'a':'p'} ${a && v>M.monthly.bud[i]*1.1?'over':''}" style="height:${100*v/mx}%"></i><s style="bottom:${100*M.monthly.bud[i]/mx}%"></s></div>`; }).join('')}</div>
@@ -1413,7 +1414,7 @@ async function renderActuals(){
       <div class="legend"><span><i style="background:var(--teal)"></i>Actual</span><span><i style="background:var(--teal-wash);border:1px dashed var(--teal)"></i>Projected</span><span><i style="background:var(--ink);height:2px"></i>Budget</span><span><i style="background:var(--red)"></i>Over budget by 10%+</span></div></div></div>
     <div class="card"><h3>OPEX by line item</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Line item</th><th class="r">Budget ${Y}</th><th class="r">Budget ${thru(M.closed)}</th><th class="r">Actual ${thru(M.closed)}</th><th>Status</th><th class="r">Projected ${Y}</th><th class="r">vs budget</th></tr></thead><tbody>
       ${M.rows.map(r=>{ const v = r.projFY - r.budFY; return `<tr class="row" tabindex="0" onclick="actItem(this.dataset.k)" onkeydown="if(event.key==='Enter')actItem(this.dataset.k)" data-k="${esc(r.item)}">
-        <td><div class="act">${esc(r.item)}</div>${!r.inList?'<div class="item" style="color:var(--amber)">Not in the budget line-item list</div>':''}${r.overrides?`<div class="item">${r.overrides} month${r.overrides>1?'s':''} forecast by the department</div>`:''}</td>
+        <td><div class="act">${esc(r.item)}</div>${!r.inList?'<div class="item" style="color:var(--amber)">Not in the budget line-item list</div>':''}${gapRowNote(r)}${r.overrides?`<div class="item">${r.overrides} month${r.overrides>1?'s':''} forecast by the department</div>`:''}</td>
         <td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.budYTD)}</td><td class="r num">${peso(r.actYTD)}</td><td>${varPill(r)}</td>
         <td class="r num">${peso(r.projFY)}</td><td class="r num" style="color:${v>1?'var(--red)':v<-1?'var(--green)':'inherit'}">${v>0?'+':''}${peso(v)}</td></tr>`; }).join('') || '<tr><td colspan="7"><div class="empty">Nothing to show for this year and department.</div></td></tr>'}
       </tbody><tfoot><tr><td>Total OPEX</td><td class="r num">${peso(M.budFY)}</td><td class="r num">${peso(M.budYTD)}</td><td class="r num">${peso(M.actYTD)}</td><td></td><td class="r num">${peso(M.projFY)}</td><td class="r num">${varFY>0?'+':''}${peso(varFY)}</td></tr></tfoot></table></div></div>
@@ -1447,6 +1448,7 @@ function actItem(item){
       ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
       ${(()=>{ const ex = (S.act.lastD?.excl||[]).filter(a=>a.line_item===item && (!dept || a.department_id===dept)); if (!ex.length) return ''; const by = {}; ex.forEach(a=>by[a.partner||'—']=(by[a.partner||'—']||0)+Number(a.amount)); const rules = S.ex.rules||[];
         return `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Kept out of plant OPEX</h3>${Object.entries(by).map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}<p class="hint" style="margin:4px 0 0">Recorded by Accounting on this line but not included above: ${esc([...new Set(ex.map(a=>rules.find(r=>r.id===a.exclusion_id)?.category).filter(Boolean))].join(', ')||'excluded by rule')}.</p>`; })()}
+      ${gapSection(item, r)}
     </div>
     <footer><span></span><div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveProjection(${JSON.stringify(item).replace(/"/g,'&quot;')})">Save forecast</button>`:''}</div></footer>
   </div>`;
@@ -3288,6 +3290,98 @@ async function anPareto(Y){
       <div class="stat"><div class="eyebrow">Largest payee</div><div class="v" style="font-size:15px;line-height:1.35">${esc(pay[0]?.[0]||'—')}</div><div class="s">${pay[0]?short(pay[0][1])+' · '+(100*pay[0][1]/t).toFixed(0)+'%':''}</div></div></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:16px"><div class="card" style="margin:0"><h3>By expense line</h3>${table(lines,'Expense line')}</div><div class="card" style="margin:0"><h3>By payee</h3>${table(pay,'Paid to')}</div></div>
     <p class="hint" style="margin-top:8px">Dark bars = the few lines and payees that make up 80% of spending. Start the budget review, contract renegotiation and savings ideas there.</p>`}`;
+}
+
+/* ================= GAP REMARKS =================
+   Why a line's budget and Accounting's actual differ (no budget, budget but no actual, far over or under).
+   Accounting is the official record; the remark records the operations view so the next budget can follow
+   Accounting's lines. The assistant reads these when it drafts and reviews budgets. */
+const GAP_CAUSES = [
+  ['acct_other_line','Accounting booked it under another line'],
+  ['budget_other_line','We budgeted it under another line'],
+  ['other_dept','Charged to or budgeted by another department'],
+  ['timing','Timing — booked in a different month or year'],
+  ['unplanned','Not planned — new or unexpected need'],
+  ['deferred','Cancelled, deferred or not needed'],
+  ['one_off','One-time item'],
+  ['price_volume','Price or volume different from plan'],
+  ['other','Other — see note']];
+const GAP_ACTIONS = [
+  ['align','Next budget: follow Accounting\'s line'],
+  ['fix_coding','Ask Accounting to correct the coding'],
+  ['adjust','Adjust the amount in the next budget'],
+  ['none','No change needed']];
+const GAP_TYPES = { no_budget:'Spent, not budgeted', no_actual:'Budgeted, nothing spent', over:'Over budget', under:'Under-used' };
+const gapLbl = (list, k) => (list.find(x=>x[0]===k)||[])[1] || k || '';
+
+function gapTypeOf(r){
+  if (!r) return null;
+  if (!r.budFY && r.actYTD > 0) return 'no_budget';
+  if (r.budYTD > 0 && !r.actYTD) return 'no_actual';
+  if (r.budYTD && r.actYTD > r.budYTD * 1.1) return 'over';
+  if (r.budYTD > 50000 && r.actYTD < r.budYTD * 0.6) return 'under';
+  return null;
+}
+async function loadGaps(Y, force){
+  if (!force && S.gap && S.gap.year === Y) return S.gap.rows;
+  const rows = await fetchAll(()=>sb.from('bgt_gap_remarks').select('*').eq('year', Y));
+  S.gap = { year:Y, rows };
+  return rows;
+}
+function gapsFor(item, dept){ return (S.gap?.rows||[]).filter(g => g.line_item===item && (dept ? g.department_id===dept : true)); }
+function gapCanEdit(dept){ return dept ? (canEditDept(dept) || canManageData()) : canManageData(); }
+
+// one line under the item name in the actuals table
+function gapRowNote(r){
+  const g = gapsFor(r.item, S.act.dept), t = gapTypeOf(r);
+  if (g.length) return `<div class="item" style="text-transform:none;color:var(--teal)" title="${esc(g.map(x=>x.remark).join(' | '))}">Gap remark: ${esc(gapLbl(GAP_CAUSES, g[0].cause))}${g.length>1?` (+${g.length-1})`:''}</div>`;
+  return t && t!=='under' ? `<div class="item" style="text-transform:none;color:var(--amber)">Gap not explained yet</div>` : '';
+}
+// card on the actuals page: every gap line and whether it has a remark
+function gapCard(M){
+  const gaps = M.rows.map(r=>({ r, t:gapTypeOf(r) })).filter(x=>x.t);
+  if (!gaps.length) return '';
+  const done = gaps.filter(x=>gapsFor(x.r.item, S.act.dept).length).length;
+  return `<div class="card" style="margin-bottom:16px"><h3>Budget vs Accounting gaps — ${done} of ${gaps.length} explained</h3>
+    <p class="hint" style="padding:0 14px">Accounting is the official record. Where operations and Accounting see a cost differently, add a gap remark on the line — the assistant uses these to make the next budget follow Accounting's lines.</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:760px"><thead><tr><th>Line item</th><th>Gap</th><th class="r">Budget ${thru(M.closed)}</th><th class="r">Actual ${thru(M.closed)}</th><th>Remark</th></tr></thead><tbody>
+    ${gaps.map(({r,t})=>{ const g = gapsFor(r.item, S.act.dept);
+      return `<tr class="row" tabindex="0" data-k="${esc(r.item)}" onclick="actItem(this.dataset.k)" onkeydown="if(event.key==='Enter')actItem(this.dataset.k)"><td class="act">${esc(r.item)}</td><td>${GAP_TYPES[t]}</td><td class="r num">${peso(r.budYTD)}</td><td class="r num">${peso(r.actYTD)}</td>
+      <td style="font-size:12.5px;max-width:360px">${g.length ? g.map(x=>`<b>${esc(gapLbl(GAP_CAUSES,x.cause))}</b>${x.related_line?` → ${esc(x.related_line)}`:''}${!S.act.dept&&x.department_id?` <span class="hint">(${esc(deptById(x.department_id)?.name||'')})</span>`:''}: ${esc(x.remark)}`).join('<br>') : '<span style="color:var(--amber)">Add a remark</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+}
+// section inside the line drawer
+function gapSection(item, r){
+  const dept = S.act.dept, t = gapTypeOf(r), mine = gapsFor(item, dept).find(g => (g.department_id||null) === (dept||null)), others = gapsFor(item, null).filter(g => g !== mine && (!dept || g.department_id===dept));
+  const ed = gapCanEdit(dept);
+  const opts = (list, v) => list.map(([k,l])=>`<option value="${k}" ${k===v?'selected':''}>${esc(l)}</option>`).join('');
+  return `<h3 style="font-size:16px;font-stretch:85%;margin:18px 0 6px">Gap remark${t?` — ${GAP_TYPES[t]}`:''}</h3>
+    ${others.length ? others.map(g=>`<div class="ins blue" style="margin-bottom:6px"><b>${esc(deptById(g.department_id)?.name||'Whole plant')}: ${esc(gapLbl(GAP_CAUSES,g.cause))}</b>${g.related_line?` → ${esc(g.related_line)}`:''}<br>${esc(g.remark)}${g.action?`<br><small>${esc(gapLbl(GAP_ACTIONS,g.action))}</small>`:''}</div>`).join('') : ''}
+    ${ed ? `<p class="hint" style="margin:0 0 6px">Why do the budget and Accounting differ on this line${dept?'':' (whole-plant remark)'}? Accounting stays the official record.</p>
+      <div class="field"><label for="gpCause">Reason</label><select class="inp" id="gpCause"><option value="">Choose…</option>${opts(GAP_CAUSES, mine?.cause)}</select></div>
+      <div class="field"><label for="gpRel">Other line involved (optional)</label><input class="inp" id="gpRel" list="gpLines" value="${esc(mine?.related_line||'')}" placeholder="e.g. the line Accounting used"><datalist id="gpLines">${S.items.opex.map(i=>`<option value="${esc(i)}">`).join('')}</datalist></div>
+      <div class="field"><label for="gpAct">What to do next budget</label><select class="inp" id="gpAct"><option value="">Choose…</option>${opts(GAP_ACTIONS, mine?.action)}</select></div>
+      <div class="field"><label for="gpNote">Remark</label><textarea class="inp" id="gpNote" rows="3" placeholder="e.g. Forklift diesel was planned under Gas & Oil but Accounting books it under Repairs – Vehicles">${esc(mine?.remark||'')}</textarea></div>
+      <div class="actions" style="justify-content:flex-end">${mine?`<button class="btn ghost" onclick="deleteGap('${mine.id}')">Remove remark</button>`:''}<button class="btn" onclick="saveGap(${JSON.stringify(item).replace(/"/g,'&quot;')})">Save remark</button></div>`
+    : mine ? '' : !others.length ? `<p class="hint" style="margin:0">No remark yet.${dept?'':' Pick a department to add one, or ask the Head of Plant Operations.'}</p>` : ''}
+    ${!ed && mine ? `<div class="ins blue"><b>${esc(gapLbl(GAP_CAUSES,mine.cause))}</b>${mine.related_line?` → ${esc(mine.related_line)}`:''}<br>${esc(mine.remark)}</div>` : ''}`;
+}
+async function saveGap(item){
+  const dept = S.act.dept || null, Y = S.act.year, r = S.act.model.rows.find(x=>x.item===item);
+  const cause = $('#gpCause').value, remark = $('#gpNote').value.trim();
+  if (!cause || !remark) { toast('Choose a reason and write a remark.', true); return; }
+  const rec = { company_id:S.company.id, year:Y, department_id:dept, line_item:item, gap_type:gapTypeOf(r), cause, related_line:$('#gpRel').value.trim()||null,
+    action:$('#gpAct').value||null, remark, budget_amt:r?.budYTD??null, actual_amt:r?.actYTD??null, months_closed:S.act.model.closed, updated_by:S.me.id, updated_at:new Date().toISOString() };
+  const ex = gapsFor(item, dept).find(g => (g.department_id||null) === dept);
+  try {
+    const res = ex ? await sb.from('bgt_gap_remarks').update(rec).eq('id', ex.id) : await sb.from('bgt_gap_remarks').insert({ ...rec, created_by:S.me.id });
+    if (res.error) throw res.error;
+    await loadGaps(Y, true); toast('Gap remark saved'); closeDrawer(); renderActuals();
+  } catch(e){ fail(e); }
+}
+async function deleteGap(id){
+  const r = await sb.from('bgt_gap_remarks').delete().eq('id', id); if (r.error) return fail(r.error);
+  await loadGaps(S.act.year, true); toast('Gap remark removed'); closeDrawer(); renderActuals();
 }
 
 boot();

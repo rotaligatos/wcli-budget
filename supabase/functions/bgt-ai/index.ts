@@ -1,5 +1,5 @@
 // bgt-ai — Budget assistant for the WCLI budget app.
-// Modes: draft_line, draft_budget, review_budget, review_plant, analysis_report, dept_analysis, price_lookup.
+// Modes: draft_line, draft_budget, draft_items, review_budget, review_plant, analysis_report, dept_analysis, price_lookup.
 // Data is read with the caller's own permissions (RLS). Nothing is written to budgets here —
 // the app shows suggestions and the user decides. Every call is logged to bgt_ai_log.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -84,9 +84,9 @@ async function kpiText(db: SupabaseClient, year: number) {
   return Object.entries(by).map(([k, v]) => `- ${k}: ${k.includes('annual') ? v[0] : sum(v) + ` over ${v.length} months`}`).join('\n');
 }
 async function prices(db: SupabaseClient, deptId?: string) {
-  const { data } = await db.from('bgt_price_items').select('item,category,unit,unit_price,supplier,quote_ref,valid_until,source_type,department_id').eq('active', true).limit(200);
+  const { data } = await db.from('bgt_price_items').select('item,category,unit,unit_price,supplier,quote_ref,valid_until,source_type,department_id,budget_year').eq('active', true).limit(300);
   return (data || []).filter((p: any) => !deptId || !p.department_id || p.department_id === deptId)
-    .map((p: any) => `- ${p.item} [${p.category || 'any'}]: ₱${p.unit_price}/${p.unit || 'unit'} ${p.supplier ? '— ' + p.supplier : ''}${p.quote_ref ? ' (' + p.quote_ref + ')' : ''}${p.source_type === 'market' ? ' [market reference]' : ''}${p.valid_until ? ' valid until ' + p.valid_until : ''}`).join('\n') || '(price list is empty)';
+    .map((p: any) => `- ${p.item} [${p.category || 'any'}]: ₱${p.unit_price}/${p.unit || 'unit'} ${p.supplier ? '— ' + p.supplier : ''}${p.quote_ref ? ' (' + p.quote_ref + ')' : ''}${p.budget_year ? ` [STANDARD ${p.budget_year} BUDGET PRICE — every department must use exactly this price, allowance 0]` : p.source_type === 'market' ? ' [market reference]' : ''}${p.valid_until ? ' valid until ' + p.valid_until : ''}`).join('\n') || '(price list is empty)';
 }
 const BASE_COMPANY = `World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — manufactures laminated boards (melamine/HPL on board) and also trades imported finished boards, mostly laminated plywood from China, Thailand and Vietnam that it does not produce. Boards sold = boards produced + imported trade boards; the cost of the imported boards themselves is cost of sales, not plant OPEX. Departments: Admin (incl. safety/SSHE), Engineering (incl. maintenance), Production, QA/QC, Warehouse, Logistics, PPIC, IT. Currency: Philippine peso.`;
 let COMPANY = BASE_COMPANY;
@@ -199,7 +199,7 @@ async function draftLine(db: SupabaseClient, key: string, p: any) {
   if (error || !b) throw new Error('Budget not found or not allowed');
   const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes,code').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year,capex_threshold').eq('id', b.cycle_id).single()]);
   const Y = cy!.year, L = await master(db), o = await outlook(db, Y), h = await deptHistory(db, b.department_id, Y);
-  const [pr, kp, sto, gap] = await Promise.all([prices(db, b.department_id), kpiText(db, Y), storesText(db, b.department_id, Y), gapText(db, b.department_id, Y)]);
+  const [pr, kp, sto, gap, use] = await Promise.all([prices(db, b.department_id), kpiText(db, Y), storesText(db, b.department_id, Y), gapText(db, b.department_id, Y), p.kind === 'capex' ? Promise.resolve('') : itemUsageText(db, b.department_id, p.current?.line_item ? [p.current.line_item] : [])]);
   const { data:cur } = await db.from(p.kind === 'capex' ? 'bgt_capex_lines' : 'bgt_opex_lines').select('*').eq('budget_id', b.id);
   const curTxt = (cur || []).map((l: any) => `- ${p.kind === 'capex' ? (l.category + ': ' + l.asset) : (l.line_item + ': ' + l.activity)} ${peso(Number(l.annual))}`).join('\n') || '(none yet)';
   const isC = p.kind === 'capex';
@@ -217,9 +217,9 @@ async function draftLine(db: SupabaseClient, key: string, p: any) {
     : { name:'propose_opex_line', description:'Propose one OPEX line for the budget form', input_schema:{ type:'object', properties:{
       line_item:{ type:'string', enum:L.opex }, expense_type:{ type:'string', enum:L.expense_type }, activity:{ type:'string', description:'Short name of the activity' },
       description:{ type:'string' }, purpose:{ type:'string', description:'Business purpose / expected benefit' }, basis:{ type:'string', enum:L.basis },
-      qty:{ type:'number' }, unit:{ type:'string' }, rate:{ type:'number', description:'Unit cost in pesos' }, times:{ type:'number', description:'Times per year (12 = monthly)' }, ...common },
-      required:['line_item','expense_type','activity','description','purpose','basis','priority','months','rationale','confidence'] } };
-  const system = `You are the budget assistant inside Costline, WCLI's plant cost app. ${COMPANY}\n${RULES}\nYou draft ONE budget ${isC ? 'CAPEX item' : 'OPEX line'} from the manager's plain-language request. Be concrete and realistic. Use the price list when an item matches (say so). Apply the cost outlook change for that expense line. If you have no reliable price, give a careful estimate, set basis to "Management Estimate", say it is an estimate, and ask for a quotation in questions. Never invent quotation numbers or supplier names. Months must add up to qty × rate × times${isC ? ' (qty × unit cost)' : ''}. Write plainly for a plant manager.`;
+      items:{ type:'array', maxItems:12, items:ITEM_SCHEMA, description:'The items behind this line; the app computes the months and total from them' }, ...common },
+      required:['line_item','expense_type','activity','description','purpose','basis','priority','items','rationale','confidence'] } };
+  const system = `You are the budget assistant inside Costline, WCLI's plant cost app. ${COMPANY}\n${RULES}\nYou draft ONE budget ${isC ? 'CAPEX item' : 'OPEX line'} from the manager's plain-language request. Be concrete and realistic. Use the price list when an item matches (say so). Apply the cost outlook change for that expense line. If you have no reliable price, give a careful estimate, set basis to "Management Estimate", say it is an estimate, and ask for a quotation in questions. Never invent quotation numbers or supplier names. ${isC ? 'Months must add up to qty × unit cost.' : ITEM_RULES + ' The outlook allowance for each line item is in ASSUMED COST CHANGE BY EXPENSE LINE (general inflation if not listed).'} Write plainly for a plant manager.`;
   const user = `Department: ${dept!.name}${dept!.notes ? ' (' + dept!.notes + ')' : ''}. Budget year ${Y}. CAPEX threshold ₱${cy!.capex_threshold}/unit.
 Manager's request: """${String(p.text || '').slice(0, 1500)}"""
 ${p.current ? `Fields already on the form (keep what is sensible): ${JSON.stringify(p.current).slice(0, 1500)}` : ''}
@@ -231,11 +231,11 @@ PRICE LIST\n${pr}
 THIS DEPARTMENT'S HISTORY BY LINE ITEM\n${historyText(h)}\n\nSTORES WITHDRAWALS (WRF, actual use of supplies, fuel and parts)\n${sto}
 
 GAP REMARKS (why past budget and Accounting differed)\n${gap}
-
+${use ? `\nITEM USAGE HISTORY (stores withdrawals and POs)\n${use}\n` : ''}
 SALES AND PRODUCTION FIGURES\n${kp}
 
 ALREADY IN THE ${Y} ${isC ? 'CAPEX' : 'OPEX'} BUDGET OF THIS DEPARTMENT (avoid duplicates)\n${curTxt}`;
-  return await claude(key, system, user, tool, 2500);
+  return await claude(key, system, user, tool, isC ? 2500 : 4500);
 }
 
 async function draftBudget(db: SupabaseClient, key: string, p: any) {
@@ -532,6 +532,65 @@ ${outlookText(o)}`;
   return await claude(key, system, user, tool, 8000);
 }
 
+/* what the department actually drew from stores and bought on PO, per item — the basis for item lists */
+async function itemUsageText(db: SupabaseClient, deptId: string, lineItems: string[]) {
+  const rows: any[] = [];
+  for (let from = 0; ; from += 1000) { const { data } = await db.from('bgt_plant_records').select('kind,rec_date,line_item,item,unit,qty,amount,status,ref_no').in('kind', ['issue', 'po']).eq('department_id', deptId).gte('rec_date', new Date(Date.now() - 800 * 864e5).toISOString().slice(0, 10)).range(from, from + 999); rows.push(...(data || [])); if (!data || data.length < 1000) break; }
+  const ok = rows.filter(r => r.item && Number(r.qty) > 0 && Number(r.amount) > 0 && r.ref_no !== 'SUMMARY' && r.status !== 'Cancelled');
+  if (!ok.length) return '(no item-level stores or PO records for this department)';
+  const last = ok.map(r => String(r.rec_date)).sort().pop()!, from12 = new Date(Date.parse(last) - 365 * 864e5).toISOString().slice(0, 10);
+  const by: Record<string, any> = {};
+  ok.forEach(r => { const k = `${r.line_item || 'other'}|${String(r.item).toUpperCase()}`; const x = (by[k] ||= { line:r.line_item || 'other', item:r.item, unit:r.unit || '', q12:0, a12:0, n:0, last:'', price:0, src:r.kind, months:new Set() });
+    if (String(r.rec_date) >= from12) { x.q12 += Number(r.qty); x.a12 += Number(r.amount); x.months.add(String(r.rec_date).slice(0, 7)); }
+    if (String(r.rec_date) >= x.last) { x.last = String(r.rec_date); x.price = Number(r.amount) / Number(r.qty); x.src = r.kind; } x.n++; });
+  const want = new Set(lineItems.filter(Boolean));
+  const groups: Record<string, any[]> = {};
+  Object.values(by).filter((x: any) => !want.size || want.has(x.line)).forEach((x: any) => (groups[x.line] ||= []).push(x));
+  return `Window: 12 months to ${last}.\n` + Object.entries(groups).map(([li, xs]) => `${li}:\n` + xs.sort((a, b) => b.a12 - a.a12).slice(0, 30).map(x =>
+    `- ${x.item}: ${x.q12 ? `${Math.round(x.q12 * 100) / 100} ${x.unit || 'units'} in 12 months over ${x.months.size} months, ${peso(x.a12)}` : 'not used in the last 12 months'}; latest ${x.src === 'po' ? 'PO' : 'stores'} price ₱${x.price.toFixed(2)}/${x.unit || 'unit'} (${x.last})`).join('\n')).join('\n') || '(none for these line items)';
+}
+const ITEM_SCHEMA = { type:'object', properties:{
+  name:{ type:'string', description:'Item as people know it, e.g. "Bond paper A4 (ream)", "Security guard service — 2 posts"' },
+  unit:{ type:'string' }, qty:{ type:'number', description:'Quantity EACH time it is bought or paid (per month for monthly items)' },
+  price:{ type:'number', description:'Base unit price in pesos BEFORE the allowance (standard prices: exact standard price)' },
+  src:{ type:'string', enum:['price_list','stores','po','quotation','contract','estimate'] },
+  ref:{ type:'string', description:'Short source note, e.g. "Stores Dec 2024", "Standard 2027", "PO Mar 2026"' },
+  adj_pct:{ type:'number', description:'Cost-outlook allowance %: 0 for standard prices, quotations and contracts already valid for the budget year; otherwise the outlook % given for the line' },
+  freq:{ type:'string', enum:['monthly','quarterly','semi','once','months'] }, month:{ type:'integer', minimum:1, maximum:12, description:'Start month (monthly/quarterly/semi) or the month (once)' },
+  months:{ type:'array', items:{ type:'integer', minimum:1, maximum:12 }, description:'Only for freq "months"' },
+  why:{ type:'string', description:'Max 14 words: usage basis' } }, required:['name','unit','qty','price','src','adj_pct','freq','month'] };
+const ITEM_RULES = `ITEM RULES: List the actual items behind each line — what will be bought or paid for, how many each time, unit price, how often. Base quantities on the department's own usage history (stores withdrawals and POs), adjusted for the volume outlook and the manager's notes. Use a STANDARD budget price from the price list exactly as given with adj_pct 0 whenever the item matches it (e.g. diesel, electricity) — every department must use the same price. Otherwise use the latest price list, PO or stores price as the base and add the line's cost-outlook % as adj_pct; quotations or contracts valid through the budget year get 0. Services and contracts are one item (e.g. monthly fee, qty 1, monthly). Group many tiny items into one "Other <category> — lot" item. 2–10 items per line. Never invent supplier names or quotation numbers. Use src "estimate" when no price is known and say so in why.`;
+async function draftItems(db: SupabaseClient, key: string, p: any) {
+  const { data:b, error } = await db.from('bgt_dept_budgets').select('id,department_id,cycle_id').eq('id', p.budget_id).single();
+  if (error || !b) throw new Error('Budget not found or not allowed');
+  const [{ data:dept }, { data:cy }] = await Promise.all([db.from('bgt_departments').select('name,notes').eq('id', b.department_id).single(), db.from('bgt_cycles').select('year').eq('id', b.cycle_id).single()]);
+  const Y = cy!.year, lines = (p.lines || []).slice(0, 6);
+  if (!lines.length) throw new Error('No lines to fill');
+  const o = await outlook(db, Y), gen = Number((o.A.find((x: any) => /^inflation_\d{4}$/.test(x.key)) || {}).value) || 5;
+  const pct = (li: string) => { const d = o.D.find((x: any) => x.line_item === li); return d ? Number(d.next_year_pct) : gen; };
+  const [h, pr, use, vol] = await Promise.all([deptHistory(db, b.department_id, Y, 2), prices(db, b.department_id), itemUsageText(db, b.department_id, lines.map((l: any) => l.line_item)), volumeText(db, Y, true)]);
+  const tool = { name:'propose_items', description:'Item lists for budget lines', input_schema:{ type:'object', properties:{
+    lines:{ type:'array', items:{ type:'object', properties:{ key:{ type:'string' }, items:{ type:'array', maxItems:12, items:ITEM_SCHEMA }, note:{ type:'string', description:'Max 20 words: basis of the list' } }, required:['key','items'] } } }, required:['lines'] } };
+  const system = `You are the budget assistant inside Costline, WCLI's plant cost app. ${COMPANY}\n${RULES}\n${ITEM_RULES}`;
+  const user = `Department: ${dept!.name}${dept!.notes ? ' (' + dept!.notes + ')' : ''}. Budget year ${Y}.${p.text ? `\nManager's notes: "${String(p.text).slice(0, 1000)}"` : ''}
+
+LINES TO DETAIL (return one entry per key)
+${lines.map((l: any) => `- key ${l.key}: ${l.line_item || '(no line item)'} — ${l.activity || ''}${l.description ? ' — ' + String(l.description).slice(0, 200) : ''}${Number(l.annual) ? ` — current amount ${peso(Number(l.annual))}` : ''}; outlook allowance for this line ${pct(l.line_item)}%${(l.items || []).length ? `; items already entered (keep and complete): ${JSON.stringify(l.items).slice(0, 600)}` : ''}`).join('\n')}
+
+ITEM USAGE HISTORY (stores withdrawals and POs of this department)
+${use}
+
+ACCOUNTING HISTORY BY LINE ITEM
+${historyText(h)}
+
+PRICE LIST
+${pr}
+
+VOLUME (boards)
+${vol}`;
+  return await claude(key, system, user, tool, 7000);
+}
+
 async function priceLookup(key: string, braveKey: string, p: any) {
   const q = String(p.query || '').trim().slice(0, 200); if (!q) throw new Error('Type what to look up');
   const u = new URL('https://api.search.brave.com/res/v1/web/search');
@@ -599,6 +658,7 @@ Deno.serve(async (req) => {
     else if (mode === 'review_plant') { if (!['admin','plant_head','md','finance'].includes(me.role)) throw new Error('Only reviewers can run the plant summary'); result = await reviewPlant(db, key, body); }
     else if (mode === 'analysis_report') { if (!['admin','plant_head','md','finance'].includes(me.role)) throw new Error('Only reviewers can run the analysis report'); result = await analysisReport(db, key, body); }
     else if (mode === 'dept_analysis') { if (!IS_REV && !(['dept_manager','preparer'].includes(me.role) && me.department_id === body.department_id)) throw new Error('You can only analyse your own department.'); result = await deptAnalysis(db, svc, key, body); }
+    else if (mode === 'draft_items') result = await draftItems(db, key, body);
     else if (mode === 'price_lookup') { const bk = Deno.env.get('BRAVE_API_KEY'); if (!bk) throw new Error('Web search is not configured (no BRAVE_API_KEY).'); result = await priceLookup(key, bk, body); }
     else throw new Error('Unknown request');
   } catch (e) { err = (e as Error).message; }

@@ -129,6 +129,7 @@ textarea.inp{resize:vertical;min-height:58px}
 .nav a:hover{background:var(--side-hover)}
 .nav a.on{background:var(--side-on);color:#fff;box-shadow:inset 3px 0 0 var(--teal)}
 .nav a .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.nbadge{background:var(--amber);color:#fff;border-radius:9px;font-size:10.5px;font-weight:700;padding:0 6px;line-height:16px;margin-left:auto;font-family:var(--mono)}
 .nav.sub a{padding-left:14px;font-size:13px}
 .me{border-top:1px solid var(--side-line);padding:8px 4px 0;font-size:12px;color:var(--side-muted)}
 .me b{display:block;color:#fff;font-weight:500;font-size:13px}
@@ -176,6 +177,20 @@ main{padding:16px 28px 64px;min-width:0}
 .ph>div:first-child{min-width:0;flex:1 1 380px}
 .ph .sub{flex-wrap:nowrap;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
 .tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tabs button{white-space:nowrap;flex:none}
+.items-box h3{font-size:16px}
+.it-row{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:8px 10px;margin-bottom:8px}
+.it-top{display:flex;gap:6px;align-items:flex-start}.it-name{position:relative;flex:1}
+.it-pick{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:5;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r);box-shadow:var(--shadow);max-height:260px;overflow:auto}
+.it-pick button{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:7px 10px;cursor:pointer;font:inherit;color:var(--ink)}
+.it-pick button:hover{background:var(--teal-wash)}.it-pick small{display:block;color:var(--faint);font-size:11.5px}
+.it-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px;margin-top:6px}
+.it-grid label{display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600;color:var(--muted)}.it-grid .inp{padding:5px 7px;font-weight:400}
+.it-ms{grid-column:span 2;display:flex;flex-wrap:wrap;gap:3px;align-items:flex-end}.it-ms label{flex-direction:row;align-items:center;gap:2px;font-weight:500;border:1px solid var(--line-strong);border-radius:4px;padding:2px 5px}
+.it-foot{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:12px}
+.it-std{font-size:12px;margin-top:4px;color:var(--muted)}.it-std a{color:var(--teal);cursor:pointer;font-weight:600}.it-std.ok{color:var(--green)}.it-std.warn{color:var(--red)}.it-std.wait{color:var(--amber)}
+.recs{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:var(--r);margin:10px 12px 0;padding:8px 12px}
+.recs>summary{cursor:pointer;font-size:13.5px}.rec{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line);margin-top:8px;flex-wrap:wrap}.rec>div:first-child{flex:1 1 360px}
+@media (max-width:520px){.it-grid{grid-template-columns:1fr 1fr}}
 .more{position:relative}.more>summary{list-style:none}.more>summary::-webkit-details-marker{display:none}
 .more .menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:230px;padding:4px;z-index:30;display:flex;flex-direction:column}
 .more .menu .btn{border:0;background:none;justify-content:flex-start;width:100%;padding:8px 10px;font-size:13.5px;color:var(--ink)}
@@ -452,6 +467,30 @@ const BGT_PESO = '#,##0.00;[Red](#,##0.00);"-"';
 function bgtMonthsOf(l){ const a=[]; for(let i=1;i<=12;i++) a.push(Number(l['m'+i])||0); return a; }
 function bgtSum(a){ return a.reduce((s,x)=>s+(Number(x)||0),0); }
 
+
+// item details behind each OPEX line (extra sheet; Finance's template sheets stay unchanged)
+const BGT_SRC = { price_list:'Price list', stores:'Stores price', po:'Last PO', quotation:'Quotation', contract:'Contract', estimate:'Estimate' };
+const BGT_FREQ = { monthly:'Every month', quarterly:'Every quarter', semi:'Twice a year', once:'Once', months:'Selected months' };
+function bgtItemMonths(it){ const m = Math.min(12, Math.max(1, Number(it.m)||1));
+  return it.freq==='quarterly' ? [m,m+3,m+6,m+9].filter(x=>x<=12) : it.freq==='semi' ? [m,m+6].filter(x=>x<=12) : it.freq==='once' ? [m] : it.freq==='months' ? (it.ms||[]).map(Number) : Array.from({length:13-m},(_,i)=>m+i); }
+function bgtItemsSheet(wb, groups){
+  const ws = wb.addWorksheet('Details');
+  const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const hr = ws.addRow(['Department','Expense Line Item','Activity / Initiative','Item','Unit','Qty each time','Unit price','Price from','Price ref','Outlook allowance %','Price used','How often','Months','Times a year','Annual']);
+  hr.eachCell(c => { c.font = { bold:true, color:{argb:'FFFFFFFF'} }; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0E5A55'} }; c.alignment = { vertical:'middle', wrapText:true }; });
+  groups.forEach(g => (g.opex||[]).forEach(l => (l.items||[]).forEach(it => {
+    const ms = bgtItemMonths(it), used = (Number(it.price)||0) * (1 + (Number(it.adj)||0)/100), r = ws.addRow([g.name, l.line_item||'', l.activity||'', it.name||'', it.unit||'', Number(it.qty)||0, Number(it.price)||0,
+      it.std ? `Standard ${it.std}` : (BGT_SRC[it.src]||'Estimate'), it.ref||'', Number(it.adj)||0, null, BGT_FREQ[it.freq]||'Every month', ms.map(x=>MN[x-1]).join(', '), ms.length, null]);
+    const n = r.number; r.getCell(11).value = { formula:`G${n}*(1+J${n}/100)`, result:used }; r.getCell(15).value = { formula:`F${n}*K${n}*N${n}`, result:(Number(it.qty)||0)*used*ms.length };
+  })));
+  const last = ws.rowCount;
+  if (last > 1) { const t = ws.addRow(['Total','','','','','','','','','','','','','',{ formula:`SUM(O2:O${last})` }]); t.font = { bold:true }; }
+  [7,11,15].forEach(c => ws.getColumn(c).numFmt = BGT_PESO);
+  [16,30,30,34,9,10,12,14,24,10,12,14,24,8,14].forEach((w,i)=>ws.getColumn(i+1).width = w);
+  ws.views = [{ state:'frozen', ySplit:1 }]; ws.autoFilter = { from:'A1', to:{ row:1, column:15 } };
+  return ws;
+}
+
 async function fillDeptWorkbook(ExcelJS, templateBuf, d){
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(templateBuf);
@@ -529,6 +568,7 @@ async function fillDeptWorkbook(ExcelJS, templateBuf, d){
   }, 'TOTAL CAPEX BUDGET');
   fixSummary(wb.getWorksheet('OPEX Summary'), 'OPEX - Detailed', 'line_item', d.opex, 66);
   fixSummary(wb.getWorksheet('CAPEX Summary'), 'CAPEX - Detailed', 'category', d.capex, 16);
+  if ((d.opex||[]).some(l=>(l.items||[]).length)) bgtItemsSheet(wb, [{ name:d.deptName||'', opex:d.opex }]);
   wb.calcProperties = { fullCalcOnLoad: true };
   return await wb.xlsx.writeBuffer();
 }
@@ -604,6 +644,7 @@ async function buildPlantWorkbook(ExcelJS, p){
   p.depts.forEach(d => d.capex.forEach(l => { const m=bgtMonthsOf(l); ws.addRow([d.name,l.category,l.asset,l.description,l.justification,l.qty==null?null:Number(l.qty),l.unit_cost==null?null:Number(l.unit_cost),l.priority,...m,bgtSum(m),l.remarks]); }));
   money(ws,7,7); money(ws,9,21); ws.autoFilter = {from:'A1', to:{row:1,column:22}}; ws.views=[{state:'frozen',ySplit:1}];
   [16,26,30,40,40,8,14,18].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(22).width=40;
+  if (p.depts.some(d=>(d.opex||[]).some(l=>(l.items||[]).length))) bgtItemsSheet(wb, p.depts);
 
   wb.calcProperties = { fullCalcOnLoad: true };
   return await wb.xlsx.writeBuffer();
@@ -753,6 +794,7 @@ async function loadMaster(){
 async function loadBudgets(){
   const { data, error } = await sb.from('bgt_dept_budgets').select('*').eq('cycle_id', S.cycle.id); if (error) throw error;
   S.budgets = data.sort((a,b)=> (deptById(a.department_id)?.sort||0) - (deptById(b.department_id)?.sort||0));
+  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{})]);
   renderNav();
 }
 const deptById = id => S.depts.find(d=>d.id===id);
@@ -816,7 +858,7 @@ function navModel(){
   groups.push({ t:R?'Budgets':'My budget', depts:list });
   groups.push({ t:'Track', items:[['actuals','Actuals and projection'],['records','Plant records'],['capex','CAPEX tracker']] });
   groups.push({ t:'Analyse', items:[['perf','Sales and plant performance'],['analysis','Analysis and scenarios'],['outlook','Cost outlook']] });
-  groups.push({ t:'Setup', items:[['prices','Price list'], ...(S.me.role==='admin'?[['admin','Users and settings']]:[])] });
+  groups.push({ t:'Setup', items:[['prices','Price list'+(preqBadge()?` <span class="nbadge">${preqBadge()}</span>`:'')], ...(S.me.role==='admin'?[['admin','Users and settings']]:[])] });
   return { R, mine, list, groups };
 }
 const NAV_ICON = {
@@ -993,7 +1035,9 @@ function flagFor(checks, kind, id){
 function filterLines(list, keys){ const q = S.search.toLowerCase(); return !q ? list : list.filter(l=>keys.some(k=>String(l[k]||'').toLowerCase().includes(q))); }
 function renderOpexTable(ed, checks){
   const list = filterLines(S.opex, ['line_item','activity','description','priority','basis']);
-  const tb = `<div class="toolbar">${ed?'<button class="btn primary" onclick="editLine(\'opex\')">Add OPEX line</button>':''}<span class="grow"></span><input class="inp" placeholder="Search lines" aria-label="Search lines" value="${esc(S.search)}" oninput="S.search=this.value;document.getElementById('lineTable').innerHTML=opexTableHtml(runChecks())"></div>`;
+  const noItems = S.opex.filter(l=>!(l.items||[]).length).length;
+  setTimeout(()=>drawLineRecs(ed), 0);
+  const tb = `<div id="lineRecs"></div><div class="toolbar">${ed?'<button class="btn primary" onclick="editLine(\'opex\')">Add OPEX line</button>':''}${ed&&noItems&&S.cycle.status==='open'?`<button class="btn" onclick="fillMissingItems()">List items with assistant (${noItems} line${noItems>1?'s':''})</button>`:''}<span class="grow"></span><input class="inp" placeholder="Search lines" aria-label="Search lines" value="${esc(S.search)}" oninput="S.search=this.value;document.getElementById('lineTable').innerHTML=opexTableHtml(runChecks())"></div>`;
   if (!S.opex.length) return tb + `<div class="empty"><b>No OPEX lines yet</b>${ed?'Add one line per activity, contract or recurring cost — for example plant electricity, forklift fuel or a training program.':'This department has not added OPEX lines.'}</div>`;
   return tb + `<div id="lineTable">${opexTableHtml(checks)}</div>`;
 }
@@ -1001,7 +1045,7 @@ function opexTableHtml(checks){
   const list = filterLines(S.opex, ['line_item','activity','description','priority','basis']);
   return `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Line item / activity</th><th>Type</th><th>Priority</th><th>Basis of estimate</th><th>Timing Jan–Dec</th><th class="r">Annual</th><th></th></tr></thead><tbody>
   ${list.map(l=>`<tr class="row" tabindex="0" onclick="editLine('opex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('opex','${l.id}')">
-    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div>${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}</td>
+    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div><div style="font-size:11.5px;color:${(l.items||[]).length?'var(--muted)':'var(--red)'}">${(l.items||[]).length ? `${l.items.length} item${l.items.length>1?'s':''}: ${esc(l.items.slice(0,3).map(x=>x.name).join(', '))}${l.items.length>3?'…':''}` : 'No items yet — list what this covers'}</div>${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}</td>
     <td>${esc(l.expense_type||'')}</td><td>${priPill(l.priority)}</td><td>${esc(l.basis||'')}</td>
     <td>${ply(l)}</td><td class="r num">${peso(annual(l))}</td><td>${flagFor(checks,'opex',l.id)}</td></tr>`).join('')}
   </tbody><tfoot><tr><td colspan="5">Total OPEX${S.search?' (filtered)':''}</td><td class="r num">${peso(sum(list.map(annual)))}</td><td></td></tr></tfoot></table></div>`;
@@ -1034,6 +1078,15 @@ function runChecks(){
     if (!l.line_item) add('opex',l.id,'err','Choose an expense line item.',n);
     if (!l.activity) add('opex',l.id,'err','Name the activity or requirement.',n);
     if (!l.priority) add('opex',l.id,'err','Set a priority.',n);
+    if (S.cycle.status==='open') {
+      const its = l.items||[];
+      if (!its.length) add('opex',l.id,'err','List the items this line covers — what, how many, unit price and when. "List items with assistant" can fill them in.',n);
+      its.forEach(it => {
+        if (!itemsOk(it)) add('opex',l.id,'err',`Item "${it.name||'unnamed'}" needs a name, quantity, unit price and timing.`,n);
+        const sp = !it.std && stdFor(it.name); if (sp) add('opex',l.id,'err',`"${it.name}" has a standard ${S.cycle.year} price (${peso(sp.unit_price,2)}/${sp.unit||'unit'}) — use it so every department budgets the same price.`,n);
+        if (it.req && (S.preqs||[]).find(r=>r.id===it.req && r.status==='open')) add('opex',l.id,'warn',`Waiting for a standard price for "${it.name}" — your estimate is used until it is set.`,n);
+      });
+    }
     if (!l.expense_type) add('opex',l.id,'warn','Choose the type of expense.',n);
     if (!l.purpose) add('opex',l.id,'warn','Explain the business purpose — why the company should spend this.',n);
     if (!l.basis) add('opex',l.id,'warn','State the basis of estimate (contract, quotation, usage…).',n);
@@ -1119,7 +1172,7 @@ function lineCommentsHtml(kind, id){
 }
 function editLine(kind, id){
   const b = budgetById(S.budgetId), ed = canEdit(b), isO = kind==='opex';
-  const l = id ? (isO?S.opex:S.capex).find(x=>x.id===id) : {m1:0,m2:0,m3:0,m4:0,m5:0,m6:0,m7:0,m8:0,m9:0,m10:0,m11:0,m12:0};
+  const l = id ? (isO?S.opex:S.capex).find(x=>x.id===id) : {m1:0,m2:0,m3:0,m4:0,m5:0,m6:0,m7:0,m8:0,m9:0,m10:0,m11:0,m12:0, ...(S._prefill||{})}; S._prefill = null;
   if (!l) return;
   const ro = ed ? '' : 'disabled';
   const L = S.lookups, calc = l.calc || {};
@@ -1137,15 +1190,8 @@ function editLine(kind, id){
       <div class="field"><label for="f_basis">Basis of estimate</label><select class="inp" id="f_basis" ${ro}>${opts(L.basis.map(x=>x.value), l.basis)}</select></div>
       <div class="field"><label for="f_priority">Priority</label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
     </div>
-    <div class="box"><h3 style="display:flex;justify-content:space-between;align-items:center">Estimate calculator ${ed?`<button type="button" class="linkbtn" onclick="togglePricePick('opex')">Pick from price list</button>`:''}</h3><div id="pricePick" class="hidden" style="margin-bottom:8px"></div>
-      <div class="row-flex">
-        <div class="field" style="width:90px"><label for="c_qty">Qty</label><input class="inp num" id="c_qty" type="number" step="any" value="${calc.qty??''}" ${ro}></div>
-        <div class="field" style="width:90px"><label for="c_unit">Unit</label><input class="inp" id="c_unit" value="${esc(calc.unit||'')}" placeholder="pcs, kWh, pax" ${ro}></div>
-        <div class="field" style="width:130px"><label for="c_rate">Rate / unit cost</label><input class="inp num" id="c_rate" type="number" step="any" value="${calc.rate??''}" ${ro}></div>
-        <div class="field" style="width:110px"><label for="c_times">Times per year</label><input class="inp num" id="c_times" type="number" step="any" value="${calc.times??''}" placeholder="12 = monthly" ${ro}></div>
-      </div>
-      <div class="sumline"><span>Annual estimate</span><span class="num" id="c_total">—</span></div>
-    </div>` : `
+    ${itemsBoxHtml(l, ed)}
+  ` : `
     <div class="g2">
       <div class="field"><label for="f_category">CAPEX category</label><select class="inp" id="f_category" ${ro}>${opts(S.items.capex, l.category)}</select></div>
       <div class="field"><label for="f_priority">Priority</label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
@@ -1162,7 +1208,7 @@ function editLine(kind, id){
     </div>
     ${ed?`<div style="margin:-4px 0 12px"><button type="button" class="linkbtn" onclick="togglePricePick('capex')">Pick unit cost from price list</button><div id="pricePick" class="hidden" style="margin-top:6px"></div></div>`:''}`;
   const spread = ed ? `
-    <div class="box"><h3>Spread an amount across months</h3>
+    <div class="box ${isO?'hidden':''}" id="spreadBox"><h3>Spread an amount across months</h3>
       <div class="row-flex">
         <div class="field" style="width:150px"><label for="sp_amt">Amount (₱)</label><input class="inp num" id="sp_amt" type="number" step="any"></div>
         <div class="field" style="width:190px"><label for="sp_mode">How</label><select class="inp" id="sp_mode" onchange="spModeUi()">
@@ -1179,7 +1225,7 @@ function editLine(kind, id){
     <div class="body">
       ${ed ? aiBoxHtml(kind, id) : ''}
       ${fields}
-      <h3 style="font-size:16px;font-stretch:85%;margin:4px 0 8px">${isO?'When will it be incurred?':'When will it be paid?'}</h3>
+      <h3 style="font-size:16px;font-stretch:85%;margin:4px 0 8px">${isO?'When will it be incurred?':'When will it be paid?'}</h3>${isO?'<p class="hint" style="margin:-4px 0 8px">Adds up from the items and how often each is needed.</p>':''}
       <div id="plyLive"></div><div class="ply-lbl">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
       <div class="months" style="margin-top:12px">${MONTHS.map((m,i)=>`<div><label for="m${i+1}">${m}</label><input class="inp" id="m${i+1}" type="number" step="any" value="${Number(l['m'+(i+1)])||''}" ${ro} oninput="liveTotals('${kind}')"></div>`).join('')}</div>
       <div class="sumline"><span>Annual budget</span><span class="num" id="annualLive" style="font-size:18px"></span></div>
@@ -1198,7 +1244,7 @@ function editLine(kind, id){
   ['c_qty','c_rate','c_times','f_qty','f_unit_cost'].forEach(x => { const e = $('#'+x); if (e) e.oninput = () => liveTotals(kind); });
   liveTotals(kind);
   S._editingId = id || null;
-  if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); }
+  if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); loadPrices().catch(()=>{}).then(()=>{ itemSyncAnswers(); drawItems(); }); drawItems(); }
   else { S._sim = null; S._simLine = l; const fa = $('#f_asset'); if (fa && !fa.disabled) { fa.addEventListener('change', ()=>cxSimilar()); } cxSimilar(); }
   if (!isO) loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.${(()=>{ const c = $('#f_category')?.value, d = c && o.D.find(x=>x.line_item===c); return d && d.next_year_pct!=null ? `<br><b>${esc(c)}:</b> assume ${Number(d.next_year_pct)>=0?'+':''}${Number(d.next_year_pct)}% vs ${S.cycle.year-1} prices — ${esc(d.rationale||'')}` : ''; })()}</div>`; }).catch(()=>{});
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
@@ -1210,12 +1256,8 @@ function liveTotals(kind){
   $('#plyLive').innerHTML = kind==='opex' ? ply(m,true) : ply(m,true).replace(/var\(--teal\)/g,'var(--kraft)').replace(/var\(--teal-wash\)/g,'var(--kraft-wash)');
   let warn = '';
   if (kind==='opex') {
-    const q = Number($('#c_qty').value), r = Number($('#c_rate').value), x = Number($('#c_times').value) || 1;
-    const est = q && r ? q*r*x : 0;
-    $('#c_total').textContent = est ? peso(est,2) : '—';
-    if (est && $('#sp_amt') && !$('#sp_amt')._touched) $('#sp_amt').value = est;
-    if (est && t && Math.abs(est - t) > 1) warn = `Monthly total differs from the calculator estimate (${peso(est)}).`;
-    if (r >= (Number(S.cycle.capex_threshold)||20000)) warn += ` Unit cost is ₱${Number(S.cycle.capex_threshold).toLocaleString()} or more — if it lasts over a year, budget it under CAPEX.`;
+    const th = Number(S.cycle.capex_threshold)||20000, big = (S._items||[]).filter(it => Number(it.price)*(1+(Number(it.adj)||0)/100) >= th);
+    if (big.length) warn = `${big.map(it=>it.name).join(', ')}: ₱${th.toLocaleString()} or more per unit — if it lasts over a year, budget it under CAPEX.`;
   } else {
     const q = Number($('#f_qty').value), u = Number($('#f_unit_cost').value), est = q*u;
     $('#c_total2').value = est ? peso(est,2) : '';
@@ -1258,8 +1300,9 @@ async function cxSimilar(){
 async function saveLine(kind, id){
   const isO = kind==='opex', v = x => { const e=$('#'+x); return e ? (e.value.trim()===''?null:e.value.trim()) : null; };
   const row = { budget_id:S.budgetId, ...readMonths(), remarks:v('f_remarks'), priority:v('f_priority'), description:v('f_description') };
-  if (isO) Object.assign(row, { line_item:v('f_line_item'), expense_type:v('f_expense_type'), activity:v('f_activity'), purpose:v('f_purpose'), basis:v('f_basis'),
-      calc: (v('c_qty')||v('c_rate')||v('c_times')||v('c_unit')) ? { qty:Number(v('c_qty'))||null, unit:v('c_unit'), rate:Number(v('c_rate'))||null, times:Number(v('c_times'))||null } : null });
+  if (isO) { const items = cleanItems(S._items);
+    Object.assign(row, { line_item:v('f_line_item'), expense_type:v('f_expense_type'), activity:v('f_activity'), purpose:v('f_purpose'), basis:v('f_basis'), items:items.length?items:null, calc:null });
+    if (items.length) itemsMonths(items).forEach((x,k)=>row['m'+(k+1)] = x); }
   else Object.assign(row, { category:v('f_category'), asset:v('f_asset'), justification:v('f_justification'), qty:v('f_qty')==null?null:Number(v('f_qty')), unit_cost:v('f_unit_cost')==null?null:Number(v('f_unit_cost')) });
   if (isO ? !(row.activity||row.line_item) : !(row.asset||row.category)) { toast(isO?'Add at least a line item or activity name.':'Add at least a category or asset name.', true); return; }
   if (!isO) {
@@ -1377,7 +1420,7 @@ async function renderOverview(){
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
-    ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
+    ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
       <div class="stat capex"><div class="eyebrow">Plant CAPEX</div><div class="v">${short(T.capex)}</div><div class="s">${peso(T.capex)}</div></div>
@@ -1831,12 +1874,14 @@ const today = () => new Date().toISOString().slice(0,10);
 function priceMatches(p, q){ q = (q||'').toLowerCase(); return !q || [p.item,p.category,p.supplier,p.quote_ref,p.notes].some(v=>String(v||'').toLowerCase().includes(q)); }
 async function renderPrices(){
   mainLoading('Loading price list…');
-  try { await loadPrices(true); } catch(e){ return fail(e); }
+  try { await loadPrices(true); await loadPriceReqs(); } catch(e){ return fail(e); }
+  setTimeout(markPreqsSeen, 1500);
   const cats = [...new Set(S.prices.map(p=>p.category).filter(Boolean))].sort();
   $('#main').innerHTML = `
   <div class="ph"><div><div class="eyebrow">${esc(S.company.name)}</div><h1>Price list</h1>
-    <div class="sub">Item prices and supplier quotations. Everyone can pick from this list when estimating a budget line, so the same price is used across departments.</div></div>
+    <div class="sub">Standard ${S.cycle.year} prices (set by the Head of Plant Operations — every department must use them) plus quotations and reference prices.</div></div>
     <div class="actions"><button class="btn primary" onclick="editPrice()">Add item price</button><button class="btn" onclick="aiPriceDialog()">Look up price online</button><button class="btn" onclick="importPricesDialog()">Import Excel</button><button class="btn ghost" onclick="exportPrices()">Download list / template</button></div></div>
+  ${preqCardHtml()}
   <div class="card"><div class="toolbar"><input class="inp" placeholder="Search item, supplier, quote" aria-label="Search prices" value="${esc(S.pr.q)}" oninput="S.pr.q=this.value;$('#prTable').innerHTML=priceTableHtml()">
     <select class="inp" style="max-width:260px" aria-label="Category" onchange="S.pr.cat=this.value;$('#prTable').innerHTML=priceTableHtml()"><option value="">All categories</option>${cats.map(c=>`<option ${c===S.pr.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
     <span class="grow"></span><span class="hint">${S.prices.length} items</span></div>
@@ -1848,7 +1893,7 @@ function priceTableHtml(){
   return `<div class="tbl-wrap"><table class="ledger" style="min-width:860px"><thead><tr><th>Item</th><th>Category</th><th class="r">Unit price</th><th>Supplier</th><th>Quotation</th><th>Valid until</th><th>Department</th></tr></thead><tbody>
   ${list.map(p => { const exp = p.valid_until && p.valid_until < today();
     return `<tr class="row" tabindex="0" onclick="editPrice('${p.id}')" onkeydown="if(event.key==='Enter')editPrice('${p.id}')" style="${p.active===false?'opacity:.5':''}">
-    <td><div class="act">${esc(p.item)} ${p.source_type==='market'?'<span class="pri pri-low" style="font-size:10.5px">Market reference</span>':''}</div>${p.source_url?`<div class="item" style="text-transform:none"><a href="${esc(p.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--teal)">Source${p.as_of?' · '+p.as_of:''}</a></div>`:''}${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td style="font-size:12.5px">${esc(p.category||'')}</td>
+    <td><div class="act">${esc(p.item)} ${p.budget_year?`<span class="pri pri-ok" style="font-size:10.5px">Standard ${p.budget_year}</span>`:''} ${p.source_type==='market'?'<span class="pri pri-low" style="font-size:10.5px">Market reference</span>':''}</div>${p.source_url?`<div class="item" style="text-transform:none"><a href="${esc(p.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--teal)">Source${p.as_of?' · '+p.as_of:''}</a></div>`:''}${p.notes?`<div class="item" style="text-transform:none">${esc(p.notes)}</div>`:''}</td><td style="font-size:12.5px">${esc(p.category||'')}</td>
     <td class="r num">${peso(p.unit_price,2)}<div class="item" style="text-transform:none">per ${esc(p.unit||'unit')}</div></td><td>${esc(p.supplier||'')}</td>
     <td style="font-size:12.5px">${esc(p.quote_ref||'')}${p.quote_date?`<div class="item" style="text-transform:none">${p.quote_date}</div>`:''}</td>
     <td>${p.valid_until?`<span class="pri ${exp?'pri-crit':'pri-ok'}">${exp?'Expired ':''}${p.valid_until}</span>`:''}</td><td style="font-size:12.5px">${esc(p.department_id?deptById(p.department_id)?.name:'All')}</td></tr>`; }).join('')}
@@ -1870,6 +1915,7 @@ function editPrice(id){
     <div class="g2"><div class="field"><label for="pType">Price type</label><select class="inp" id="pType">${[['quotation','Supplier quotation'],['contract','Contract'],['market','Market reference (published price)']].map(([k,l])=>`<option value="${k}" ${(p.source_type||'quotation')===k?'selected':''}>${l}</option>`).join('')}</select></div>
       <div class="field"><label for="pUrl">Source link (optional)</label><input class="inp" id="pUrl" value="${esc(p.source_url||'')}" placeholder="https://"></div></div>
     <div class="field"><label for="pNotes">Notes</label><input class="inp" id="pNotes" value="${esc(p.notes||'')}" placeholder="Specs, VAT inclusive/exclusive, minimum order"></div>
+    ${canManageData()?`<div class="field"><label><input type="checkbox" id="pStd" ${p.budget_year?'checked':''}> Standard ${S.cycle.year} budget price — every department must use this price as is (include the outlook increase in it)</label></div>`:p.budget_year?`<div class="banner green">Standard ${p.budget_year} price — only the Head of Plant Operations can change it.</div>`:''}
     <div class="field"><label><input type="checkbox" id="pAct" ${p.active!==false?'checked':''}> Active (shown in the picker)</label></div>
     <div class="actions" style="justify-content:space-between"><span>${id && canManageData()?`<button class="btn danger" onclick="deletePrice('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="savePrice('${id||''}')">Save</button></span></div>`);
 }
@@ -1877,9 +1923,11 @@ async function savePrice(id){
   const v = x => $('#'+x).value.trim() || null;
   const row = { company_id:S.company.id, item:v('pItem'), category:v('pCat'), department_id:v('pDept'), unit_price:Number(v('pPrice'))||0, unit:v('pUnit'), supplier:v('pSup'), quote_ref:v('pRef'), quote_date:v('pQd'), valid_until:v('pVu'), notes:v('pNotes'), source_type:$('#pType').value, source_url:v('pUrl'), as_of:v('pQd')||today(), active:$('#pAct').checked, updated_by:S.me.id };
   if (!row.item) { toast('Name the item.', true); return; }
+  if ($('#pStd')) row.budget_year = $('#pStd').checked ? S.cycle.year : null;
   const r = id ? await sb.from('bgt_price_items').update(row).eq('id', id).select().single() : await sb.from('bgt_price_items').insert(row).select().single();
   if (r.error) return fail(r.error);
-  closeModal(); toast('Price saved'); renderPrices();
+  let n = 0; if (r.data.budget_year) { await loadPrices(true); n = await applyStdPrice(r.data); }
+  closeModal(); toast(`Price saved${n?` — ${n} budget line${n>1?'s':''} updated to the standard price`:''}`); renderPrices();
 }
 async function deletePrice(id){ const r = await sb.from('bgt_price_items').delete().eq('id', id); if (r.error) return fail(r.error); closeModal(); toast('Price deleted'); renderPrices(); }
 const PRICE_COLS = [['item','Item'],['category','Budget line item / category'],['unit','Per (unit)'],['unit_price','Unit price'],['supplier','Supplier'],['quote_ref','Quotation ref'],['quote_date','Quotation date'],['valid_until','Valid until'],['dept','Department code'],['notes','Notes']];
@@ -2535,7 +2583,7 @@ function aiBoxHtml(kind, id){
 }
 function formSnapshot(kind){
   const v = x => $('#'+x)?.value || undefined;
-  return kind==='opex' ? { line_item:v('f_line_item'), expense_type:v('f_expense_type'), activity:v('f_activity'), description:v('f_description'), purpose:v('f_purpose'), basis:v('f_basis'), priority:v('f_priority'), qty:v('c_qty'), unit:v('c_unit'), rate:v('c_rate'), times:v('c_times'), annual:sum(Object.values(readMonths())) }
+  return kind==='opex' ? { line_item:v('f_line_item'), expense_type:v('f_expense_type'), activity:v('f_activity'), description:v('f_description'), purpose:v('f_purpose'), basis:v('f_basis'), priority:v('f_priority'), items:cleanItems(S._items||[]), annual:sum(Object.values(readMonths())) }
     : { category:v('f_category'), asset:v('f_asset'), description:v('f_description'), justification:v('f_justification'), qty:v('f_qty'), unit_cost:v('f_unit_cost'), priority:v('f_priority'), annual:sum(Object.values(readMonths())) };
 }
 async function aiDraft(kind){
@@ -2545,9 +2593,9 @@ async function aiDraft(kind){
   try {
     const r = await ai({ mode:'draft_line', kind, budget_id:S.budgetId, text:text || 'Improve this line: complete missing fields, check the amount and timing.', current:has?cur:undefined });
     const set = (id, v) => { const e = $('#'+id); if (e && v != null && v !== '') { if (e.tagName==='SELECT' && ![...e.options].some(o=>o.value===v)) e.insertAdjacentHTML('beforeend', `<option>${esc(v)}</option>`); e.value = v; } };
-    if (kind==='opex') { ['line_item','expense_type','activity','description','purpose','basis','priority'].forEach(k=>set('f_'+k, r[k])); set('c_qty', r.qty); set('c_unit', r.unit); set('c_rate', r.rate); set('c_times', r.times); }
+    if (kind==='opex') { ['line_item','expense_type','activity','description','purpose','basis','priority'].forEach(k=>set('f_'+k, r[k])); if ((r.items||[]).length) { await loadPrices().catch(()=>{}); S._items = r.items.map(normAiItem); } }
     else { ['category','asset','description','justification','priority'].forEach(k=>set('f_'+k, r[k])); set('f_qty', r.qty); set('f_unit_cost', r.unit_cost); }
-    (r.months||[]).slice(0,12).forEach((v,i)=> $('#m'+(i+1)).value = Number(v) ? Math.round(Number(v)*100)/100 : '');
+    if (kind==='opex' && (S._items||[]).length) drawItems(); else (r.months||[]).slice(0,12).forEach((v,i)=> $('#m'+(i+1)).value = Number(v) ? Math.round(Number(v)*100)/100 : '');
     if (r.remarks) { const rem = $('#f_remarks'); rem.value = rem.value && !rem.value.includes(r.remarks) ? rem.value.trim() + ' ' + r.remarks : r.remarks; }
     $('#f_priority')?.dispatchEvent(new Event('change'));
     liveTotals(kind); if (kind==='opex') refreshRef();
@@ -2708,6 +2756,14 @@ async function aiBudgetAdd(){
       remarks:`Assistant draft: ${c.rationale||''}${c.carried_over?' (deferred from an earlier year)':''} — review and confirm.`, carried_from:src?.id||null, sort:base+opex.length+j+1 };
     for (let k=1;k<=12;k++) row['m'+k] = k===(Number(c.month)||1) ? amt : 0; return row; });
   if (!opex.length && !capex.length) { toast('Select at least one line.', true); return; }
+  if (opex.length) {   // list the items behind every line: what, how many, price, when
+    const add = $('#abAdd'); if (add) add.disabled = true;
+    const st = document.createElement('div'); st.id = 'abItems'; $('#abBody').prepend(st);
+    const res = await aiItemsFor(opex.map((o,j)=>({ key:String(j), line_item:o.line_item, activity:o.activity, description:o.description, annual:sum(MONTHS.map((_,k)=>Number(o['m'+(k+1)])||0)) })),
+      (d,n) => { st.innerHTML = AI_BUSY(`Listing the items for each line… ${d} of ${n}`); });
+    opex.forEach((o,j) => { const its = res[String(j)]; if (!its) return; o.items = cleanItems(its); itemsMonths(o.items).forEach((v,k)=>o['m'+(k+1)] = v); });
+    st.remove();
+  }
   try {
     if (opex.length) { const x = await sb.from('bgt_opex_lines').insert(opex); if (x.error) throw x.error; }
     if (capex.length) { const x = await sb.from('bgt_capex_lines').insert(capex); if (x.error) throw x.error; }
@@ -3846,6 +3902,318 @@ async function deleteGap(id){
   const r = await sb.from('bgt_gap_remarks').delete().eq('id', id); if (r.error) return fail(r.error);
   await loadGaps(S.act.year, true); toast('Gap remark removed'); closeDrawer(); renderActuals();
 }
+
+/* ================= LINE ITEM DETAILS =================
+   Every OPEX line lists what will actually be bought or paid for: item, quantity, unit price, where the price
+   came from, the cost-outlook allowance and when it is needed. The line's months are the sum of its items. */
+const ITEM_SRC = [['price_list','Price list'],['stores','Stores price'],['po','Last PO'],['quotation','Quotation'],['contract','Contract'],['estimate','Estimate']];
+const ITEM_FREQ = [['monthly','Every month'],['quarterly','Every quarter'],['semi','Twice a year'],['once','Once'],['months','Selected months']];
+const srcLbl = k => (ITEM_SRC.find(x=>x[0]===k)||[,'Estimate'])[1];
+const itemUnit = it => { const q = Number(it.qty)||0, p = Number(it.price)||0, a = Number(it.adj)||0; return q * p * (1 + a/100); };
+function itemMonthList(it){
+  const m = Math.min(12, Math.max(1, Number(it.m)||1));
+  if (it.freq==='quarterly') return [m, m+3, m+6, m+9].filter(x=>x<=12);
+  if (it.freq==='semi') return [m, m+6].filter(x=>x<=12);
+  if (it.freq==='once') return [m];
+  if (it.freq==='months') return (it.ms||[]).map(Number).filter(x=>x>=1&&x<=12);
+  return Array.from({length:13-m}, (_,i)=>m+i);   // monthly, from the start month
+}
+function itemMonths(it){ const a = Array(12).fill(0), u = itemUnit(it); itemMonthList(it).forEach(k => a[k-1] += u); return a; }
+const itemAnnual = it => sum(itemMonths(it));
+function itemsMonths(items){ const a = Array(12).fill(0); (items||[]).forEach(it => itemMonths(it).forEach((v,i)=>a[i]+=v)); return a.map(v=>Math.round(v*100)/100); }
+const itemsOk = it => it && String(it.name||'').trim() && Number(it.qty)>0 && Number(it.price)>0 && itemMonthList(it).length;
+function freqText(it){ const n = itemMonthList(it).length, m = Number(it.m)||1;
+  return it.freq==='monthly' ? (m>1?`monthly from ${MONTHS[m-1]}`:'monthly') : it.freq==='once' ? `once, ${MONTHS[m-1]}` : it.freq==='months' ? itemMonthList(it).map(x=>MONTHS[x-1]).join(', ') : `${ITEM_FREQ.find(x=>x[0]===it.freq)?.[1].toLowerCase()} (${n}×)`; }
+
+/* outlook allowance for the line item being edited */
+async function lineAllowance(lineItem){
+  try { const o = await loadOutlook(S.cycle.year); return Math.round(drvPct(o, lineItem, 'next')*10)/10; } catch(e){ return 0; }
+}
+// a price that is already valid for the budget year needs no allowance
+function defaultAdj(src, validUntil, pct){ if (src==='quotation' || src==='contract') return 0; if (validUntil && validUntil >= `${S.cycle.year}-12-31`) return 0; return pct; }
+
+/* ---------- editor inside the OPEX drawer ---------- */
+function itemsBoxHtml(l, ed){
+  S._items = JSON.parse(JSON.stringify(l.items || []));
+  return `<div class="box items-box"><h3 style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Items — what exactly will be bought or paid for
+      ${ed?`<span class="actions"><button type="button" class="btn sm" id="itAi" onclick="itemsWithAI()">List items with assistant</button><button type="button" class="btn sm primary" onclick="addItem()">Add item</button></span>`:''}</h3>
+    <p class="hint" style="margin:0 0 8px">One row per item: bond paper, ballpens, toner, a service contract. Type the name to pick a price from the price list or past purchases; the cost-outlook allowance is added for ${S.cycle.year}. No known price? Enter your estimate.</p>
+    <div id="itemRows"></div>
+    <div class="sumline"><span>Items total</span><span class="num" id="itemsTot">—</span></div></div>`;
+}
+function drawItems(){
+  const box = $('#itemRows'); if (!box) return;
+  const ed = !$('#f_activity')?.disabled, ro = ed ? '' : 'disabled';
+  const opt = (list, v) => list.map(([k,l])=>`<option value="${k}" ${k===v?'selected':''}>${l}</option>`).join('');
+  box.innerHTML = S._items.length ? S._items.map((it,i)=>`<div class="it-row" data-i="${i}">
+      <div class="it-top"><div class="it-name"><input class="inp" id="itN${i}" value="${esc(it.name||'')}" placeholder="Item, e.g. Bond paper A4 (ream)" autocomplete="off" ${ro} oninput="itemSet(${i},'name',this.value);itemSearch(${i})" onfocus="itemSearch(${i})" onblur="setTimeout(()=>itemHide(${i}),200)"><div class="it-pick hidden" id="itP${i}"></div></div>
+        ${ed?`<button type="button" class="btn ghost sm" aria-label="Remove item" onclick="removeItem(${i})">✕</button>`:''}</div>
+      <div class="it-grid">
+        <label>Qty each time<input class="inp num" type="number" step="any" min="0" value="${it.qty??''}" ${ro} oninput="itemSet(${i},'qty',this.value)"></label>
+        <label>Unit<input class="inp" value="${esc(it.unit||'')}" placeholder="ream, pc, liter" ${ro} oninput="itemSet(${i},'unit',this.value,1)"></label>
+        <label>Unit price ₱<input class="inp num" type="number" step="any" min="0" value="${it.price??''}" ${it.std?'readonly title="Standard price — set by the Head of Plant Operations"':ro} oninput="itemSet(${i},'price',this.value)"></label>
+        ${it.std ? `<label>Price from<input class="inp" value="Standard ${it.std}" readonly></label><label>Allowance %<input class="inp num" value="0" readonly title="The standard price already includes the outlook"></label>`
+        : `<label>Price from<select class="inp" ${ro} onchange="itemSet(${i},'src',this.value);itemSrcChanged(${i})">${opt(ITEM_SRC, it.src||'estimate')}</select></label>
+        <label>Allowance %<input class="inp num" type="number" step="any" value="${it.adj??0}" ${ro} oninput="itemSet(${i},'adj',this.value)" title="Cost-outlook increase added to the price for ${S.cycle.year}"></label>`}
+        <label>How often<select class="inp" ${ro} onchange="itemSet(${i},'freq',this.value);drawItems()">${opt(ITEM_FREQ, it.freq||'monthly')}</select></label>
+        ${it.freq==='months' ? `<div class="it-ms">${MONTHS.map((mm,k)=>`<label><input type="checkbox" ${ro} ${(it.ms||[]).includes(k+1)?'checked':''} onchange="itemMonth(${i},${k+1},this.checked)">${mm}</label>`).join('')}</div>`
+          : `<label>${it.freq==='monthly'?'From':it.freq==='once'?'Month':'First month'}<select class="inp" ${ro} onchange="itemSet(${i},'m',this.value)">${MONTHS.map((mm,k)=>`<option value="${k+1}" ${Number(it.m||1)===k+1?'selected':''}>${mm}</option>`).join('')}</select></label>`}
+      </div>
+      <div class="it-foot"><span class="hint" id="itR${i}">${itemRefText(it)}</span><b class="num" id="itA${i}">${peso(itemAnnual(it))}</b></div>
+      <div id="itS${i}">${itemStdNote(it, i, ed)}</div>
+    </div>`).join('') : `<div class="hint" style="padding:6px 0 4px">No items yet.${ed?' Add them one by one, or let the assistant list them from your past usage and prices.':''}</div>`;
+  itemsChanged();
+}
+// standard prices set by the Head of Plant Operations for the budget year; everyone uses them as is
+const stdPrices = () => (S.prices||[]).filter(p => p.active!==false && Number(p.budget_year)===S.cycle.year);
+const stdKey = p => String(p.item||'').split(/\s[—–-]\s|[(,]/)[0].trim().toLowerCase();
+function stdFor(name){ const n = ' ' + String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' ';
+  return stdPrices().find(p => { const k = stdKey(p).replace(/[^a-z0-9]+/g,' ').trim(); return k.length>=3 && n.includes(' '+k+' '); }); }
+function itemStdNote(it, i, ed){
+  if (it.std) return `<div class="it-std ok">Standard ${it.std} price — the same for every department.</div>`;
+  const sp = it.name && stdFor(it.name);
+  if (sp) return `<div class="it-std warn">A standard ${S.cycle.year} price exists: <b>${esc(sp.item)}</b> ${peso(sp.unit_price,2)}/${esc(sp.unit||'unit')}.${ed?` <a onclick="useStd(${i},'${sp.id}')">Use it</a>`:''}</div>`;
+  const rq = it.req && (S.preqs||[]).find(r=>r.id===it.req);
+  if (rq) return `<div class="it-std ${rq.status==='open'?'wait':'ok'}">${rq.status==='open'?'Standard price requested — waiting for the Head of Plant Operations.':rq.status==='answered'?`Answered: ${peso(rq.answer_price,2)}/${esc(rq.answer_unit||rq.unit||'unit')}${rq.answer_note?' — '+esc(rq.answer_note):''}.`:`Request declined${rq.answer_note?': '+esc(rq.answer_note):''} — keep your estimate.`}</div>`;
+  return ed && it.name && (it.src||'estimate')==='estimate' ? `<div class="it-std"><a onclick="askStdPrice(${i})">No known price — ask the Head of Plant Operations for a standard price</a></div>` : '';
+}
+function useStd(i, pid){ const sp = (S.prices||[]).find(p=>p.id===pid), it = S._items[i]; if (!sp || !it) return;
+  Object.assign(it, { price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item }); delete it.req; drawItems(); }
+function askStdPrice(i){
+  const it = S._items[i]; if (!it) return;
+  modal2(`<h3>Ask for a standard price</h3><p>The Head of Plant Operations sets one price for everyone. You will see the answer here and the line updates itself.</p>
+    <div class="field"><label for="rqItem">Item</label><input class="inp" id="rqItem" value="${esc(it.name||'')}"></div>
+    <div class="g2"><div class="field"><label for="rqUnit">Per</label><input class="inp" id="rqUnit" value="${esc(it.unit||'')}" placeholder="liter, pc, month"></div>
+      <div class="field"><label for="rqPrice">Your estimate ₱ (used until answered)</label><input class="inp num" id="rqPrice" type="number" step="any" value="${it.price??''}"></div></div>
+    <div class="field"><label for="rqNote">Note</label><textarea class="inp" id="rqNote" rows="2" placeholder="Specs, where you got the estimate, how many you need"></textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="rqGo">Send request</button></div>`);
+  $('#rqGo').onclick = async () => {
+    const b = budgetById(S.budgetId), name = $('#rqItem').value.trim(); if (!name) { toast('Name the item.', true); return; }
+    const row = { company_id:S.company.id, year:S.cycle.year, department_id:b.department_id, line_item:$('#f_line_item')?.value||null, item:name, unit:$('#rqUnit').value.trim()||null,
+      suggested_price:Number($('#rqPrice').value)||null, note:$('#rqNote').value.trim()||null, requested_by:S.me.id };
+    const r = await sb.from('bgt_price_requests').insert(row).select().single(); if (r.error) return fail(r.error);
+    (S.preqs ||= []).push(r.data); Object.assign(it, { req:r.data.id, name, unit:row.unit||it.unit, price:row.suggested_price ?? it.price, src:'estimate' });
+    closeModal2(); drawItems(); renderNav(); toast('Request sent — save the line; it updates when the price is set');
+  };
+}
+function itemRefText(it){
+  const q = Number(it.qty)||0, p = Number(it.price)||0;
+  if (!q || !p) return it.name ? 'Enter quantity and unit price' : '';
+  return `${q.toLocaleString('en-PH')} ${esc(it.unit||'')} × ${peso(p,2)}${Number(it.adj)?` + ${Number(it.adj)}%`:''} · ${freqText(it)} · ${srcLbl(it.src)}${it.ref?' — '+esc(it.ref):''}`;
+}
+function itemSet(i, k, v, noRedraw){
+  const it = S._items[i]; if (!it) return;
+  it[k] = ['qty','price','adj','m'].includes(k) ? (v===''?null:Number(v)) : v;
+  if (k==='m') it.m = Number(v);
+  const r = $('#itR'+i), a = $('#itA'+i); if (r) r.innerHTML = itemRefText(it); if (a) a.textContent = peso(itemAnnual(it));
+  if (k==='name') { const sn = $('#itS'+i); if (sn) sn.innerHTML = itemStdNote(it, i, !$('#f_activity')?.disabled); }
+  itemsChanged();
+}
+function itemMonth(i, m, on){ const it = S._items[i], s = new Set(it.ms||[]); on ? s.add(m) : s.delete(m); it.ms = [...s].sort((a,b)=>a-b); itemSet(i,'ms',it.ms); }
+async function itemSrcChanged(i){ const it = S._items[i]; it.adj = defaultAdj(it.src, null, await lineAllowance($('#f_line_item')?.value)); drawItems(); }
+async function addItem(){
+  const pct = await lineAllowance($('#f_line_item')?.value);
+  S._items.push({ name:'', qty:null, unit:'', price:null, src:'estimate', adj:pct, freq:'monthly', m:1 });
+  drawItems(); setTimeout(()=>$('#itN'+(S._items.length-1))?.focus(), 30);
+}
+function removeItem(i){ S._items.splice(i,1); drawItems(); }
+/* the line's months follow its items */
+function itemsChanged(){
+  const tot = sum(S._items.map(itemAnnual)); const t = $('#itemsTot'); if (t) t.textContent = S._items.length ? peso(tot,2) : '—';
+  if (!S._items.length) { document.querySelectorAll('.months input').forEach(e=>{ if (!e.dataset.lock) return; e.readOnly = false; delete e.dataset.lock; }); return; }
+  const m = itemsMonths(S._items);
+  m.forEach((v,k)=>{ const e = $('#m'+(k+1)); if (e) { e.value = v ? Math.round(v*100)/100 : ''; e.readOnly = true; e.dataset.lock = 1; } });
+  const sp = $('#spreadBox'); if (sp) sp.classList.add('hidden');
+  liveTotals('opex');
+}
+/* search the price list and past purchases */
+let _itT;
+function itemSearch(i){
+  clearTimeout(_itT); _itT = setTimeout(async () => {
+    const q = (S._items[i]?.name||'').trim(), box = $('#itP'+i); if (!box) return;
+    if (q.length < 2) { box.classList.add('hidden'); return; }
+    const { data, error } = await sb.rpc('bgt_item_catalog2', { p_q:q, p_line:$('#f_line_item')?.value || null, p_year:S.cycle.year });
+    if (error || !(data||[]).length) { box.innerHTML = `<div class="hint" style="padding:8px">No known price for "${esc(q)}" — enter your estimate.</div>`; box.classList.remove('hidden'); return; }
+    S._cat = data;
+    box.innerHTML = data.slice(0,12).map((c,k)=>`<button type="button" onmousedown="itemPick(${i},${k})"><span><b>${esc(c.name)}</b>${c.budget_year?` <span class="pri pri-ok" style="font-size:10.5px">Standard ${c.budget_year}</span>`:''}<small>${srcLbl(c.src)}${c.ref&&c.src!=='stores'?' · '+esc(c.ref):''}${c.as_of?' · '+fmtDay(c.as_of):''}${c.line_item?' · '+esc(c.line_item):''}</small></span><span class="num">${peso(c.price,2)}${c.unit?'/'+esc(c.unit):''}</span></button>`).join('');
+    box.classList.remove('hidden');
+  }, 250);
+}
+function itemHide(i){ $('#itP'+i)?.classList.add('hidden'); }
+async function itemPick(i, k){
+  const c = S._cat?.[k], it = S._items[i]; if (!c || !it) return;
+  const pct = await lineAllowance($('#f_line_item')?.value);
+  Object.assign(it, { name:c.name, unit:c.unit || it.unit || '', price:Number(c.price), src:c.src, ref:`${c.ref&&c.src!=='stores'?c.ref+' ':''}${c.as_of?fmtDay(c.as_of):''}`.trim(), adj:c.budget_year ? 0 : defaultAdj(c.src, c.valid_until, pct), pid:c.id||undefined, std:c.budget_year||undefined });
+  if (c.budget_year) delete it.req;
+  if (!it.qty) it.qty = 1;
+  drawItems(); toast('Price filled in — set the quantity and how often');
+}
+function cleanItems(items){
+  return (items||[]).filter(it => String(it.name||'').trim() || Number(it.qty) || Number(it.price)).map(it => ({ name:String(it.name||'').trim(), spec:it.spec||undefined, unit:it.unit||'', qty:Number(it.qty)||0, price:Number(it.price)||0,
+    src:it.src||'estimate', ref:it.ref||undefined, adj:Number(it.adj)||0, pid:it.pid||undefined, std:it.std||undefined, req:it.req||undefined, freq:it.freq||'monthly', m:Number(it.m)||1, ms:it.freq==='months'?(it.ms||[]):undefined, why:it.why||undefined }));
+}
+
+/* ---------- assistant: list the items ---------- */
+// one line in the drawer
+async function itemsWithAI(){
+  await loadPrices().catch(()=>{});
+  const btn = $('#itAi'), li = $('#f_line_item')?.value, act = $('#f_activity')?.value;
+  if (!li && !act) { toast('Choose the line item or name the activity first.', true); return; }
+  btn.disabled = true; const t = btn.textContent; btn.innerHTML = '<span class="spin" style="width:12px;height:12px"></span> Listing…';
+  try {
+    const r = await ai({ mode:'draft_items', budget_id:S.budgetId, lines:[{ key:'x', line_item:li, activity:act, description:$('#f_description')?.value, annual:sum(Object.values(readMonths())), items:cleanItems(S._items) }] });
+    const got = (r.lines||[])[0];
+    if (!got?.items?.length) { toast('The assistant found nothing to list for this line.', true); return; }
+    S._items = got.items.map(normAiItem); drawItems();
+    toast(`${S._items.length} items listed — check quantities and prices, then Save line`);
+  } catch(e){ fail(e); } finally { btn.disabled = false; btn.textContent = t; }
+}
+function normAiItem(x){ const sp = stdFor(x.name) || stdPrices().find(p=>p.item.toLowerCase()===String(x.name||'').toLowerCase());
+  if (sp) return { name:x.name, spec:x.spec, unit:sp.unit||x.unit||'', qty:Number(x.qty)||0, price:Number(sp.unit_price), src:'price_list', ref:sp.item, adj:0, pid:sp.id, std:sp.budget_year, freq:x.freq||'monthly', m:Number(x.month ?? x.m)||1, ms:x.months || x.ms, why:x.why };
+  return { name:x.name, spec:x.spec, unit:x.unit||'', qty:Number(x.qty)||0, price:Number(x.price)||0, src:x.src||'estimate', ref:x.ref, adj:Number(x.adj_pct ?? x.adj)||0, freq:x.freq||'monthly', m:Number(x.month ?? x.m)||1, ms:x.months || x.ms, why:x.why }; }
+// many lines at once (draft budget, or lines still without items); batches of 5 lines, 3 at a time
+async function aiItemsFor(lines, onProgress){
+  await loadPrices().catch(()=>{});
+  const out = {}, chunks = []; for (let i=0;i<lines.length;i+=5) chunks.push(lines.slice(i,i+5));
+  let done = 0;
+  const run = async ch => { try { const r = await ai({ mode:'draft_items', budget_id:S.budgetId, lines:ch });
+      (r.lines||[]).forEach(x => { if (x.key!=null && (x.items||[]).length) out[x.key] = x.items.map(normAiItem); }); } catch(e){ console.error(e); }
+    done += ch.length; onProgress && onProgress(done, lines.length); };
+  for (let i=0;i<chunks.length;i+=3) await Promise.all(chunks.slice(i,i+3).map(run));
+  return out;
+}
+// toolbar: fill items for the lines that still have none
+async function fillMissingItems(){
+  const todo = S.opex.filter(l => !(l.items||[]).length);
+  if (!todo.length) { toast('Every line already has items.'); return; }
+  modal(`<h3>List items with the assistant</h3><p>${todo.length} line${todo.length>1?'s have':' has'} no items yet. The assistant lists what each one covers — items, quantities, prices from the price list and past purchases, plus the ${S.cycle.year} outlook allowance — from your past usage. You review each line afterwards.</p><div id="fmBusy"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="fmGo">List the items</button></div>`);
+  $('#fmGo').onclick = async () => {
+    $('#fmGo').disabled = true; $('#fmBusy').innerHTML = AI_BUSY(`Listing items… 0 of ${todo.length} lines`);
+    const res = await aiItemsFor(todo.map(l => ({ key:l.id, line_item:l.line_item, activity:l.activity, description:l.description, annual:annual(l) })), (d,n) => { const e = $('#fmBusy'); if (e) e.innerHTML = AI_BUSY(`Listing items… ${d} of ${n} lines`); });
+    let n = 0;
+    for (const l of todo) { const items = res[l.id]; if (!items) continue;
+      const row = { items:cleanItems(items), calc:{ ...(l.calc||{}), ai:true } }; itemsMonths(row.items).forEach((v,k)=>row['m'+(k+1)] = v);
+      const r = await sb.from('bgt_opex_lines').update(row).eq('id', l.id).select().single(); if (!r.error) { Object.assign(l, r.data); n++; } }
+    closeModal(); toast(n ? `Items listed for ${n} line${n>1?'s':''} — open each to check and save` : 'The assistant could not list items — try again or add them by hand.', !n); renderBudget();
+  };
+}
+
+/* ---------- standard price requests ---------- */
+async function loadPriceReqs(){ try { const { data } = await sb.from('bgt_price_requests').select('*').eq('year', S.cycle.year).order('created_at', { ascending:false }); S.preqs = data||[]; } catch(e){ S.preqs = []; } return S.preqs; }
+const preqBadge = () => isReviewer() ? (S.preqs||[]).filter(r=>r.status==='open').length : (S.preqs||[]).filter(r=>r.status!=='open' && r.requested_by===S.me.id && !r.seen_at).length;
+function preqCardHtml(){
+  const R = canManageData(), list = (S.preqs||[]).filter(r => R || r.requested_by===S.me.id || r.department_id===S.me.department_id);
+  if (!list.length) return '';
+  const open = list.filter(r=>r.status==='open');
+  return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)"><h3>Requests for a standard price — ${open.length} waiting</h3>
+    <p class="hint" style="padding:0 14px;margin:0 0 6px">${R?'Managers ask when an item has no standard price. Your answer becomes the price everyone uses, and every budget line that asked is updated.':'Your questions to the Head of Plant Operations about prices to use.'}</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:760px"><thead><tr><th>Item</th><th>Department</th><th class="r">Their estimate</th><th>Note</th><th>Answer</th></tr></thead><tbody>
+    ${list.map(r=>`<tr><td class="act">${esc(r.item)}${r.unit?`<div class="item" style="text-transform:none">per ${esc(r.unit)}</div>`:''}${r.line_item?`<div class="item">${esc(r.line_item)}</div>`:''}</td><td style="font-size:12.5px">${esc(deptById(r.department_id)?.name||'')}<div class="item" style="text-transform:none">${fmtDate(r.created_at)}</div></td>
+      <td class="r num">${r.suggested_price!=null?peso(r.suggested_price,2):'—'}</td><td style="font-size:12.5px;max-width:260px">${esc(r.note||'')}</td>
+      <td style="font-size:12.5px">${r.status==='open' ? (R?`<button class="btn sm primary" onclick="answerPreq('${r.id}')">Set the price</button>`:'<span class="pri pri-high">Waiting</span>') : r.status==='answered' ? `<b class="num">${peso(r.answer_price,2)}</b>/${esc(r.answer_unit||r.unit||'unit')}${r.answer_note?`<div>${esc(r.answer_note)}</div>`:''}` : `<span class="pri pri-med">Declined</span> ${esc(r.answer_note||'')}`}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+function answerPreq(id){
+  const r = (S.preqs||[]).find(x=>x.id===id); if (!r) return;
+  modal(`<h3>Set the standard price — ${esc(r.item)}</h3><p>${esc(deptById(r.department_id)?.name||'')} asked${r.suggested_price!=null?` (their estimate ${peso(r.suggested_price,2)})`:''}. The price you set is added to the price list as the ${r.year} standard and applied to every line that asked for it.</p>
+    <div class="field"><label for="apItem">Item name in the price list</label><input class="inp" id="apItem" value="${esc(r.item)}"></div>
+    <div class="g2"><div class="field"><label for="apPrice">Standard ${r.year} price ₱ (include the outlook)</label><input class="inp num" id="apPrice" type="number" step="any" value="${r.suggested_price??''}"></div>
+      <div class="field"><label for="apUnit">Per</label><input class="inp" id="apUnit" value="${esc(r.unit||'')}"></div></div>
+    <div class="field"><label for="apNote">Note to the department (optional)</label><input class="inp" id="apNote" placeholder="e.g. Based on Petron contract Q-2026-14 plus 5%"></div>
+    <div class="actions" style="justify-content:space-between"><button class="btn ghost" id="apNo">Decline — keep their estimate</button><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="apGo">Set price</button></span></div>`);
+  $('#apNo').onclick = async () => { const x = await sb.from('bgt_price_requests').update({ status:'declined', answer_note:$('#apNote').value.trim()||null, answered_by:S.me.id, answered_at:new Date().toISOString() }).eq('id', id); if (x.error) return fail(x.error); closeModal(); await loadPriceReqs(); renderNav(); renderPrices(); };
+  $('#apGo').onclick = async () => {
+    const price = Number($('#apPrice').value); if (!(price>0)) { toast('Enter the price.', true); return; }
+    const pi = await sb.from('bgt_price_items').insert({ company_id:S.company.id, item:$('#apItem').value.trim()||r.item, category:r.line_item, unit:$('#apUnit').value.trim()||r.unit, unit_price:price, source_type:'quotation', budget_year:r.year, notes:$('#apNote').value.trim()||null, as_of:today(), active:true, updated_by:S.me.id }).select().single();
+    if (pi.error) return fail(pi.error);
+    const x = await sb.from('bgt_price_requests').update({ status:'answered', answer_price:price, answer_unit:pi.data.unit, answer_note:$('#apNote').value.trim()||null, price_item_id:pi.data.id, answered_by:S.me.id, answered_at:new Date().toISOString() }).eq('id', id);
+    if (x.error) return fail(x.error);
+    await loadPrices(true); const n = await applyStdPrice(pi.data, id);
+    closeModal(); await loadPriceReqs(); renderNav(); toast(`Standard price set${n?` — ${n} budget line${n>1?'s':''} updated`:''}`); renderPrices();
+  };
+}
+/* push a standard price into every line (open budget year) that uses it or asked for it */
+async function applyStdPrice(sp, reqId){
+  const cy = S.cycles.find(c=>c.year===Number(sp.budget_year)); if (!cy) return 0;
+  const { data:bs } = await sb.from('bgt_dept_budgets').select('id').eq('cycle_id', cy.id); if (!(bs||[]).length) return 0;
+  const lines = await fetchAll(()=>sb.from('bgt_opex_lines').select('id,items').in('budget_id', bs.map(b=>b.id)));
+  let n = 0;
+  for (const l of lines) {
+    let hit = false;
+    const items = (l.items||[]).map(it => { if (it.pid===sp.id || (reqId && it.req===reqId)) { hit = true; const o = { ...it, price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item }; delete o.req; return o; } return it; });
+    if (!hit) continue;
+    const r = await sb.rpc('bgt_set_line_items', { p_line:l.id, p_items:items, p_months:itemsMonths(items) }); if (!r.error) n++; else console.error(r.error);
+  }
+  return n;
+}
+async function markPreqsSeen(){
+  const ids = (S.preqs||[]).filter(r=>r.status!=='open' && r.requested_by===S.me.id && !r.seen_at).map(r=>r.id); if (!ids.length) return;
+  await sb.from('bgt_price_requests').update({ seen_at:new Date().toISOString() }).in('id', ids); ids.forEach(id=>{ const r = S.preqs.find(x=>x.id===id); if (r) r.seen_at = new Date().toISOString(); }); renderNav();
+}
+
+// in the drawer: apply standard prices that were set after the manager asked
+function itemSyncAnswers(){
+  let n = 0;
+  (S._items||[]).forEach(it => { const r = it.req && (S.preqs||[]).find(x=>x.id===it.req && x.status==='answered'); const sp = r && (S.prices||[]).find(p=>p.id===r.price_item_id);
+    if (sp) { Object.assign(it, { price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item }); delete it.req; n++; } });
+  if (n) toast(`${n} standard price${n>1?'s':''} applied — Save line to keep`);
+}
+
+/* ---------- recommended lines: last year's spending with no line here, and lines Accounting books elsewhere ---------- */
+async function lineRecs(){
+  const b = budgetById(S.budgetId); if (!b) return [];
+  const Y = S.cycle.year, dept = b.department_id, out = [];
+  const cur = new Set(S.opex.map(l=>l.line_item).filter(Boolean));
+  let M = null; try { M = actModel(await loadYearData(Y-1, dept), 'budget'); } catch(e){}
+  const { data:gaps } = await sb.from('bgt_gap_remarks').select('*').eq('department_id', dept).in('year', [Y-1, Y-2]);
+  const used = new Set();
+  // 1. what managers already explained: Accounting books it under another line
+  (gaps||[]).forEach(g => {
+    if (!g.related_line) return;
+    let acct = null, mine = null;
+    if (g.cause==='acct_other_line') { acct = g.related_line; mine = g.line_item; }
+    else if (g.cause==='budget_other_line') { acct = g.line_item; mine = g.related_line; }
+    else return;
+    if (!acct || acct===mine || cur.has(acct)) return;
+    const k = 'al|'+mine+'|'+acct; if (used.has(k)) return; used.add(k);
+    out.push({ type:'align', from:mine, to:acct, year:g.year, text:`${g.year} gap remark: Accounting books "${mine}" costs under "${acct}". Budget it under ${acct} so budget and actuals line up.`, note:g.remark,
+      lines:S.opex.filter(l=>l.line_item===mine).map(l=>l.id) });
+  });
+  if (M && M.closed) {
+    const rows = M.rows.filter(r => r.inList !== false);
+    const spentNoLine = rows.filter(r => r.actYTD >= 5000 && !cur.has(r.item) && !out.some(o=>o.to===r.item));
+    const budNoSpend = rows.filter(r => r.budYTD >= 20000 && r.actYTD < r.budYTD*0.1);
+    // 2. budgeted but nothing booked, while something else was booked without budget — likely booked elsewhere
+    budNoSpend.forEach(a => { const c = spentNoLine.find(r => !r.budFY && r.actYTD >= a.budYTD*0.3); if (!c) return;
+      out.push({ type:'mismatch', from:a.item, to:c.item, text:`In ${Y-1}, "${a.item}" had ${peso(a.budYTD)} budgeted but ${peso(a.actYTD)} booked, while "${c.item}" had ${peso(c.actYTD)} booked with no budget (${thru(M.closed)}). Accounting may be booking it under ${c.item} — check with Accounting and budget it there.`,
+        lines:S.opex.filter(l=>l.line_item===a.item).map(l=>l.id) }); used.add('m|'+c.item); });
+    // 3. spent last year, no line in this budget
+    spentNoLine.filter(r => !used.has('m|'+r.item)).sort((a,b)=>b.actYTD-a.actYTD).forEach(r => out.push({ type:'missing', to:r.item, unbud:!r.budFY,
+      text:`${peso(r.actYTD)} booked in ${Y-1} (${thru(M.closed)}, full-year pace ${peso(r.actYTD/M.closed*12)})${r.budFY?'':' with no budget'} — no line for it in ${Y} yet.` }));
+  }
+  return out.filter(o => !(S._recDismiss||new Set()).has(o.type+'|'+(o.from||'')+'|'+o.to));
+}
+async function drawLineRecs(ed){
+  const box = $('#lineRecs'); if (!box) return;
+  let recs = []; try { recs = await lineRecs(); } catch(e){ console.error(e); }
+  if (!recs.length) { box.innerHTML = ''; return; }
+  const key = o => esc(o.type+'|'+(o.from||'')+'|'+o.to);
+  box.innerHTML = `<details class="recs" open><summary><b>Recommended for ${S.cycle.year}</b> — ${recs.length} line item${recs.length>1?'s':''} to add or align with Accounting</summary>
+    ${recs.map(o=>`<div class="rec ${o.type}"><div><span class="pri ${o.type==='missing'?(o.unbud?'pri-crit':'pri-high'):'pri-high'}" style="font-size:10.5px">${o.type==='missing'?(o.unbud?'Unbudgeted last year':'Missing line'):o.type==='align'?'Align with Accounting':'Possibly misaligned'}</span> <b>${esc(o.to)}</b>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(o.text)}${o.note?` <i>"${esc(o.note)}"</i>`:''}</div></div>
+      <div class="actions">${ed ? `${(o.lines||[]).length?`<button class="btn sm" onclick="recMove('${esc(o.to)}', ${JSON.stringify(o.lines).replace(/"/g,'&quot;')})">Move my ${o.lines.length>1?o.lines.length+' lines':'line'} to ${esc(o.to)}</button>`:''}<button class="btn sm primary" onclick="recAdd('${esc(o.to)}')">Add line</button>` : ''}<button class="btn sm ghost" onclick="(S._recDismiss ||= new Set()).add('${key(o)}');drawLineRecs(${ed})">Dismiss</button></div></div>`).join('')}</details>`;
+}
+function recAdd(item){ S._prefill = { line_item:item, description:`Recommended: ${item} was booked by Accounting last year.` }; editLine('opex'); }
+async function recMove(to, ids){
+  if (!confirm(`Move ${ids.length>1?ids.length+' lines':'this line'} to "${to}"?`)) return;
+  const r = await sb.from('bgt_opex_lines').update({ line_item:to }).in('id', ids).select(); if (r.error) return fail(r.error);
+  (r.data||[]).forEach(x => Object.assign(S.opex.find(l=>l.id===x.id)||{}, x)); toast('Moved'); renderBudget();
+}
+
+// a dialog on top of the line drawer (the regular modal would replace the drawer)
+function modal2(html){ closeModal2(); const d = document.createElement('div'); d.id = 'overlay2'; d.innerHTML = `<div class="modal" style="z-index:65" onclick="if(event.target===this)closeModal2()"><div class="card">${html}</div></div>`; document.body.appendChild(d); }
+function closeModal2(){ document.getElementById('overlay2')?.remove(); }
 
 boot();
 </script>

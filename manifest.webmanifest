@@ -1,0 +1,18 @@
+{
+  "name": "Costline",
+  "short_name": "Costline",
+  "description": "From budget line to bottom line. Plant budgets, Accounting actuals, cost per board and analysis.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#16201D",
+  "theme_color": "#16201D",
+  "orientation": "any",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -2500,6 +2500,14 @@ async function loadCapexAll(){
   return (S.cx.cache.all = lines);
 }
 async function loadDeprExisting(){ if (S.cx.cache.de) return S.cx.cache.de; const { data, error } = await sb.from('bgt_depr_existing').select('*'); if (error) throw error; return (S.cx.cache.de = data||[]); }
+async function loadRegister(){ if (S.cx.cache.rg) return S.cx.cache.rg;
+  const [a, d] = await Promise.all([fetchAll(()=>sb.from('bgt_assets').select('*').eq('active', true).order('in_service', { ascending:false, nullsFirst:false })), fetchAll(()=>sb.from('bgt_asset_depr').select('asset_id,year,month,amount,basis'))]);
+  const by = {}; d.forEach(r => (by[r.asset_id] ||= []).push(r));
+  return (S.cx.cache.rg = a.map(x => ({ ...x, sched:(by[x.id]||[]).sort((p,q)=>p.year-q.year||p.month-q.month) })));
+}
+const rgYear = (a, Y) => MONTHS.map((_,i)=>sum(a.sched.filter(r=>r.year===Y && r.month===i+1).map(r=>Number(r.amount))));
+const rgBook = (a, Y) => a.investment==null ? null : Math.max(0, Number(a.investment) - sum(a.sched.filter(r=>r.year<Y).map(r=>Number(r.amount))));
+const rgEnd = a => { const l = a.sched[a.sched.length-1]; return l ? `${MONTHS[l.month-1]} ${l.year}` : ''; };
 async function loadCapexActuals(){ if (S.cx.cache.ca) return S.cx.cache.ca; const rows = await fetchAll(()=>sb.from('bgt_actuals').select('year,month,department_id,line_item,amount').eq('kind','capex').order('year')); return (S.cx.cache.ca = rows); }
 
 const firstMonth = l => { for (let i=1;i<=12;i++) if (Number(l['m'+i])) return i; return 1; };
@@ -2527,12 +2535,19 @@ function deprInYear(ev, life, salvage, Y){
 }
 // depreciation for year Y: existing assets (Accounting), CAPEX already spent (ledger where loaded, else budget items), and new CAPEX in the budget
 async function deprModel(Y, deptId=null){
-  const [AC, L, DE, CA] = await Promise.all([loadAssetClasses(), loadCapexAll(), loadDeprExisting(), loadCapexActuals()]);
+  const [AC, L, DE, CA, RG] = await Promise.all([loadAssetClasses(), loadCapexAll(), loadDeprExisting(), loadCapexActuals(), loadRegister()]);
   const ledgerYears = new Set(CA.map(a=>a.year));
   const out = { Y, existing:Array(12).fill(0), past:Array(12).fill(0), current:Array(12).fill(0), byDept:{}, items:[], pending:0 };
   const add = (bucket, d, arr) => { for (let i=0;i<12;i++){ out[bucket][i] += arr[i]; } out.byDept[d] = (out.byDept[d]||0) + sum(arr); };
-  DE.filter(e=>e.year===Y && (!deptId || e.department_id===deptId)).forEach(e => add('existing', e.department_id||'plant', Array(12).fill(Number(e.amount)/12)));
-  CA.filter(a=>a.year<Y && (!deptId || a.department_id===deptId)).forEach(a => { const life = AC.find(c=>c.category===a.line_item)?.useful_life_months ?? 60;
+  // assets already in use: Accounting's yearly figure when entered (official), otherwise the project register
+  const deY = DE.filter(e=>e.year===Y && (!deptId || e.department_id===deptId));
+  out.registerT = sum(RG.filter(a=>!deptId || a.department_id===deptId).map(a=>sum(rgYear(a, Y))));
+  out.existingSrc = deY.length ? 'accounting' : out.registerT ? 'register' : '';
+  if (deY.length) deY.forEach(e => add('existing', e.department_id||'plant', Array(12).fill(Number(e.amount)/12)));
+  else RG.filter(a=>!deptId || a.department_id===deptId).forEach(a => { const arr = rgYear(a, Y); if (sum(arr)) add('existing', a.department_id||'plant', arr); });
+  // ledger CAPEX already in the register (same purchase) is not counted twice
+  const inRegister = a => RG.some(r => r.ledger_year===a.year && r.ledger_partner && String(a.partner||'').toUpperCase().includes(r.ledger_partner.toUpperCase()));
+  CA.filter(a=>a.year<Y && (!deptId || a.department_id===deptId) && !inRegister(a)).forEach(a => { const life = AC.find(c=>c.category===a.line_item)?.useful_life_months ?? 60;
     add('past', a.department_id, deprInYear({ y:a.year, m:a.month, amt:Number(a.amount) }, Number(life), salvageOf(a.line_item, AC), Y)); });
   L.filter(l=>!deptId || l.department_id===deptId).forEach(l => capexEvents(l, L).forEach(ev => {
     if (ev.y < Y && ledgerYears.has(ev.y)) return;            // that year's spending is taken from the ledger instead
@@ -2594,7 +2609,8 @@ async function renderCapexTracker(){
           <td class="r num">${dp.life?peso(dp.yr):'<span class="hint">none</span>'}<div class="item" style="text-transform:none">${dp.life?Math.round(dp.life/12*10)/10+' yrs':'not depreciated'}</div></td>
           <td>${canSetCapexStatus(l.department_id)?`<button class="btn" onclick="capexStatusDialog('${l.id}')">Update</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="10" class="hint" style="padding:16px">No CAPEX items for this selection.</td></tr>`}
       </tbody></table></div></div>
-    ${D ? deprCard(D, open.year, AC) : ''}`;
+    ${D ? deprCard(D, open.year, AC) : ''}
+    ${await registerCard(open?.year || S.cycle.year)}`;
   } catch(e){ fail(e); }
 }
 const plannedMonths = l => { const m = MONTHS.filter((_,i)=>Number(l['m'+(i+1)])); return m.length ? (m.length>3 ? `${m[0]}–${m[m.length-1]}` : m.join(', ')) : '—'; };
@@ -2603,7 +2619,7 @@ function deprCard(D, Y, AC){
   const ed = canManageData();
   return `<div class="card" style="margin-top:16px"><h3>Depreciation in ${Y} — added to operating cost</h3>
     <div class="stats" style="padding:14px 14px 0;margin:0">
-      <div class="stat"><div class="eyebrow">Assets already on the books</div><div class="v">${short(sum(D.existing))}</div><div class="s">${sum(D.existing)?'from Accounting':'Not entered — ask Accounting for the yearly figure'}</div></div>
+      <div class="stat"><div class="eyebrow">Assets already on the books</div><div class="v">${short(sum(D.existing))}</div><div class="s">${D.existingSrc==='accounting'?'from Accounting'+(D.registerT?` (project register: ${short(D.registerT)})`:''):D.existingSrc==='register'?'from the project register below':'Not entered — ask Accounting for the yearly figure'}</div></div>
       <div class="stat"><div class="eyebrow">CAPEX of earlier years</div><div class="v">${short(sum(D.past))}</div><div class="s">ledger CAPEX where loaded, otherwise items marked done</div></div>
       <div class="stat capex"><div class="eyebrow">New ${Y} CAPEX</div><div class="v">${short(sum(D.current))}</div><div class="s">from the month after purchase${D.pending?` · incl. ${short(D.pending)} pending carry-overs`:''}</div></div>
       <div class="stat opex"><div class="eyebrow">Total depreciation ${Y}</div><div class="v">${short(D.total)}</div><div class="s">${peso(D.total/12)} a month on average</div></div>
@@ -2715,6 +2731,60 @@ async function ovDeprCard(opexT){
       <div class="stat"><div class="eyebrow">Per board</div><div class="v">${boards?peso(tot/boards,2):'—'}</div><div class="s">${boards?`${Math.round(boards).toLocaleString('en-PH')} boards (${bTxt})`:'Enter a volume target on Sales and plant performance'}</div></div>
     </div>${!sum(D.existing)?`<p class="hint" style="padding:0 14px 12px;margin:0">Depreciation of assets bought before the app's records is not entered yet — <a style="cursor:pointer;color:var(--teal)" onclick="go('capex')">add Accounting's figure on the CAPEX tracker</a>.</p>`:''}</div>`;
   } catch(e){ console.error(e); return ''; }
+}
+
+/* ---------- project register: CAPEX projects already in use, with their depreciation schedule ---------- */
+async function registerCard(Y){
+  const RG = (await loadRegister()).filter(a=>!S.cx.dept || a.department_id===S.cx.dept), ed = canManageData();
+  const live = RG.filter(a=>sum(rgYear(a, Y)) || a.sched.some(r=>r.year>Y)), list = S.cx.rgAll ? RG : live;
+  const tY = sum(RG.map(a=>sum(rgYear(a, Y)))), book = sum(live.map(a=>rgBook(a, Y)||0));
+  return `<div class="card" style="margin-top:16px"><h3 style="display:flex;align-items:center;gap:10px">Project register — CAPEX already in use<span class="grow" style="flex:1"></span>${ed?'<button class="btn" onclick="editAsset()">Add a project</button>':''}</h3>
+    <p class="hint" style="padding:0 14px;margin:8px 0">Projects implemented in earlier years and their monthly depreciation. Used for the ${Y} depreciation above unless Accounting's yearly figure is entered. ${live.length} still depreciating in or after ${Y}: <b>${peso(tY)}</b> in ${Y}, book value ${peso(book)} at the start of ${Y}.</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:1100px"><thead><tr><th>Site</th><th>Department</th><th style="min-width:240px">Project / asset</th><th class="r">Investment</th><th>In use from</th><th class="r">Life</th><th class="r">Depreciation ${Y}</th><th class="r">Book value 1 Jan ${Y}</th><th>Ends</th><th></th></tr></thead><tbody>
+    ${list.map(a=>{ const d = sum(rgYear(a, Y)), bv = rgBook(a, Y);
+      return `<tr><td style="font-size:12.5px;white-space:nowrap">${esc(a.site||'')}</td><td style="font-size:12.5px">${esc(deptById(a.department_id)?.name||'')}</td>
+        <td><div class="item">${esc(a.category||'')}</div><div class="act">${esc(a.name)}</div>${a.note?`<div class="hint" style="font-size:12px">${esc(a.note)}</div>`:''}</td>
+        <td class="r num">${a.investment!=null?peso(a.investment):'—'}</td><td style="font-size:12.5px">${a.in_service?fmtDay(a.in_service).replace(/^\w+ 1, /,m=>m.split(' ')[0]+' '):'—'}</td>
+        <td class="r num">${a.life_months?Math.round(a.life_months/12*10)/10+' yrs':'—'}</td><td class="r num">${d?peso(d):''}</td><td class="r num">${bv!=null&&a.sched.length?peso(bv):''}</td>
+        <td style="font-size:12.5px;white-space:nowrap">${a.sched.length?rgEnd(a):'<span class="hint">no schedule</span>'}</td><td>${ed?`<button class="btn ghost" onclick="editAsset('${a.id}')">Edit</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="10" class="hint" style="padding:14px">No projects in the register${S.cx.dept?' for this department':''}.</td></tr>`}
+    </tbody></table></div>
+    <p style="padding:8px 14px 12px;margin:0"><a style="cursor:pointer;color:var(--teal);font-size:13px" onclick="S.cx.rgAll=!S.cx.rgAll;renderCapexTracker()">${S.cx.rgAll?'Show only projects still depreciating':`Show all ${RG.length} projects, including fully depreciated`}</a></p></div>`;
+}
+async function editAsset(id){
+  const a = id ? (await loadRegister()).find(x=>x.id===id) : { site:'Plant 1', department_id:S.cx.dept||null, sched:[] }, AC = await loadAssetClasses();
+  modal(`<h3>${id?'Edit project':'Add a project already in use'}</h3>
+    <div class="g2"><div class="field"><label for="asName">Project / asset</label><input class="inp" id="asName" value="${esc(a.name||'')}"></div>
+      <div class="field"><label for="asSite">Site</label><input class="inp" id="asSite" value="${esc(a.site||'')}"></div></div>
+    <div class="g2"><div class="field"><label for="asDept">Department</label><select class="inp" id="asDept"><option value="">—</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===a.department_id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+      <div class="field"><label for="asCat">Asset class</label><select class="inp" id="asCat"><option value="">—</option>${AC.map(c=>`<option ${c.category===a.category?'selected':''}>${esc(c.category)}</option>`).join('')}</select></div></div>
+    <div class="g3"><div class="field"><label for="asInv">Investment (₱)</label><input class="inp num" id="asInv" type="number" step="any" value="${a.investment??''}"></div>
+      <div class="field"><label for="asIn">In use from</label><input class="inp" id="asIn" type="month" value="${a.in_service?String(a.in_service).slice(0,7):''}"></div>
+      <div class="field"><label for="asLife">Life (months)</label><input class="inp num" id="asLife" type="number" min="1" value="${a.life_months??''}"></div></div>
+    <div class="field"><label for="asNote">Note</label><textarea class="inp" id="asNote" rows="2">${esc(a.note||'')}</textarea></div>
+    ${id && a.sched.length ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="asRe"> Replace the current schedule (${a.sched.length} months, ${peso(sum(a.sched.map(r=>Number(r.amount))))}) with straight-line investment ÷ life</label>` : '<p class="hint" style="margin:0">The depreciation schedule is investment ÷ life, monthly from the month it went into use.</p>'}
+    <div class="actions" style="justify-content:space-between;margin-top:14px"><span>${id?`<button class="btn ghost" onclick="deleteAsset('${id}')">Remove</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveAsset(${id?`'${id}'`:''})">Save</button></span></div>`);
+}
+async function saveAsset(id){
+  const name = $('#asName').value.trim(); if (!name) { toast('Enter the project name.', true); return; }
+  const inv = $('#asInv').value===''?null:Number($('#asInv').value), ym = $('#asIn').value, life = $('#asLife').value===''?null:Number($('#asLife').value);
+  const row = { company_id:S.company.id, name, site:$('#asSite').value.trim()||null, department_id:$('#asDept').value||null, category:$('#asCat').value||null, investment:inv, in_service:ym?ym+'-01':null, life_months:life, note:$('#asNote').value.trim()||null, updated_by:S.me.id, updated_at:new Date().toISOString() };
+  try {
+    let aid = id;
+    if (id) { const r = await sb.from('bgt_assets').update(row).eq('id', id); if (r.error) throw r.error; }
+    else { const r = await sb.from('bgt_assets').insert({ ...row, source:'register', created_by:S.me.id }).select('id').single(); if (r.error) throw r.error; aid = r.data.id; }
+    const regen = !id || $('#asRe')?.checked || !(await loadRegister()).find(x=>x.id===id)?.sched.length;
+    if (regen && inv && ym && life) {
+      const d = await sb.from('bgt_asset_depr').delete().eq('asset_id', aid); if (d.error) throw d.error;
+      const [y0, m0] = ym.split('-').map(Number), per = Math.round(inv/life*100)/100, rows = [];
+      for (let k=0; k<life; k++) { const t = y0*12 + m0-1 + k; rows.push({ asset_id:aid, year:Math.floor(t/12), month:t%12+1, amount:k===life-1 ? Math.round((inv-per*(life-1))*100)/100 : per, basis:'straight_line' }); }
+      const r = await sb.from('bgt_asset_depr').insert(rows); if (r.error) throw r.error;
+    }
+    S.cx.cache = {}; closeModal(); toast('Project saved'); renderCapexTracker();
+  } catch(e){ fail(e); }
+}
+async function deleteAsset(id){
+  const r = await sb.from('bgt_assets').update({ active:false, updated_by:S.me.id, updated_at:new Date().toISOString() }).eq('id', id); if (r.error) return fail(r.error);
+  S.cx.cache = {}; closeModal(); toast('Project removed from the register'); renderCapexTracker();
 }
 
 /* ================= PLANT RECORDS (PO-based expenses, consumption) ================= */

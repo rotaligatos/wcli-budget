@@ -2508,6 +2508,7 @@ async function loadRegister(){ if (S.cx.cache.rg) return S.cx.cache.rg;
 const rgYear = (a, Y) => MONTHS.map((_,i)=>sum(a.sched.filter(r=>r.year===Y && r.month===i+1).map(r=>Number(r.amount))));
 const rgBook = (a, Y) => a.investment==null ? null : Math.max(0, Number(a.investment) - sum(a.sched.filter(r=>r.year<Y).map(r=>Number(r.amount))));
 const rgEnd = a => { const l = a.sched[a.sched.length-1]; return l ? `${MONTHS[l.month-1]} ${l.year}` : ''; };
+async function loadProjects(){ if (S.cx.cache.pj) return S.cx.cache.pj; return (S.cx.cache.pj = await fetchAll(()=>sb.from('bgt_capex_projects').select('*'))); }
 async function loadCapexActuals(){ if (S.cx.cache.ca) return S.cx.cache.ca; const rows = await fetchAll(()=>sb.from('bgt_actuals').select('year,month,department_id,line_item,amount').eq('kind','capex').order('year')); return (S.cx.cache.ca = rows); }
 
 const firstMonth = l => { for (let i=1;i<=12;i++) if (Number(l['m'+i])) return i; return 1; };
@@ -2535,7 +2536,7 @@ function deprInYear(ev, life, salvage, Y){
 }
 // depreciation for year Y: existing assets (Accounting), CAPEX already spent (ledger where loaded, else budget items), and new CAPEX in the budget
 async function deprModel(Y, deptId=null){
-  const [AC, L, DE, CA, RG] = await Promise.all([loadAssetClasses(), loadCapexAll(), loadDeprExisting(), loadCapexActuals(), loadRegister()]);
+  const [AC, L, DE, CA, RG, PJ] = await Promise.all([loadAssetClasses(), loadCapexAll(), loadDeprExisting(), loadCapexActuals(), loadRegister(), loadProjects()]);
   const ledgerYears = new Set(CA.map(a=>a.year));
   const out = { Y, existing:Array(12).fill(0), past:Array(12).fill(0), current:Array(12).fill(0), byDept:{}, items:[], pending:0 };
   const add = (bucket, d, arr) => { for (let i=0;i<12;i++){ out[bucket][i] += arr[i]; } out.byDept[d] = (out.byDept[d]||0) + sum(arr); };
@@ -2553,7 +2554,7 @@ async function deprModel(Y, deptId=null){
     if (ev.y < Y && ledgerYears.has(ev.y)) return;            // that year's spending is taken from the ledger instead
     const st = l.impl_status || 'planned';
     if (ev.y < Y-1 && !['done','in_progress'].includes(st)) return;   // older years: only items actually implemented (planned-but-never-done items add no depreciation)
-    if (RG.some(a => a.capex_line_id===l.id)) return;           // implemented as a project in the register — depreciation comes from there
+    if (RG.some(a => a.capex_line_id===l.id) || PJ.some(p => p.id===l.project_id && p.asset_id)) return;   // implemented as a project in the register — depreciation comes from there
     if (ev.y > Y) return;
     const arr = deprInYear(ev, lifeOf(l, AC), salvageOf(l.category, AC), Y); if (!sum(arr)) return;
     add(ev.y===Y ? 'current' : 'past', l.department_id, arr);
@@ -2573,7 +2574,7 @@ function lineDepr(l, AC){ const life = lifeOf(l, AC), sv = salvageOf(l.category,
 async function renderCapexTracker(){
   mainLoading('Loading CAPEX…');
   try {
-    const [L, AC] = await Promise.all([loadCapexAll(), loadAssetClasses()]);
+    const [L, AC, PJ, RG] = await Promise.all([loadCapexAll(), loadAssetClasses(), loadProjects(), loadRegister()]);
     const open = S.cycles.find(c=>c.status==='open'), years = [...new Set(L.map(l=>l.year))].sort((a,b)=>b-a);
     if (S.cx.year==null) S.cx.year = years.find(y=>y<(open?.year||9999)) || years[0] || S.cycle.year;
     if (!isReviewer()) S.cx.dept = S.me.department_id;
@@ -2607,11 +2608,12 @@ async function renderCapexTracker(){
       ${list.map(l=>{ const st = l.impl_status||'planned', dp = lineDepr(l, AC), carried = L.find(x=>x.carried_from===l.id), src = l.carried_from ? L.find(x=>x.id===l.carried_from) : null;
         const timing = st==='done' ? `${l.impl_amount!=null?peso(l.impl_amount):peso(annual(l))}${l.impl_date?' · in use '+fmtDay(l.impl_date):''}` : st==='deferred' ? `To ${l.target_year||'?'}${l.target_month?' '+MONTHS[l.target_month-1]:''}${carried?' · <span class="chip pri-ok" style="font-size:11px">in '+carried.year+' budget</span>':''}` : st==='rescheduled' ? `Moved to ${l.target_month?MONTHS[l.target_month-1]:'?'} ${l.target_year||l.year}` : '';
         return `<tr><td class="num">${l.year}</td><td style="font-size:13px">${esc(deptById(l.department_id)?.name)}</td>
-          <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled')}</div>${src?`<div class="hint" style="font-size:11.5px">Carried over from ${src.year}</div>`:''}${l.impl_note?`<div class="hint" style="font-size:12px">${esc(l.impl_note)}</div>`:''}</td>
+          <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled')}</div>${src?`<div class="hint" style="font-size:11.5px">Carried over from ${src.year}</div>`:''}${projLine(l, L, PJ, RG)}${l.impl_note?`<div class="hint" style="font-size:12px">${esc(l.impl_note)}</div>`:''}</td>
           <td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${l.quote_amount!=null?`${peso(l.quote_amount)}<div class="item" style="text-transform:none;color:${Number(l.quote_amount)>annual(l)?'var(--red)':'var(--green)'}">${Number(l.quote_amount)>=annual(l)?'+':''}${annual(l)?Math.round(100*(l.quote_amount-annual(l))/annual(l)):0}% vs budget</div>${l.quote_supplier?`<div class="hint" style="font-size:11.5px">${esc(l.quote_supplier)}${l.quote_ref?' · '+esc(l.quote_ref):''}</div>`:''}`:'<span class="hint">—</span>'}</td><td style="font-size:12.5px">${plannedMonths(l)}</td><td>${capexChip(st)}</td><td style="font-size:12.5px">${timing}</td>
           <td class="r num">${dp.life?peso(dp.yr):'<span class="hint">none</span>'}<div class="item" style="text-transform:none">${dp.life?Math.round(dp.life/12*10)/10+' yrs':'not depreciated'}</div></td>
           <td>${canSetCapexStatus(l.department_id)?`<button class="btn" onclick="capexStatusDialog('${l.id}')">Update</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="10" class="hint" style="padding:16px">No CAPEX items for this selection.</td></tr>`}
       </tbody></table></div></div>
+    ${projCard(L, PJ, RG)}
     ${D ? deprCard(D, open.year, AC) : ''}
     ${await registerCard(open?.year || S.cycle.year)}`;
   } catch(e){ fail(e); }
@@ -2738,7 +2740,7 @@ async function ovDeprCard(opexT){
 
 /* ---------- project register: CAPEX projects already in use, with their depreciation schedule ---------- */
 async function registerCard(Y){
-  const RG = (await loadRegister()).filter(a=>!S.cx.dept || a.department_id===S.cx.dept), ed = canManageData();
+  await loadProjects(); await loadCapexAll(); const RG = (await loadRegister()).filter(a=>!S.cx.dept || a.department_id===S.cx.dept), ed = canManageData();
   const live = RG.filter(a=>sum(rgYear(a, Y)) || a.sched.some(r=>r.year>Y)), list = S.cx.rgAll ? RG : live;
   const tY = sum(RG.map(a=>sum(rgYear(a, Y)))), book = sum(live.map(a=>rgBook(a, Y)||0));
   return `<div class="card" style="margin-top:16px"><h3 style="display:flex;align-items:center;gap:10px">Project register — CAPEX already in use<span class="grow" style="flex:1"></span>${ed?'<button class="btn" onclick="editAsset()">Add a project</button>':''}</h3>
@@ -2746,7 +2748,7 @@ async function registerCard(Y){
     <div class="tbl-wrap"><table class="ledger" style="min-width:1100px"><thead><tr><th>Site</th><th>Department</th><th style="min-width:240px">Project / asset</th><th class="r">Investment</th><th>In use from</th><th class="r">Life</th><th class="r">Depreciation ${Y}</th><th class="r">Book value 1 Jan ${Y}</th><th>Ends</th><th></th></tr></thead><tbody>
     ${list.map(a=>{ const d = sum(rgYear(a, Y)), bv = rgBook(a, Y);
       return `<tr><td style="font-size:12.5px;white-space:nowrap">${esc(a.site||'')}</td><td style="font-size:12.5px">${esc(deptById(a.department_id)?.name||'')}</td>
-        <td><div class="item">${esc(a.category||'')}</div><div class="act">${esc(a.name)}</div>${a.note?`<div class="hint" style="font-size:12px">${esc(a.note)}</div>`:''}</td>
+        <td><div class="item">${esc(a.category||'')}</div><div class="act">${esc(a.name)}</div>${(()=>{ const p = (S.cx.cache.pj||[]).find(x=>x.asset_id===a.id); if (!p) return ''; const ls = (S.cx.cache.all||[]).filter(l=>l.project_id===p.id).sort((x,y)=>x.year-y.year); return ls.length ? `<div style="font-size:11.5px;color:var(--teal)">Budget CAPEX: ${ls.map(l=>`${l.year} ${esc((l.asset||'').slice(0,40))} (${CAPEX_ST[l.impl_status||'planned'][0].toLowerCase()})`).join(' → ')}</div>` : ''; })()}${a.note?`<div class="hint" style="font-size:12px">${esc(a.note)}</div>`:''}</td>
         <td class="r num">${a.investment!=null?peso(a.investment):'—'}</td><td style="font-size:12.5px">${a.in_service?fmtDay(a.in_service).replace(/^\w+ 1, /,m=>m.split(' ')[0]+' '):'—'}</td>
         <td class="r num">${a.life_months?Math.round(a.life_months/12*10)/10+' yrs':'—'}</td><td class="r num">${d?peso(d):''}</td><td class="r num">${bv!=null&&a.sched.length?peso(bv):''}</td>
         <td style="font-size:12.5px;white-space:nowrap">${a.sched.length?rgEnd(a):'<span class="hint">no schedule</span>'}</td><td>${ed?`<button class="btn ghost" onclick="editAsset('${a.id}')">Edit</button>`:''}</td></tr>`; }).join('') || `<tr><td colspan="10" class="hint" style="padding:14px">No projects in the register${S.cx.dept?' for this department':''}.</td></tr>`}
@@ -2788,6 +2790,27 @@ async function saveAsset(id){
 async function deleteAsset(id){
   const r = await sb.from('bgt_assets').update({ active:false, updated_by:S.me.id, updated_at:new Date().toISOString() }).eq('id', id); if (r.error) return fail(r.error);
   S.cx.cache = {}; closeModal(); toast('Project removed from the register'); renderCapexTracker();
+}
+
+/* ---------- projects: the same CAPEX requested over several years, and what it became ---------- */
+function projLine(l, L, PJ, RG){
+  const p = PJ.find(x=>x.id===l.project_id); if (!p) return '';
+  const ys = [...new Set(L.filter(x=>x.project_id===p.id).map(x=>x.year))].sort(), a = p.asset_id ? RG.find(r=>r.id===p.asset_id) : null;
+  return `<div style="font-size:11.5px;margin-top:2px;color:var(--teal)" title="${esc(p.note||'')}">Project: ${esc(p.name)} · requested ${ys.join(', ')}${p.status==='implemented'?` · <b>implemented${p.implemented_on?' '+fmtDay(p.implemented_on).replace(/ \d+,/,''):''}${a?' as '+esc(a.name):''}</b>`:''}</div>`;
+}
+function projCard(L, PJ, RG){
+  const rows = PJ.map(p => { const ls = L.filter(l=>l.project_id===p.id && (!S.cx.dept || l.department_id===S.cx.dept)); if (!ls.length) return null;
+    const ys = [...new Set(ls.map(l=>l.year))].sort(), last = ls.filter(l=>l.year===ys[ys.length-1]), a = p.asset_id ? RG.find(r=>r.id===p.asset_id) : null;
+    return { p, ys, amt:sum(last.map(annual)), dept:deptById(ls[0].department_id)?.name, a }; }).filter(Boolean).filter(r=>r.ys.length>1 || r.p.status==='implemented')
+    .sort((x,y)=>(x.p.status==='implemented')-(y.p.status==='implemented') || y.ys.length-x.ys.length || y.amt-x.amt);
+  if (!rows.length) return '';
+  const open = rows.filter(r=>r.p.status!=='implemented');
+  return `<div class="card" style="margin-top:16px"><h3>Projects across budget years</h3>
+    <p class="hint" style="padding:0 14px;margin:8px 0">The same CAPEX requested in several budgets, and what it became. ${open.length} projects re-proposed and still open (latest request ${peso(sum(open.map(r=>r.amt)))}); ${rows.length-open.length} implemented.</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th style="min-width:260px">Project</th><th>Department</th><th>Requested in</th><th class="r">Latest request</th><th>Outcome</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td><div class="act">${esc(r.p.name)}</div>${r.p.note?`<div class="hint" style="font-size:12px">${esc(r.p.note)}</div>`:''}</td><td style="font-size:12.5px">${esc(r.dept||'')}</td><td class="num" style="font-size:12.5px">${r.ys.join(', ')}</td><td class="r num">${peso(r.amt)}</td>
+      <td style="font-size:12.5px">${r.p.status==='implemented'?`<span class="chip pri-ok">Implemented${r.p.implemented_on?' '+fmtDay(r.p.implemented_on).replace(/ \d+,/,''):''}</span>${r.a?`<div class="hint" style="font-size:11.5px">${esc(r.a.name)} — see project register</div>`:''}`:r.ys.length>2?`<span class="chip pri-high">Requested ${r.ys.length} times</span>`:'<span class="chip pri-med">Re-proposed</span>'}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
 }
 
 /* ================= PLANT RECORDS (PO-based expenses, consumption) ================= */

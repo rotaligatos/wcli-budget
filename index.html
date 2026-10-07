@@ -3349,6 +3349,7 @@ async function renderAnalysis(){
 }
 /* ---------- 1. analysis report ---------- */
 async function anReportView(Y){
+  { const { data } = await sb.from('bgt_answers').select('*').eq('source','analysis_report'); S.an.ans = data||[]; }
   const { data:reps, error } = await sb.from('bgt_reports').select('id,year,title,focus,model,created_by,created_at,content').eq('year', Y).eq('kind','analysis').order('created_at', { ascending:false }); if (error) throw error;
   const sel = (reps||[]).find(r=>r.id===S.an.sel) || (reps||[])[0];
   const can = isReviewer();
@@ -3369,7 +3370,8 @@ function anRender(rep){
     <div class="card" style="margin-top:16px"><h3>Sensitivities</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Driver</th><th>Change tested</th><th>Effect per year</th><th>Basis</th></tr></thead><tbody>${(r.sensitivities||[]).map(e=>`<tr><td class="act">${esc(e.driver)}</td><td>${esc(e.change)}</td><td class="num">${esc(e.effect)}</td><td style="font-size:12.5px">${esc(e.basis)}</td></tr>`).join('')}</tbody></table></div><p class="hint" style="padding:8px 14px 12px;margin:0">Try your own numbers in <a onclick="S.an.tab='whatif';renderAnalysis()">What-if scenarios</a>.</p></div>
     <div class="card" style="margin-top:16px"><h3>Risks</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Response</th></tr></thead><tbody>${(r.risks||[]).map(e=>`<tr><td>${esc(e.risk)}</td><td>${lvl(e.likelihood)}</td><td>${lvl(e.impact)}</td><td style="font-size:12.5px">${esc(e.response)}</td></tr>`).join('')}</tbody></table></div></div>
     <div class="card" style="margin-top:16px"><h3>Recommendations</h3><ol style="margin:0;padding:10px 14px 14px 34px">${(r.recommendations||[]).map(x=>`<li style="margin:4px 0">${esc(x)}</li>`).join('')}</ol>
-      ${(r.open_questions||[]).length?`<h3 style="margin-top:4px">Open questions</h3><ul style="margin:0;padding:6px 14px 14px 34px">${r.open_questions.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>
+      ${(r.open_questions||[]).length?`<h3 style="margin-top:4px">Open questions</h3><p class="hint" style="padding:0 14px;margin:6px 0">Answer them here — the assistant reads your answers in every report, draft and review from now on.</p><ol style="margin:0;padding:6px 14px 14px 34px">${r.open_questions.map((x,i)=>{ const a = (S.an.ans||[]).find(z=>z.source_id===rep.id && z.q_index===i);
+        return `<li style="margin:0 0 12px"><div>${esc(x)}</div>${a?`<div class="ins blue" style="margin:6px 0 0"><b>Answer</b> <span class="hint">· ${esc(S.users?.find?.(u=>u.id===a.answered_by)?.full_name||'')} ${fmtDate(a.answered_at)}</span><br>${esc(a.answer)}${isReviewer()?` <a style="cursor:pointer;color:var(--teal);font-size:12.5px" onclick="anAnswer('${rep.id}',${i})">Edit</a>`:''}</div>`:isReviewer()?`<button class="btn ghost" style="margin-top:4px" onclick="anAnswer('${rep.id}',${i})">Answer</button>`:''}</li>`; }).join('')}</ol>`:''}</div>
     ${canManageData()?`<p style="text-align:right;margin-top:10px"><a onclick="anDelete('${rep.id}')" style="color:var(--red)">Delete this report</a></p>`:''}`;
 }
 function anGenerate(){
@@ -3400,7 +3402,7 @@ async function anDownload(id){
     <h2>Outside drivers</h2>${tbl(['Driver','Latest','Effect on the plant budget','Assumed change'],(r.environment||[]).map(x=>[e(x.factor),e(x.latest),e(x.effect),e(x.assumed_change||'')]))}
     <h2>Sensitivities</h2>${tbl(['Driver','Change','Effect per year','Basis'],(r.sensitivities||[]).map(x=>[e(x.driver),e(x.change),e(x.effect),e(x.basis)]))}
     <h2>Risks</h2>${tbl(['Risk','Likelihood','Impact','Response'],(r.risks||[]).map(x=>[e(x.risk),e(x.likelihood),e(x.impact),e(x.response)]))}
-    <h2>Recommendations</h2><ol>${(r.recommendations||[]).map(x=>`<li>${e(x)}</li>`).join('')}</ol>${(r.open_questions||[]).length?`<h2>Open questions</h2><ul>${r.open_questions.map(x=>`<li>${e(x)}</li>`).join('')}</ul>`:''}</body></html>`;
+    <h2>Recommendations</h2><ol>${(r.recommendations||[]).map(x=>`<li>${e(x)}</li>`).join('')}</ol>${(r.open_questions||[]).length?`<h2>Open questions</h2><ul>${r.open_questions.map((x,qi)=>`<li>${e(x)}${(()=>{ const a=(S.an.ans||[]).find(z=>z.source_id===rep.id && z.q_index===qi); return a?`<br><i>Answer: ${e(a.answer)}</i>`:''; })()}</li>`).join('')}</ul>`:''}</body></html>`;
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+html], { type:'application/msword' })); a.download = `${rep.year} Budget analysis - ${S.company.code}.doc`; a.click(); toast('Downloaded');
 }
 /* ---------- 2. what-if scenarios ---------- */
@@ -3466,6 +3468,25 @@ async function anPareto(Y){
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:16px"><div class="card" style="margin:0"><h3>By expense line</h3>${table(lines,'Expense line')}</div><div class="card" style="margin:0"><h3>By payee</h3>${table(pay,'Paid to')}</div></div>
     <p class="hint" style="margin-top:8px">Dark bars = the few lines and payees that make up 80% of spending. Start the budget review, contract renegotiation and savings ideas there.</p>`}`;
 }
+
+function anAnswer(repId, i){
+  const sel = $('#anSel'); 
+  sb.from('bgt_reports').select('year,content').eq('id', repId).single().then(({ data:rep, error }) => {
+    if (error) return fail(error);
+    const q = (rep.content?.open_questions||[])[i], a = (S.an.ans||[]).find(z=>z.source_id===repId && z.q_index===i);
+    modal(`<h3>Answer</h3><p style="margin-top:0">${esc(q||'')}</p>
+      <div class="field"><label for="anA">Your answer</label><textarea class="inp" id="anA" rows="5" placeholder="Facts, figures and decisions the assistant should use">${esc(a?.answer||'')}</textarea></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="anAI" ${a?.use_for_ai===false?'':'checked'}> Let the assistant use this answer in reports, drafts and reviews</label>
+      <div class="actions" style="justify-content:space-between;margin-top:12px"><span>${a?`<button class="btn ghost" onclick="anAnswerDel('${a.id}')">Remove answer</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="anAGo">Save</button></span></div>`);
+    $('#anAGo').onclick = async () => {
+      const t = $('#anA').value.trim(); if (!t) { toast('Write an answer first.', true); return; }
+      const row = { company_id:S.company.id, year:rep.year, source:'analysis_report', source_id:repId, q_index:i, question:q, answer:t, use_for_ai:$('#anAI').checked, answered_by:S.me.id, answered_at:new Date().toISOString() };
+      const r = await sb.from('bgt_answers').upsert(row, { onConflict:'source_id,q_index' }); if (r.error) return fail(r.error);
+      closeModal(); toast('Answer saved'); renderAnalysis();
+    };
+  });
+}
+async function anAnswerDel(id){ const r = await sb.from('bgt_answers').delete().eq('id', id); if (r.error) return fail(r.error); closeModal(); toast('Answer removed'); renderAnalysis(); }
 
 /* ================= GAP REMARKS =================
    Why a line's budget and Accounting's actual differ (no budget, budget but no actual, far over or under).

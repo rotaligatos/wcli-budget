@@ -1152,10 +1152,10 @@ async function renderOverview(){
       </tbody><tfoot><tr><td colspan="2">Plant total</td><td class="r num">${peso(T.opex)}</td><td class="r num">${peso(T.capex)}</td><td colspan="2"></td>${hasPY?`<td class="r num">${peso(pyT)}</td><td class="r num">${chg(T.opex+T.capex, pyT)}</td>`:''}</tr></tfoot></table></div></div>
     <div class="ov-grid">
         <div class="card"><h3>By priority</h3><div class="bars">${prios.map((p,i)=>`<div class="bar"><span>${esc(p.split(' /')[0])}</span><div class="track2"><i style="width:${100*pv[i]/Math.max(...pv,1)}%;background:${pColors[i]}"></i></div><span class="num" style="text-align:right">${short(pv[i])}</span></div>`).join('')}</div></div>
-        <div class="card"><h3>Monthly cash need</h3><div style="padding:14px"><div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px">
+        <div class="card" ${S.ovTrend==='year'?'style="grid-column:1/-1"':''}><h3 style="display:flex;align-items:center;gap:10px">${S.ovTrend==='year'?'Year by year — budget vs actual':'Monthly cash need'}${trendToggle(S.ovTrend||'month','ovTrend')}</h3>${S.ovTrend==='year' ? `<div style="padding:14px">${yearTrendHtml(await yearTrendData(null, S.act?.method||'budget'), { capex:true })}</div>` : `<div style="padding:14px"><div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:120px">
           ${monthly.map((v,i)=>`<div title="${MONTHS[i]}: OPEX ${peso(v)} · CAPEX ${peso(capexMonthly[i])}" style="display:flex;flex-direction:column;justify-content:flex-end;height:100%"><i style="display:block;height:${100*capexMonthly[i]/mm}%;background:var(--kraft)"></i><i style="display:block;height:${100*v/mm}%;background:var(--teal)"></i></div>`).join('')}
           </div><div class="ply-lbl" style="gap:4px">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:4px"></span>OPEX <span style="display:inline-block;width:10px;height:10px;background:var(--kraft);margin:0 4px 0 12px"></span>CAPEX</div></div></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;background:var(--teal);margin-right:4px"></span>OPEX <span style="display:inline-block;width:10px;height:10px;background:var(--kraft);margin:0 4px 0 12px"></span>CAPEX</div></div>`}</div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Top OPEX line items</h3><div class="bars">${topItems(o).map(([k,v])=>`<div class="bar" style="grid-template-columns:minmax(160px,320px) 1fr 120px"><span style="font-size:12px">${esc(k)}</span><div class="track2"><i style="width:${100*v/(topItems(o)[0]?.[1]||1)}%;background:var(--teal)"></i></div><span class="num" style="text-align:right">${short(v)}</span></div>`).join('') || '<div class="empty">No OPEX lines yet.</div>'}</div></div>`;
     if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
@@ -1407,11 +1407,11 @@ async function renderActuals(){
     ${ins ? `<div class="ins-grid">${ins}</div>` : ''}
     ${await exclCard(D)}
     ${gapCard(M)}
-    <div class="card" style="margin-bottom:16px"><h3>Month by month</h3><div style="padding:14px">
+    <div class="card" style="margin-bottom:16px"><h3 style="display:flex;align-items:center;gap:10px">${S.act.trend==='year'?'Year by year':'Month by month'}${trendToggle(S.act.trend||'month','actTrend')}</h3><div style="padding:14px">${S.act.trend==='year' ? yearTrendHtml(await yearTrendData(S.act.dept, S.act.method)) : `
       <div class="mchart">${MONTHS.map((m,i)=>{ const a = i < M.closed; const v = a ? M.monthly.act[i] : M.monthly.proj[i];
         return `<div title="${m}: budget ${peso(M.monthly.bud[i])} · ${a?'actual':'projected'} ${peso(v)}"><i class="${a?'a':'p'} ${a && v>M.monthly.bud[i]*1.1?'over':''}" style="height:${100*v/mx}%"></i><s style="bottom:${100*M.monthly.bud[i]/mx}%"></s></div>`; }).join('')}</div>
       <div class="ply-lbl" style="gap:4px">${MONTHS.map(m=>`<span>${m[0]}</span>`).join('')}</div>
-      <div class="legend"><span><i style="background:var(--teal)"></i>Actual</span><span><i style="background:var(--teal-wash);border:1px dashed var(--teal)"></i>Projected</span><span><i style="background:var(--ink);height:2px"></i>Budget</span><span><i style="background:var(--red)"></i>Over budget by 10%+</span></div></div></div>
+      <div class="legend"><span><i style="background:var(--teal)"></i>Actual</span><span><i style="background:var(--teal-wash);border:1px dashed var(--teal)"></i>Projected</span><span><i style="background:var(--ink);height:2px"></i>Budget</span><span><i style="background:var(--red)"></i>Over budget by 10%+</span></div>`}</div></div>
     <div class="card"><h3>OPEX by line item</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Line item</th><th class="r">Budget ${Y}</th><th class="r">Budget ${thru(M.closed)}</th><th class="r">Actual ${thru(M.closed)}</th><th>Status</th><th class="r">Projected ${Y}</th><th class="r">vs budget</th></tr></thead><tbody>
       ${M.rows.map(r=>{ const v = r.projFY - r.budFY; return `<tr class="row" tabindex="0" onclick="actItem(this.dataset.k)" onkeydown="if(event.key==='Enter')actItem(this.dataset.k)" data-k="${esc(r.item)}">
         <td><div class="act">${esc(r.item)}</div>${!r.inList?'<div class="item" style="color:var(--amber)">Not in the budget line-item list</div>':''}${gapRowNote(r)}${r.overrides?`<div class="item">${r.overrides} month${r.overrides>1?'s':''} forecast by the department</div>`:''}</td>
@@ -1708,6 +1708,48 @@ async function refreshRef(){
     renderConsider(item, res.find(r=>r.y===Y-1), dept);
   } catch(e){ box.innerHTML = '<span class="hint">History not available.</span>'; console.error(e); }
 }
+
+/* ================= YEARLY TREND =================
+   Budget vs Accounting actual (and projection for the open year) per year — used on the Actuals page and the Plant overview. */
+async function trendYears(){
+  if (!S._tYears) { const { data } = await sb.from('bgt_imports').select('year');
+    S._tYears = [...new Set([...(data||[]).map(x=>x.year), ...S.cycles.map(c=>c.year)])].sort((a,b)=>a-b).slice(-6); }
+  return S._tYears;
+}
+async function yearTrendData(dept, method='budget'){
+  const ys = await trendYears(), out = [];
+  for (const y of ys) {
+    const D = await loadYearData(y, dept), drv = method==='outlook' ? await loadDrivers(y+1) : null, M = actModel(D, method, drv);
+    out.push({ y, bud:M.budFY, act:M.actYTD, closed:M.closed, proj:M.projFY, cap:sum(D.capBud.map(annual)), excl:sum(D.excl.filter(a=>a.kind!=='capex').map(a=>Number(a.amount)||0)), ext:!!D.ext?.length, hasCycle:D.hasCycle });
+  }
+  return out;
+}
+function yearTrendHtml(R, { capex=false } = {}){
+  if (!R.length) return '<div class="empty">No years with data yet.</div>';
+  const val = r => r.closed ? (r.closed===12 ? r.act : r.proj) : 0;
+  const mx = Math.max(...R.map(r=>Math.max(r.bud + (capex?r.cap:0), val(r))), 1);
+  const yrLbl = r => r.closed===12 ? 'actual' : r.closed ? `actual Jan–${MONTHS[r.closed-1]} + projected` : 'budget only';
+  const chart = `<div style="display:grid;grid-template-columns:repeat(${R.length},1fr);gap:14px;height:160px;align-items:end">
+    ${R.map(r=>{ const a = r.closed ? r.act : 0, p = r.closed && r.closed<12 ? r.proj - r.act : 0;
+      return `<div style="display:flex;gap:4px;align-items:flex-end;height:100%;justify-content:center" title="${r.y}: budget ${peso(r.bud)}${capex?` + CAPEX ${peso(r.cap)}`:''} · ${yrLbl(r)} ${peso(val(r))}">
+        <div style="width:38%;display:flex;flex-direction:column;justify-content:flex-end;height:100%">${capex&&r.cap?`<i style="display:block;height:${100*r.cap/mx}%;background:var(--kraft)"></i>`:''}<i style="display:block;height:${100*r.bud/mx}%;background:var(--surface-2);border:1px solid var(--ink);border-bottom:0"></i></div>
+        <div style="width:38%;display:flex;flex-direction:column;justify-content:flex-end;height:100%">${p>0?`<i style="display:block;height:${100*p/mx}%;background:var(--teal-wash);border:1px dashed var(--teal);border-bottom:0"></i>`:''}<i style="display:block;height:${100*a/mx}%;background:${r.bud && val(r)>r.bud*1.1?'var(--red)':'var(--teal)'}"></i></div></div>`; }).join('')}</div>
+    <div style="display:grid;grid-template-columns:repeat(${R.length},1fr);gap:14px;font-size:12px;color:var(--muted);text-align:center;margin-top:4px">${R.map(r=>`<span>${r.y}${r.ext?'*':''}</span>`).join('')}</div>
+    <div class="legend"><span><i style="background:var(--surface-2);border:1px solid var(--ink)"></i>Budget OPEX</span>${capex?'<span><i style="background:var(--kraft)"></i>Budget CAPEX</span>':''}<span><i style="background:var(--teal)"></i>Actual OPEX (Accounting)</span><span><i style="background:var(--teal-wash);border:1px dashed var(--teal)"></i>Projected rest of year</span><span><i style="background:var(--red)"></i>Over budget by 10%+</span></div>`;
+  const chg = (a,b) => a && b ? `<span style="color:${a>b?'var(--red)':'var(--green)'}">${a>=b?'+':''}${Math.round(100*(a-b)/b)}%</span>` : '';
+  const table = `<div class="tbl-wrap" style="margin-top:12px"><table class="ledger" style="min-width:720px"><thead><tr><th>Year</th><th class="r">Budget OPEX</th>${capex?'<th class="r">Budget CAPEX</th>':''}<th class="r">Actual OPEX</th><th>Covers</th><th class="r">Full year (actual / projected)</th><th class="r">vs budget</th><th class="r">vs year before</th><th class="r">Kept out (resale)</th></tr></thead><tbody>
+    ${R.map((r,i)=>{ const fy = val(r), prev = i ? val(R[i-1]) : 0;
+      return `<tr><td class="act">${r.y}${r.ext?'*':''}</td><td class="r num">${r.hasCycle?peso(r.bud):'—'}</td>${capex?`<td class="r num">${r.hasCycle?peso(r.cap):'—'}</td>`:''}<td class="r num">${r.closed?peso(r.act):'—'}</td><td style="font-size:12px">${yrLbl(r)}</td>
+        <td class="r num">${fy?peso(fy):'—'}</td><td class="r num">${fy&&r.bud?chg(fy, r.bud):''}</td><td class="r num">${fy&&prev?chg(fy, prev):''}</td><td class="r num">${r.excl?peso(r.excl):''}</td></tr>`; }).join('')}
+    </tbody></table></div>${R.some(r=>r.ext)?'<p class="hint" style="margin:6px 0 0">* That year some departments budgeted only part of the year; their budget is extended to 12 months at their average monthly rate.</p>':''}
+    <p class="hint" style="margin:6px 0 0">Actuals are Accounting's official figures, net of costs kept out of plant OPEX. Open-year projection uses the method chosen on the Actuals page.</p>`;
+  return chart + table;
+}
+function trendToggle(cur, fn){
+  return `<div class="seg" role="tablist" style="display:inline-flex;gap:0;margin-left:auto">${[['month','Month by month'],['year','Year by year']].map(([k,l])=>`<button class="btn ${cur===k?'primary':'ghost'}" style="border-radius:0;padding:4px 12px;font-size:13px" role="tab" aria-selected="${cur===k}" onclick="${fn}('${k}')">${l}</button>`).join('')}</div>`;
+}
+async function actTrend(k){ S.act.trend = k; renderActuals(); }
+async function ovTrend(k){ S.ovTrend = k; renderOverview(); }
 
 /* ================= COST OUTLOOK ================= */
 const METHOD_TXT = { budget:'the budget', runrate:'the run-rate (average monthly actual so far)', outlook:'the run-rate adjusted for the cost outlook' };

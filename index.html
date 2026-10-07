@@ -191,6 +191,31 @@ main{padding:16px 28px 64px;min-width:0}
 .recs{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:var(--r);margin:10px 12px 0;padding:8px 12px}
 .recs>summary{cursor:pointer;font-size:13.5px}.rec{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line);margin-top:8px;flex-wrap:wrap}.rec>div:first-child{flex:1 1 360px}
 @media (max-width:520px){.it-grid{grid-template-columns:1fr 1fr}}
+/* Penny */
+.penny-btn{position:fixed;z-index:58;border:0;background:none;padding:0;cursor:grab;touch-action:none;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));user-select:none;-webkit-user-select:none}
+.penny-btn.drag{cursor:grabbing;filter:drop-shadow(0 10px 16px rgba(0,0,0,.3))}.penny-btn:focus-visible{outline:2px solid var(--teal);outline-offset:4px;border-radius:50%}
+.penny-btn .penny-tag{margin-top:-6px;background:var(--ink);color:var(--bg);font-size:10.5px;font-weight:700;border-radius:8px;padding:1px 7px;letter-spacing:.03em}
+.penny-face{display:block;transition:transform .2s}.penny-btn:hover .penny-face{transform:rotate(-8deg) scale(1.05)}
+.penny-face .pn-eyes{transform-origin:32px 30px;transition:transform .08s}.penny-face.blink .pn-eyes{transform:scaleY(.12)}
+.penny-face.think{animation:pnBob 1s ease-in-out infinite}@keyframes pnBob{50%{transform:translateY(-3px) rotate(6deg)}}
+@media (prefers-reduced-motion:reduce){.penny-face.think{animation:none}.penny-btn:hover .penny-face{transform:none}}
+.penny-panel{position:fixed;z-index:59;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow),0 18px 50px rgba(0,0,0,.18);display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - 16px)}
+@media (max-width:599px){.penny-panel{height:min(78vh,640px)}}
+.pn-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface-2)}.pn-head b{display:block;font-family:var(--display);font-size:17px}.pn-head small{color:var(--muted);font-size:11.5px}.pn-head .grow{flex:1}
+.pn-body{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.pn-msg{max-width:92%;font-size:13.5px;line-height:1.45}.pn-msg p{margin:0 0 6px}.pn-msg p:last-child{margin-bottom:0}.pn-msg ul,.pn-msg ol{margin:4px 0 6px;padding-left:18px}.pn-msg .pn-h{font-weight:700;margin-top:6px}
+.pn-msg.u{align-self:flex-end;background:var(--teal);color:var(--on-accent);border-radius:12px 12px 2px 12px;padding:8px 11px}
+.pn-msg.a{align-self:flex-start;background:var(--surface-2);border:1px solid var(--line);border-radius:12px 12px 12px 2px;padding:9px 12px}
+.pn-typing{display:flex;gap:4px}.pn-typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:pnDot 1s infinite}.pn-typing i:nth-child(2){animation-delay:.15s}.pn-typing i:nth-child(3){animation-delay:.3s}@keyframes pnDot{50%{opacity:.25;transform:translateY(-3px)}}
+.pn-chips{display:flex;gap:6px;overflow-x:auto;padding:6px 12px;border-top:1px solid var(--line);scrollbar-width:none}.pn-chip{flex:none;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink)}.pn-chip:hover{border-color:var(--teal);color:var(--teal)}
+.pn-in{display:flex;gap:8px;padding:8px 12px 12px}.pn-in textarea{flex:1;resize:none;border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;background:var(--input);font:inherit;font-size:13.5px}
+.pn-card{margin-top:8px;border:1px solid var(--line-strong);border-left:3px solid var(--teal);border-radius:8px;background:var(--surface);padding:8px 10px;font-size:12.5px}.pn-card.done{border-left-color:var(--green);opacity:.85}.pn-card.dismissed{opacity:.55}
+.pn-card-t{font-weight:700;font-size:13px}.pn-card-r{color:var(--muted);margin:2px 0 4px}.pn-card-d{margin:4px 0}.pn-card-a{display:flex;gap:6px;margin-top:6px}
+.pn-items{width:100%;border-collapse:collapse;margin-top:4px}.pn-items td{border-top:1px solid var(--line);padding:4px 0;vertical-align:top}.pn-items td div{color:var(--muted);font-size:11.5px}.pn-items td.num{text-align:right;white-space:nowrap;padding-left:8px}.pn-items tr.tot td{font-weight:700}
+.pn-suggest{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0 12px;font-size:13px}
+.pn-tbl{border-collapse:collapse;width:100%;font-size:12px;margin:4px 0 8px}.pn-tbl th,.pn-tbl td{border-bottom:1px solid var(--line);padding:3px 5px;text-align:left}.pn-tbl th{font-weight:600;color:var(--muted)}
+.pg{border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2);padding:6px 10px;margin:-4px 0 12px;font-size:12.5px}.pg-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}.pg-row:last-child{border-bottom:0}.pg-row>.pri{flex:none;align-self:flex-start;min-width:132px;text-align:center}.pg-cut{color:var(--red);margin-top:2px}
+
 .more{position:relative}.more>summary{list-style:none}.more>summary::-webkit-details-marker{display:none}
 .more .menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:230px;padding:4px;z-index:30;display:flex;flex-direction:column}
 .more .menu .btn{border:0;background:none;justify-content:flex-start;width:100%;padding:8px 10px;font-size:13.5px;color:var(--ink)}
@@ -757,7 +782,7 @@ async function bootInner(){
     const { data:me, error } = await sb.rpc('bgt_login'); if (error) throw error;
     S.me = me;
     if (!me.active || me.role === 'pending') { $('#pendingEmail').textContent = me.email; show('pending'); return; }
-    show('app'); await loadMaster(); route();
+    show('app'); await loadMaster(); route(); pennyInit();
   } catch(e){ fail(e); show('login'); }
 }
 sb.auth.onAuthStateChange((ev) => {
@@ -994,6 +1019,7 @@ function renderBudget(){
     <div class="actions">
       ${actionsFor(b).map(([a,l,cls])=>`<button class="btn ${cls}" onclick="doAction('${a}')">${l}</button>`).join('')}
       ${ed?'<button class="btn" onclick="aiBudgetDialog()">Draft budget with assistant</button>':''}
+      ${isReviewer() && b.status!=='draft' ? `<button class="btn" onclick="pennyToggle(true);pennyAsk('Is the ${esc(d?.name||'')} budget aligned with the ${S.cycle.year} direction, SWOT and scenarios? What should I ask them?')">Alignment check (Penny)</button>` : ''}
       <button class="btn" onclick="aiReview()">Review with assistant</button>
       <button class="btn" onclick="exportDept()">Export for Finance</button>
       ${ed?'<button class="btn ghost" onclick="importDialog()">Import Excel</button>':''}
@@ -1153,6 +1179,7 @@ function doAction(action){
   const warn = action==='submit' && errs.length ? `<div class="banner red">${errs.length} line issue${errs.length>1?'s':''} must be fixed first. See the Checks tab.</div>` : '';
   modal(`<h3>${titles[action]}</h3><p>${esc(deptById(b.department_id)?.name)} · ${peso(sum(S.opex.map(annual)))} OPEX · ${peso(sum(S.capex.map(annual)))} CAPEX</p>${warn}
     <div class="field"><label for="actNote">${needNote?'Reason for returning (required)':'Note (optional)'}</label><textarea class="inp" id="actNote"></textarea></div>
+    ${action==='submit'?`<div class="pn-suggest">${PENNY_FACE(30)}<div>Want a second look first? Penny checks items, prices, priorities and last year's spending, and suggests tweaks before it goes to the Plant Head.<br><a class="linkbtn" onclick="closeModal();pennyToggle(true);pennyAsk('Check my budget before I submit')">Ask Penny to check my budget</a></div></div>`:''}
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn ${action==='return'?'danger':'primary'}" id="actGo" ${warn?'disabled':''}>${{submit:'Submit',plant_approve:'Approve',md_approve:'Approve',finance_accept:'Accept',return:'Return budget',reopen:'Reopen'}[action]}</button></div>`);
   $('#actGo').onclick = async () => {
     const note = $('#actNote').value.trim();
@@ -1188,14 +1215,16 @@ function editLine(kind, id){
     <div class="field"><label for="f_purpose">Business purpose / expected benefit</label><textarea class="inp" id="f_purpose" placeholder="Why the company should incur this cost and what it supports" ${ro}>${esc(l.purpose||'')}</textarea></div>
     <div class="g2">
       <div class="field"><label for="f_basis">Basis of estimate</label><select class="inp" id="f_basis" ${ro}>${opts(L.basis.map(x=>x.value), l.basis)}</select></div>
-      <div class="field"><label for="f_priority">Priority</label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
+      <div class="field"><label for="f_priority">Priority <a class="linkbtn" style="font-size:11.5px;margin-left:4px" onclick="$('#pgBox').classList.toggle('hidden')">What do these mean?</a></label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
     </div>
+    <div id="pgBox" class="hidden">${priorityGuideHtml()}</div>
     ${itemsBoxHtml(l, ed)}
   ` : `
     <div class="g2">
       <div class="field"><label for="f_category">CAPEX category</label><select class="inp" id="f_category" ${ro}>${opts(S.items.capex, l.category)}</select></div>
-      <div class="field"><label for="f_priority">Priority</label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
+      <div class="field"><label for="f_priority">Priority <a class="linkbtn" style="font-size:11.5px;margin-left:4px" onclick="$('#pgBox').classList.toggle('hidden')">What do these mean?</a></label><select class="inp" id="f_priority" ${ro}>${opts(L.priority.map(x=>x.value), l.priority)}</select><span class="hint" id="priHint"></span></div>
     </div>
+    <div id="pgBox" class="hidden">${priorityGuideHtml()}</div>
     <div class="field"><label for="f_asset">Asset / project</label><input class="inp" id="f_asset" value="${esc(l.asset||'')}" placeholder="e.g. Warehouse forklift replacement" ${ro}></div>
     <div class="field"><label for="f_description">Detailed description</label><textarea class="inp" id="f_description" placeholder="What will be purchased or built, with key specifications" ${ro}>${esc(l.description||'')}</textarea></div>
     <div id="simBox"></div>
@@ -4214,6 +4243,163 @@ async function recMove(to, ids){
 // a dialog on top of the line drawer (the regular modal would replace the drawer)
 function modal2(html){ closeModal2(); const d = document.createElement('div'); d.id = 'overlay2'; d.innerHTML = `<div class="modal" style="z-index:65" onclick="if(event.target===this)closeModal2()"><div class="card">${html}</div></div>`; document.body.appendChild(d); }
 function closeModal2(){ document.getElementById('overlay2')?.remove(); }
+
+/* ================= PENNY — the Costline assistant =================
+   A little copper coin with a face. Drag her anywhere; click to chat. She reads the data you are allowed
+   to see, answers, and proposes changes as cards you approve. She never submits or approves budgets. */
+const PRIORITY_GUIDE = [
+  ['Critical / Mandatory','Not funding it could stop or disrupt operations, or create a compliance, legal or safety issue.','Boiler fuel, power, permits, fire safety, statutory inspections, security contract.','Production stops, penalties or safety exposure. Never cut; only re-price.'],
+  ['High','Important to the year\'s plan; deferring it has a real negative impact.','Preventive maintenance, key spare parts, delivery capacity, critical software.','Higher breakdown risk, lost output or bigger repair cost later.'],
+  ['Medium','Clear benefit, but it can reasonably be deferred or reduced.','Upgrades, extra training, non-urgent repairs, replacing working equipment.','Benefit comes later; little immediate effect. First place to defer.'],
+  ['Low / Discretionary','Desirable but can be postponed, reduced or removed.','Nice-to-have furniture, events, extra supplies beyond usage.','Little or no effect on operations. Cut first.']];
+function priorityGuideHtml(){
+  return `<div class="pg">${PRIORITY_GUIDE.map(([v,m,e,c])=>`<div class="pg-row"><span class="${PRI_CLASS[v]?'pri '+PRI_CLASS[v]:'pri'}">${esc(v)}</span><div><b>${esc(m)}</b><div>Examples: ${esc(e)}</div><div class="pg-cut">If cut: ${esc(c)}</div></div></div>`).join('')}</div>`;
+}
+const PENNY_FACE = (sz=56, mood='') => `<svg class="penny-face ${mood}" width="${sz}" height="${sz}" viewBox="0 0 64 64" aria-hidden="true">
+  <defs><radialGradient id="pnG${sz}" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#F6C27A"/><stop offset=".55" stop-color="#D98A3D"/><stop offset="1" stop-color="#A85B22"/></radialGradient></defs>
+  <circle cx="32" cy="32" r="30" fill="url(#pnG${sz})" stroke="#8A4A1A" stroke-width="2"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#F3B66C" stroke-width="1.5" stroke-dasharray="2 3" opacity=".8"/>
+  <text x="32" y="17" text-anchor="middle" font-size="9" font-weight="700" fill="#8A4A1A" font-family="Archivo,Arial">₱</text>
+  <g class="pn-eyes"><ellipse cx="23" cy="30" rx="4" ry="5" fill="#3B2412"/><ellipse cx="41" cy="30" rx="4" ry="5" fill="#3B2412"/>
+    <circle cx="24.4" cy="28.2" r="1.5" fill="#fff"/><circle cx="42.4" cy="28.2" r="1.5" fill="#fff"/></g>
+  <ellipse cx="17" cy="38" rx="3.6" ry="2.2" fill="#F0846A" opacity=".75"/><ellipse cx="47" cy="38" rx="3.6" ry="2.2" fill="#F0846A" opacity=".75"/>
+  <path class="pn-mouth" d="M25 40 Q32 47 39 40" fill="none" stroke="#3B2412" stroke-width="2.6" stroke-linecap="round"/>
+</svg>`;
+
+S.penny = { open:false, busy:false, msgs:[] };
+try { S.penny.msgs = JSON.parse(sessionStorage.getItem('costline.penny')||'[]'); } catch(_){}
+const pennySave = () => { try { sessionStorage.setItem('costline.penny', JSON.stringify(S.penny.msgs.slice(-30))); } catch(_){} };
+
+function pennyInit(){
+  if (document.getElementById('penny')) return;
+  const b = document.createElement('button'); b.id = 'penny'; b.className = 'penny-btn'; b.setAttribute('aria-label','Ask Penny, the budget assistant'); b.title = 'Penny — drag me anywhere, click to chat';
+  b.innerHTML = PENNY_FACE(58) + '<span class="penny-tag">Penny</span>';
+  document.body.appendChild(b);
+  let pos = null; try { pos = JSON.parse(localStorage.getItem('costline.penny.pos')||'null'); } catch(_){}
+  const place = (x, y) => { const w = b.offsetWidth || 64, h = b.offsetHeight || 64, botbar = innerWidth < 900 ? 64 : 0;
+    x = Math.max(6, Math.min(innerWidth - w - 6, x)); y = Math.max(6, Math.min(innerHeight - h - 6 - botbar, y)); b.style.left = x+'px'; b.style.top = y+'px'; return { x, y }; };
+  const def = () => place(innerWidth - 84, innerHeight - (innerWidth < 900 ? 150 : 96));
+  pos ? place(pos.x * innerWidth, pos.y * innerHeight) : def();
+  // drag (mouse, touch, pen); a short press without moving opens the chat
+  let st = null;
+  b.addEventListener('pointerdown', e => { st = { x:e.clientX, y:e.clientY, l:b.offsetLeft, t:b.offsetTop, moved:false }; b.setPointerCapture(e.pointerId); });
+  b.addEventListener('pointermove', e => { if (!st) return; const dx = e.clientX-st.x, dy = e.clientY-st.y;
+    if (!st.moved && Math.hypot(dx,dy) < 6) return; st.moved = true; b.classList.add('drag'); place(st.l+dx, st.t+dy); pennyPlacePanel(); });
+  b.addEventListener('pointerup', () => { if (!st) return; const moved = st.moved; st = null; b.classList.remove('drag');
+    if (moved) { try { localStorage.setItem('costline.penny.pos', JSON.stringify({ x:b.offsetLeft/innerWidth, y:b.offsetTop/innerHeight })); } catch(_){} return; }
+    pennyToggle(); });
+  b.addEventListener('keydown', e => { if (e.key==='Enter' || e.key===' ') { e.preventDefault(); pennyToggle(); } });
+  addEventListener('resize', () => { place(b.offsetLeft, b.offsetTop); pennyPlacePanel(); });
+  setInterval(() => { const f = b.querySelector('.penny-face'); if (!f || S.penny.busy) return; f.classList.add('blink'); setTimeout(()=>f.classList.remove('blink'), 180); }, 4200);
+}
+function pennyToggle(force){
+  S.penny.open = force ?? !S.penny.open;
+  let p = document.getElementById('pennyPanel');
+  if (!S.penny.open) { p?.remove(); return; }
+  if (!p) { p = document.createElement('section'); p.id = 'pennyPanel'; p.className = 'penny-panel'; p.setAttribute('role','dialog'); p.setAttribute('aria-label','Penny, the budget assistant'); document.body.appendChild(p); }
+  pennyRender(); pennyPlacePanel(); setTimeout(()=>$('#pnIn')?.focus(), 30);
+}
+// open the panel next to Penny, on whichever side has room
+function pennyPlacePanel(){
+  const p = document.getElementById('pennyPanel'), b = document.getElementById('penny'); if (!p || !b) return;
+  if (innerWidth < 600) { Object.assign(p.style, { left:'8px', right:'8px', top:'auto', bottom:(innerWidth<900?72:8)+'px', width:'auto' }); return; }
+  const w = Math.min(420, innerWidth - 24), h = Math.min(620, innerHeight - 24), bx = b.offsetLeft, by = b.offsetTop, bw = b.offsetWidth;
+  let x = bx + bw + 10 + w < innerWidth ? bx + bw + 10 : bx - w - 10; if (x < 8) x = Math.max(8, Math.min(innerWidth - w - 8, bx - w/2));
+  let y = Math.max(8, Math.min(innerHeight - h - 8, by + b.offsetHeight - h));
+  Object.assign(p.style, { left:x+'px', top:y+'px', width:w+'px', height:h+'px', right:'auto', bottom:'auto' });
+}
+function pennyContext(){
+  const b = S.view==='budget' ? budgetById(S.budgetId) : null;
+  return { view:S.view, cycle_id:S.cycle?.id, year:S.cycle?.year, budget_id:b?.id||null, department_id:b?.department_id || (S.view==='analysis'?S.an?.dept:null) || null,
+    department:b ? deptById(b.department_id)?.name : null, status:b?.status||null, tab:S.view==='budget'?S.tab:null };
+}
+function pennyChips(){
+  const c = pennyContext(), b = c.budget_id && budgetById(c.budget_id), R = isReviewer();
+  if (b && R && b.status!=='draft') return ['Is this budget aligned with the 2027 direction and SWOT?', 'What should I ask this department before approving?', 'Which lines could be deferred if we must cut 10%?'];
+  if (b && canEdit(b)) return ['Check my budget before I submit', 'What did we spend last year that is not in this budget?', 'What do the priorities mean?', 'List the items for my lines without items'];
+  if (R && S.view==='overview') return ['Which departments need my attention?', 'Summarise the budgets submitted so far against the plant direction', 'What do the priorities mean?'];
+  return ['What do the priorities mean?', 'How do I list the items for a line?', 'What is the cost outlook for 2027?'];
+}
+function pennyMd(t){
+  const lines = esc(t||'').split('\n'); let out = '', list = '';
+  const inl = s => s.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|\s)_(.+?)_(?=\s|$)/g,'$1<i>$2</i>');
+  const flush = () => { if (list) { out += `<${list}>` + buf.join('') + `</${list}>`; list = ''; buf = []; } }; let buf = [];
+  let tbl = [];
+  const flushT = () => { if (!tbl.length) return; const rows = tbl.filter(r=>!/^\s*\|?\s*:?-{2,}/.test(r)).map(r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>inl(c.trim())));
+    out += `<table class="pn-tbl"><tr>${rows[0].map(c=>`<th>${c}</th>`).join('')}</tr>${rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`; tbl = []; };
+  lines.forEach(l => { if (/^\s*\|.*\|\s*$/.test(l)) { flush(); tbl.push(l); return; } flushT(); const m = l.match(/^\s*([-•*]|\d+[.)])\s+(.*)$/);
+    if (m) { const k = /\d/.test(m[1]) ? 'ol' : 'ul'; if (list && list!==k) flush(); list = k; buf.push(`<li>${inl(m[2])}</li>`); return; }
+    flush(); const h = l.match(/^#{1,4}\s+(.*)$/); out += h ? `<p class="pn-h">${inl(h[1])}</p>` : l.trim() ? `<p>${inl(l)}</p>` : ''; });
+  flush(); flushT(); return out;
+}
+function pennyRender(){
+  const p = document.getElementById('pennyPanel'); if (!p) return;
+  const M = S.penny.msgs;
+  p.innerHTML = `<header class="pn-head">${PENNY_FACE(34, S.penny.busy?'think':'')}<div><b>Penny</b><small>${S.penny.busy?'Looking into it…':'Every peso counts'}</small></div><span class="grow"></span>
+      ${M.length?`<button class="btn ghost sm" onclick="pennyClear()" title="Start over">New chat</button>`:''}<button class="btn ghost sm" onclick="pennyToggle(false)" aria-label="Close">✕</button></header>
+    <div class="pn-body" id="pnBody">
+      ${!M.length ? `<div class="pn-msg a"><p>Hi${S.me?.full_name?' '+esc(S.me.full_name.split(' ')[0]):''}! I'm Penny. I can check your budget, find what's missing, explain priorities, look up prices and draft lines with items for you to approve. What do you need?</p></div>` : ''}
+      ${M.map((m,i)=>`<div class="pn-msg ${m.role==='user'?'u':'a'}">${m.role==='user'?`<p>${esc(m.content)}</p>`:pennyMd(m.content)}${(m.proposals||[]).map((pr,j)=>pennyCard(pr,i,j)).join('')}</div>`).join('')}
+      ${S.penny.busy?`<div class="pn-msg a pn-typing"><i></i><i></i><i></i></div>`:''}
+    </div>
+    <div class="pn-chips">${pennyChips().map(c=>`<button class="pn-chip" onclick="pennyAsk(this.textContent)">${esc(c)}</button>`).join('')}</div>
+    <form class="pn-in" onsubmit="event.preventDefault();pennyAsk($('#pnIn').value)"><textarea id="pnIn" rows="2" placeholder="Ask Penny about your budget…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pennyAsk(this.value)}" ${S.penny.busy?'disabled':''}></textarea><button class="btn primary" ${S.penny.busy?'disabled':''} aria-label="Send">Send</button></form>`;
+  const body = $('#pnBody'); if (body) body.scrollTop = body.scrollHeight;
+}
+function pennyClear(){ S.penny.msgs = []; pennySave(); pennyRender(); }
+async function pennyAsk(text){
+  text = String(text||'').trim(); if (!text || S.penny.busy) return;
+  S.penny.msgs.push({ role:'user', content:text }); S.penny.busy = true; pennySave(); pennyRender();
+  try {
+    const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ page:pennyContext(), messages:S.penny.msgs.map(m=>({ role:m.role, content:m.content })) } });
+    if (error) { let msg = error.message; try { const j = await error.context.json(); msg = j.error || msg; } catch(_){} throw new Error(msg); }
+    if (data?.error) throw new Error(data.error);
+    S.penny.msgs.push({ role:'assistant', content:data.reply || '(no answer)', proposals:(data.proposals||[]).map(p=>({ ...p, state:'open' })) });
+  } catch(e){ S.penny.msgs.push({ role:'assistant', content:'Sorry — I could not finish that: ' + e.message }); }
+  S.penny.busy = false; pennySave(); pennyRender();
+}
+/* ---------- proposal cards ---------- */
+function pennyCard(p, i, j){
+  const items = (p.items||[]).map(normPennyItem), tot = sum(items.map(itemAnnual));
+  const title = p.kind==='add_line' ? `Add line: ${esc(p.activity||p.line_item)}` : p.kind==='remove_line' ? `Remove: ${esc(p.current?.activity||p.current?.line_item||'line')}` : `Change: ${esc(p.current?.activity||p.current?.line_item||'line')}`;
+  const diff = [];
+  if (p.kind==='add_line') diff.push(`${esc(p.line_item)} · ${esc(p.priority||'')}`);
+  if (p.kind==='update_line') { if (p.priority && p.priority!==p.current?.priority) diff.push(`Priority: ${esc(p.current?.priority||'none')} → <b>${esc(p.priority)}</b>`);
+    if (p.line_item && p.line_item!==p.current?.line_item) diff.push(`Line item: ${esc(p.current?.line_item||'')} → <b>${esc(p.line_item)}</b>`);
+    if (p.activity && p.activity!==p.current?.activity) diff.push(`Name: <b>${esc(p.activity)}</b>`); if (p.purpose) diff.push(`Purpose: ${esc(p.purpose)}`);
+    if (items.length) diff.push(`Items: ${peso(p.current?.annual||0)} → <b>${peso(tot)}</b>`); }
+  return `<div class="pn-card ${p.state}"><div class="pn-card-t">${title}</div>${p.reason?`<div class="pn-card-r">${esc(p.reason)}</div>`:''}${diff.length?`<div class="pn-card-d">${diff.join('<br>')}</div>`:''}
+    ${items.length?`<table class="pn-items">${items.map(it=>`<tr><td>${esc(it.name)}${it.std?` <span class="pri pri-ok" style="font-size:9.5px">Std</span>`:''}<div>${Number(it.qty).toLocaleString('en-PH')} ${esc(it.unit||'')} × ${peso(it.price,2)}${Number(it.adj)?' +'+it.adj+'%':''} · ${esc(freqText(it))}</div></td><td class="num">${peso(itemAnnual(it))}</td></tr>`).join('')}<tr class="tot"><td>Total a year</td><td class="num">${peso(tot)}</td></tr></table>`:''}
+    <div class="pn-card-a">${p.state==='open' ? `<button class="btn sm primary" onclick="pennyApply(${i},${j})">${p.kind==='remove_line'?'Remove line':'Apply'}</button><button class="btn sm ghost" onclick="pennyDismiss(${i},${j})">Dismiss</button>` : `<span class="hint">${p.state==='done'?'Applied ✓':p.state==='dismissed'?'Dismissed':'Could not apply'}</span>`}</div></div>`;
+}
+// standard prices win over whatever the assistant wrote
+function normPennyItem(x){ const it = { name:x.name, unit:x.unit||'', qty:Number(x.qty)||0, price:Number(x.price)||0, src:x.src||'estimate', adj:Number(x.adj ?? x.adj_pct)||0, freq:x.freq||'monthly', m:Number(x.m ?? x.month)||1, ms:x.ms||x.months, ref:x.ref };
+  const sp = typeof stdFor==='function' && (stdFor(it.name) || (S.prices||[]).find(p=>Number(p.budget_year)===S.cycle?.year && p.item.toLowerCase()===String(it.name).toLowerCase()));
+  return sp ? { ...it, price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item } : it; }
+function pennyDismiss(i, j){ S.penny.msgs[i].proposals[j].state = 'dismissed'; pennySave(); pennyRender(); }
+async function pennyApply(i, j){
+  const p = S.penny.msgs[i]?.proposals?.[j]; if (!p) return;
+  const b = budgetById(p.budget_id);
+  if (!b || !canEdit(b)) { toast('This budget cannot be edited right now (only drafts or returned budgets, by its department or the Head of Plant Operations).', true); return; }
+  try { await loadPrices().catch(()=>{});
+    const items = cleanItems((p.items||[]).map(normPennyItem)), row = {};
+    if (items.length) { row.items = items; itemsMonths(items).forEach((v,k)=>row['m'+(k+1)] = v); }
+    let r;
+    if (p.kind==='add_line') {
+      const { data:mx } = await sb.from('bgt_opex_lines').select('sort').eq('budget_id', b.id).order('sort', { ascending:false }).limit(1);
+      Object.assign(row, { budget_id:b.id, line_item:p.line_item, activity:p.activity, description:p.description||null, purpose:p.purpose||null, priority:p.priority||null, expense_type:(S.lookups?.expense_type||[]).some(x=>x.value===p.expense_type) ? p.expense_type : null,
+        remarks:`Added with Penny: ${p.reason||''}`.trim(), sort:((mx||[])[0]?.sort||0)+1 });
+      if (!items.length) for (let k=1;k<=12;k++) row['m'+k] = 0;
+      r = await sb.from('bgt_opex_lines').insert(row);
+    } else if (p.kind==='update_line') {
+      ['priority','activity','purpose','line_item'].forEach(k => { if (p[k]) row[k] = p[k]; });
+      r = await sb.from('bgt_opex_lines').update(row).eq('id', p.line_id);
+    } else r = await sb.from('bgt_opex_lines').delete().eq('id', p.line_id);
+    if (r.error) throw r.error;
+    p.state = 'done'; pennySave(); pennyRender(); toast('Done — Penny\'s change is in the budget');
+    if (S.view==='budget' && S.budgetId===b.id) openBudget(b.id);
+  } catch(e){ fail(e); }
+}
 
 boot();
 </script>

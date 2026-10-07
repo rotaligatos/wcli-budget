@@ -2055,7 +2055,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (to produce)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
   ['uptime_pct','Machine uptime / OEE','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;
@@ -2073,7 +2073,7 @@ async function renderPerf(){
     const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
     const ph = (k,t) => { const v = tot(k); return v==null ? '' : t==='pct' ? v.toFixed(2) : Math.round(v); };
     const kRow = ([k,l,u,t]) => `<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
-        return `<td class="r">${ed?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${ph(k,t)}"`:''}>`:`<span class="num">${t==='pct'&&(mo===0?tot(k):v)!=null?(mo===0?tot(k):v).toFixed(2)+'%':fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`;
+        return `<td class="r">${ed&&k!=='production_required'?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${ph(k,t)}"`:''}>`:`<span class="num">${t==='pct'&&(mo===0?tot(k):v)!=null?(mo===0?tot(k):v).toFixed(2)+'%':fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`;
     const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
     // sales and volume: every month entered; OPEX ratios: only months that have both OPEX actuals and the figure
     const avail = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)!=null); return ms.length ? { sum:sum(ms.map(mo=>g(m,mo))), last:Math.max(...ms), n:ms.length, ms } : null; };
@@ -2133,6 +2133,15 @@ async function fiYearTable(Y){
       </tbody></table></div><div class="hint" style="margin-top:6px">Red = missed the target that year (yield below target, or Class B above target).</div>`;
   } catch(e){ el.innerHTML = '<span class="hint">Year-by-year view not available.</span>'; }
 }
+// boards required by sales = boards produced less the Class B ratio (monthly ratio, else the year's)
+async function fillRequired(Y){
+  const { data:K } = await sb.from('bgt_kpis').select('id,month,metric,value').eq('company_id', S.company.id).eq('year', Y).in('metric', ['production_output','reject_pct','production_required']);
+  const g = (k,m) => { const r = (K||[]).find(x=>x.metric===k && x.month===m); return r ? Number(r.value) : null; }, ups = [];
+  for (let m=1; m<=12; m++) { const p = g('production_output',m), r = g('reject_pct',m) ?? g('reject_pct',0);
+    if (p==null || r==null) continue; const v = Math.round(p * (1 - r/100));
+    if (g('production_required',m) !== v) ups.push({ company_id:S.company.id, year:Y, month:m, metric:'production_required', value:v, updated_by:S.me.id }); }
+  if (ups.length) { const r = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (r.error) throw r.error; }
+}
 async function saveKpis(Y){
   const K = await loadKpis(Y), ups = [], dels = [];
   document.querySelectorAll('.kv').forEach(e => { const k = e.dataset.k, m = Number(e.dataset.m), ex = K.find(x=>x.metric===k && x.month===m), v = e.value.trim();
@@ -2140,7 +2149,7 @@ async function saveKpis(Y){
   try {
     if (ups.length) { const r = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (r.error) throw r.error; }
     if (dels.length) { const r = await sb.from('bgt_kpis').delete().in('id', dels); if (r.error) throw r.error; }
-    delete S.ol.cache['k'+Y]; toast(ups.length+dels.length ? 'Figures saved' : 'No changes'); renderPerf();
+    await fillRequired(Y); delete S.ol.cache['k'+Y]; toast(ups.length+dels.length ? 'Figures saved' : 'No changes'); renderPerf();
   } catch(e){ fail(e); }
 }
 async function exportKpiTemplate(){
@@ -2169,7 +2178,7 @@ function importKpiDialog(){
           ups.push({ company_id:S.company.id, year:Y, month:m, metric:code, value:Number(v), updated_by:S.me.id }); } }
       if (!ups.length) { $('#kfMsg').textContent = 'No figures found.'; return; }
       const res = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (res.error) throw res.error;
-      delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
+      await fillRequired(Y); delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
     } catch(e){ fail(e); }
   };
 }

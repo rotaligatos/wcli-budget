@@ -408,6 +408,7 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
   .ph .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 .basis-working{background:var(--blue-wash);color:var(--blue)}.basis-submitted{background:var(--amber-wash);color:var(--amber)}.basis-approved{background:var(--green-wash);color:var(--green)}
+.olp{margin:6px 0 16px;border-left:4px solid var(--teal)}
 .il-list{display:flex;flex-direction:column;gap:6px}.il-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
 .preq-strip ul{margin:6px 0;padding-left:18px}.preq-strip li{margin:2px 0}.preq-strip .muted{opacity:.8;font-size:12.5px}.preq-act{display:flex;gap:12px;align-items:center;margin-top:4px}.preq-act a{cursor:pointer;color:var(--teal);font-weight:600}
 .banner.amber{background:var(--amber-wash);border-color:var(--amber-line);color:var(--amber-text)}.banner.green{background:var(--green-wash);border-color:var(--green-line);color:var(--green-text)}
@@ -503,7 +504,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 10:35</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 15:14</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -998,7 +999,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 10:35</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 15:14</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1225,7 +1226,7 @@ function runChecks(){
       if (!its.length) add('opex',l.id,'err','List the items this line covers — what, how many, unit price and when. "List items with assistant" can fill them in.',n);
       its.forEach(it => {
         if (!itemsOk(it)) add('opex',l.id,'err',`Item "${it.name||'unnamed'}" needs a name, quantity, unit price and timing.`,n);
-        const sp = !it.std && stdFor(it.name); if (sp) add('opex',l.id,'err',`"${it.name}" has a standard ${S.cycle.year} price (${peso(sp.unit_price,2)}/${sp.unit||'unit'}) — use it so every department budgets the same price.`,n);
+        const sp = !it.std && stdFor(it.name, it.unit); if (sp) add('opex',l.id,'err',`"${it.name}" has a standard ${S.cycle.year} price (${peso(sp.unit_price,2)}/${sp.unit||'unit'}) — use it so every department budgets the same price.`,n);
         if (it.req && (S.preqs||[]).find(r=>r.id===it.req && r.status==='open')) add('opex',l.id,'warn',`Waiting for a standard price for "${it.name}" — your estimate is used until it is set.`,n);
       });
     }
@@ -2253,6 +2254,7 @@ async function renderOutlook(){
       <div class="sub">What is happening outside the company that will move our costs — and the change we assume for each expense line.${latest?` Figures as of <b>${latest}</b>.`:''}</div></div>
       <div class="actions">${ed?'<button class="btn primary" onclick="editAssump()">Add an indicator</button>':''}</div></div>
     ${!o.A.length ? `<div class="banner blue">No outlook recorded for ${y} yet.</div>` : ''}
+    <div id="olpBox"></div>
     ${cats.map(([c,l])=>{ const list = o.A.filter(a=>(a.category||'custom')===c); if (!list.length) return '';
       return `<h3 class="sec">${l}</h3><div class="ol-grid">${list.map(a=>`<div class="ol-card">
         <div class="eyebrow">${esc(a.label)}</div>
@@ -2282,7 +2284,7 @@ async function renderOutlook(){
           <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveDrivers(${y})">Save changes</button></div>`:''}</div>`;
-    renderTrend(y, o);
+    renderTrend(y, o); olpCardHtml(y).then(h=>{ const e=$("#olpBox"); if (e) e.innerHTML = h; }).catch(console.error);
   } catch(e){ fail(e); }
 }
 async function saveDrivers(y){
@@ -2705,6 +2707,85 @@ async function editCapBasis(Y){
     const r = await sb.from('bgt_assumptions').upsert(row, { onConflict:'company_id,year,key' }); if (r.error) return fail(r.error);
     delete S.ol.cache['cb'+Y]; closeModal(); toast('Saved'); renderPerf();
   };
+}
+
+/* ================= 2027 BUDGET PRICES FROM THE OUTLOOK (Rommel 2026-10-08) =================
+   Fuel, exchange rate and utilities are not dictated: Costline computes them from the outlook (market price now, the next
+   year's crude and peso forecasts) and WCLI's own purchase history (what we pay vs the pump price), and publishes them as
+   standard prices everyone uses. Only the board price index is set by the Head of Plant Operations. */
+const OLP_DEF = { share:70, crude_now:81, fuel_buffer:3, gas_ratio:1.12, fx_buffer:1, elec_adj:5, elec_wcli:null, water_rate:null, water_adj:5, ratio:null };
+async function olpData(y){
+  const o = await loadOutlook(y), A = k => o.A.find(a=>a.key===k);
+  const [{ data:st }, { data:h }, { data:pr }] = await Promise.all([
+    sb.from('bgt_settings').select('value').eq('key','outlook_prices').maybeSingle(),
+    sb.from('bgt_indicator_history').select('key,year,value,basis').in('key',['diesel','usdphp']),
+    sb.from('bgt_plant_records').select('rec_date,qty,amount,item').eq('kind','issue').ilike('item','%diesel%').gt('qty',0).gt('amount',0).limit(5000)]);
+  const P = { ...OLP_DEF, ...(st?.value||{}) };
+  // internal factor: what WCLI paid for diesel vs the Metro Manila pump average, per year where both exist
+  const paid = {}; (pr||[]).forEach(r => { const yy = Number(String(r.rec_date).slice(0,4)); const x = (paid[yy] ||= { q:0, a:0 }); x.q += Number(r.qty); x.a += Number(r.amount); });
+  const pairs = Object.entries(paid).map(([yy,x]) => { const pump = (h||[]).find(z=>z.key==='diesel' && z.year===Number(yy) && z.basis==='avg'); return pump ? { y:Number(yy), wcli:x.a/x.q, pump:Number(pump.value) } : null; }).filter(Boolean);
+  const ratio = P.ratio ?? (pairs.length ? sum(pairs.map(p=>p.wcli/p.pump))/pairs.length : 0.975);
+  const fxNext = Number((h||[]).find(z=>z.key==='usdphp' && z.year===y && z.basis==='forecast')?.value) || Number(A('usdphp')?.value) || null;
+  return { o, A, P, pairs, ratio, fxNext };
+}
+function olpCompute(d){
+  const { A, P, ratio, fxNext } = d, r2 = x => Math.round(x*100)/100, rows = [];
+  const pump = Number(A('diesel')?.value), fxNow = Number(A('usdphp')?.value), crudeNext = Number(A('dubai_crude')?.value), meralco = Number(A('meralco')?.value);
+  if (pump && fxNow && fxNext && crudeNext) {
+    const crudeEff = (P.share/100)*(crudeNext/P.crude_now-1), fxEff = (P.share/100)*(fxNext/fxNow-1), pump27 = pump*(1+crudeEff+fxEff);
+    const diesel = r2(pump27*ratio*(1+P.fuel_buffer/100));
+    rows.push({ key:'diesel', item:'Diesel', unit:'liter', category:'GAS AND OIL', price:diesel,
+      how:`Pump now ₱${pump.toFixed(2)}/L × (1 ${crudeEff<0?'−':'+'} ${Math.abs(crudeEff*100).toFixed(1)}% crude $${P.crude_now}→$${crudeNext} ${fxEff<0?'−':'+'} ${Math.abs(fxEff*100).toFixed(1)}% peso ${fxNow}→${fxNext}, on the ${P.share}% of the pump price that follows oil) = ₱${pump27.toFixed(2)} pump in 2027; × ${ratio.toFixed(3)} what WCLI pays vs pump; + ${P.fuel_buffer}% volatility buffer` });
+    rows.push({ key:'gasoline', item:'Gasoline', unit:'liter', category:'GAS AND OIL', price:r2(diesel*P.gas_ratio), how:`Diesel price × ${P.gas_ratio} (WCLI's gasoline-to-diesel price ratio in its stores records)`, approx:true });
+  }
+  if (fxNow && fxNext) rows.push({ key:'usd', item:'US dollar exchange rate', unit:'US$', category:null, price:r2((fxNow+fxNext)/2*(1+P.fx_buffer/100)),
+    how:`Average of today's ₱${fxNow} and the 12-month forecast ₱${fxNext}, + ${P.fx_buffer}% buffer — use it for anything priced in dollars` });
+  const eBase = Number(P.elec_wcli) || meralco;
+  if (eBase) rows.push({ key:'electricity', item:'Electricity', unit:'kWh', category:'UTILITIES - ELECTRICITY', price:r2(eBase*(1+P.elec_adj/100)),
+    how:`${P.elec_wcli ? `WCLI's own rate from its bill ₱${eBase}` : `Meralco overall rate ₱${eBase} (published benchmark — enter WCLI's rate from a bill for a closer figure)`} + ${P.elec_adj}% for ${S.cycle.year}`, approx:!P.elec_wcli });
+  if (Number(P.water_rate)) rows.push({ key:'water', item:'Water', unit:'m³', category:'UTILITIES - WATER', price:r2(Number(P.water_rate)*(1+P.water_adj/100)), how:`WCLI's water rate ₱${P.water_rate}/m³ from its bill + ${P.water_adj}% inflation` });
+  return rows;
+}
+async function olpCardHtml(y){
+  const d = await olpData(y), rows = olpCompute(d), ed = canManageData();
+  await loadPrices().catch(()=>{});
+  const pub = k => (S.prices||[]).find(p => Number(p.budget_year)===y && p.source_type==='outlook' && p.notes?.startsWith(`[olp:${k}]`));
+  S._olp = { y, rows, d };
+  return `<div class="card olp"><h3>${y} budget prices from the outlook</h3>
+    <p class="hint" style="padding:0 14px;margin:0 0 6px">Fuel, exchange rate and utilities are computed here from the market (outlook) and WCLI's own purchase prices, and published as <b>Standard ${y}</b> prices that every department uses. Board prices (the price index) are set by the Head of Plant Operations on the Price list.</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:640px"><thead><tr><th>Item</th><th class="r">${y} price</th><th>How it is worked out</th><th>Published</th></tr></thead><tbody>
+    ${rows.map(r=>{ const p = pub(r.key); return `<tr><td class="act">${esc(r.item)}${r.approx?' <span class="pri pri-med" style="font-size:10px">approx.</span>':''}</td><td class="r num"><b>${peso(r.price,2)}</b>/${esc(r.unit)}</td><td style="font-size:12px;max-width:420px">${esc(r.how)}</td>
+      <td style="font-size:12px">${p ? (Math.abs(Number(p.unit_price)-r.price)<0.005 ? '<span style="color:var(--green)">✓ in use</span>' : `<span style="color:var(--amber)">in use: ${peso(p.unit_price,2)}</span>`) : '<span class="hint">not yet</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div>
+    ${d.pairs.length?`<p class="hint" style="padding:6px 14px 0;margin:0">WCLI paid ${d.pairs.map(p=>`₱${p.wcli.toFixed(2)}/L in ${p.y} vs pump ₱${p.pump.toFixed(2)}`).join('; ')} → factor ${d.ratio.toFixed(3)}.</p>`:''}
+    ${!d.P.water_rate?'<p class="hint" style="padding:4px 14px 0;margin:0">Water: enter WCLI\'s ₱/m³ from a bill under Settings to publish a water price; until then managers estimate it.</p>':''}
+    ${ed?`<div class="row-flex" style="padding:10px 14px"><button class="btn primary" onclick="olpPublish()">Publish as ${y} standard prices</button><button class="btn ghost" onclick="olpSettings()">Settings</button></div>`:''}</div>`;
+}
+async function olpPublish(){
+  const { y, rows } = S._olp || {}; if (!rows?.length) return;
+  let n = 0, lines = 0;
+  for (const r of rows) {
+    const ex = (S.prices||[]).find(p => Number(p.budget_year)===y && p.source_type==='outlook' && p.notes?.startsWith(`[olp:${r.key}]`));
+    const row = { company_id:S.company.id, item:r.item, unit:r.unit, unit_price:r.price, category:r.category, supplier:'Costline outlook', source_type:'outlook', budget_year:y, active:true,
+      as_of:new Date().toISOString().slice(0,10), notes:`[olp:${r.key}] ${r.how}` };
+    const q = ex ? await sb.from('bgt_price_items').update(row).eq('id', ex.id).select().single() : await sb.from('bgt_price_items').insert(row).select().single();
+    if (q.error) return fail(q.error); n++;
+    lines += await applyStdPrice(q.data).catch(()=>0);
+  }
+  await loadPrices(true).catch(()=>{});
+  toast(`${n} standard price${n>1?'s':''} published${lines?` — ${lines} budget line${lines>1?'s':''} updated`:''}`); renderOutlook();
+}
+async function olpSettings(){
+  const P = S._olp?.d?.P || OLP_DEF, f = (k, l, h) => `<div class="field"><label for="op_${k}">${l}</label><input class="inp num" id="op_${k}" type="number" step="any" value="${P[k]??''}" placeholder="${h||''}"></div>`;
+  modal(`<h3>How the outlook prices are worked out</h3>
+    <div class="g2">${f('crude_now','Crude this year (US$/bbl)')}${f('share','Share of the pump price that follows oil (%)')}${f('fuel_buffer','Fuel volatility buffer (%)')}${f('ratio','WCLI vs pump price factor','auto from records')}${f('gas_ratio','Gasoline ÷ diesel price')}${f('fx_buffer','Exchange-rate buffer (%)')}${f('elec_wcli','WCLI electricity rate ₱/kWh (from a bill)','uses Meralco benchmark')}${f('elec_adj','Electricity change next year (%)')}${f('water_rate','WCLI water rate ₱/m³ (from a bill)','not set')}${f('water_adj','Water change next year (%)')}</div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="olpSaveSettings()">Save</button></div>`, 'wide');
+}
+async function olpSaveSettings(){
+  const v = {}; Object.keys(OLP_DEF).forEach(k => { const e = $('#op_'+k); if (!e) return; const x = e.value.trim(); v[k] = x==='' ? null : Number(x); });
+  ['share','crude_now','fuel_buffer','gas_ratio','fx_buffer','elec_adj','water_adj'].forEach(k => { if (v[k]==null) v[k] = OLP_DEF[k]; });
+  const r = await sb.from('bgt_settings').upsert({ key:'outlook_prices', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
+  closeModal(); toast('Saved — check the prices, then publish'); renderOutlook();
 }
 
 /* ================= BUDGET ASSISTANT ================= */
@@ -4114,26 +4195,32 @@ function drawItems(){
 // standard prices set by the Head of Plant Operations for the budget year; everyone uses them as is
 const stdPrices = () => (S.prices||[]).filter(p => p.active!==false && Number(p.budget_year)===S.cycle.year);
 const stdKey = p => String(p.item||'').split(/\s[—–-]\s|[(,]/)[0].trim().toLowerCase();
-function stdFor(name){ const n = ' ' + String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' ';
-  return stdPrices().find(p => { const k = stdKey(p).replace(/[^a-z0-9]+/g,' ').trim(); return k.length>=3 && n.includes(' '+k+' '); }); }
+// a standard price applies when the item name contains its key AND the units agree (so "water pump" never gets the water rate);
+// without a unit on the item, the name must start with the key
+const normUnit = u => { const x = String(u||'').toLowerCase().replace(/[^a-z0-9$³]+/g,''); if (!x) return '';
+  if (/^(l|lt|ltr|liter|liters|litre|litres)$/.test(x)) return 'l'; if (/^(m3|m³|cum|cubicmeter|cubicmeters)$/.test(x)) return 'm3';
+  if (/^(usd|us\$|\$|dollar|dollars)$/.test(x)) return 'usd'; if (/^(pc|pcs|piece|pieces|unit|units)$/.test(x)) return 'pc'; return x; };
+function stdFor(name, unit){ const n = ' ' + String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' ', u = normUnit(unit);
+  return stdPrices().find(p => { const k = stdKey(p).replace(/[^a-z0-9]+/g,' ').trim(); if (k.length<3 || !n.includes(' '+k+' ')) return false;
+    const pu = normUnit(p.unit); if (u && pu) return u===pu; return n.trimStart().startsWith(k); }); }
 function itemStdNote(it, i, ed){
   if (it.std) return `<div class="it-std ok">Standard ${it.std} price — the same for every department.</div>`;
-  const sp = it.name && stdFor(it.name);
+  const sp = it.name && stdFor(it.name, it.unit);
   if (sp) return `<div class="it-std warn">A standard ${S.cycle.year} price exists: <b>${esc(sp.item)}</b> ${peso(sp.unit_price,2)}/${esc(sp.unit||'unit')}.${ed?` <a onclick="useStd(${i},'${sp.id}')">Use it</a>`:''}</div>`;
   const rq = it.req && (S.preqs||[]).find(r=>r.id===it.req);
   if (rq) return `<div class="it-std ${rq.status==='open'?'wait':'ok'}">${rq.status==='open'?'Standard price requested — waiting for the Head of Plant Operations.':rq.status==='answered'?`Answered: ${peso(rq.answer_price,2)}/${esc(rq.answer_unit||rq.unit||'unit')}${rq.answer_note?' — '+esc(rq.answer_note):''}.`:`Request declined${rq.answer_note?': '+esc(rq.answer_note):''} — keep your estimate.`}</div>`;
   if (!ed || !it.name || (it.src||'estimate')!=='estimate') return '';
   // only plant-wide cost drivers (fuel, exchange rate, boards, utilities…) are set by the Head of Plant Operations; everything else is found or estimated here
-  if (isPlantSet(it.name)) return `<div class="it-std warn">Plant-wide cost (fuel, exchange rate, boards, utilities) — the Head of Plant Operations sets the price everyone uses. <a onclick="askStdPrice(${i})">Ask for the price to use</a></div>`;
+  if (isPlantSet(it.name)) return `<div class="it-std warn">Board price — set by the Head of Plant Operations (board price index). <a onclick="askStdPrice(${i})">Ask for the price to use</a></div>`;
   return `<div class="it-std">No price on the list yet: <a onclick="itemFind(${i})">search the price list</a> · <a onclick="itemLookup(${i})">look up online</a> · or keep your estimate and say where it came from.</div>`;
 }
 /* which items are plant-wide cost drivers — editable on the Price list page */
-const PLANT_SET_DEFAULT = ['diesel','gasoline','fuel','lpg','bunker','electricity','kwh','meralco','water','exchange rate','usd','dollar','board','mdf','particle board','particleboard','plywood','melamine','decor paper','substrate','resin'];
+const PLANT_SET_DEFAULT = ['board','boards','mdf','particle board','particleboard','plywood','hardboard','melamine board','board price index'];
 async function loadPlantSet(){ try { const { data } = await sb.from('bgt_settings').select('value').eq('key','plant_set_prices').maybeSingle(); S.plantSet = Array.isArray(data?.value) && data.value.length ? data.value : PLANT_SET_DEFAULT; } catch(_){ S.plantSet = PLANT_SET_DEFAULT; } return S.plantSet; }
 function isPlantSet(name){ const n = ' ' + String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' '; return (S.plantSet||PLANT_SET_DEFAULT).some(k => { const w = String(k).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); return w && n.includes(' '+w+' '); }); }
 function plantSetCardHtml(){
   if (!canManageData()) return '';
-  return `<div class="card" style="margin-bottom:16px"><h3>Prices set by the plant</h3><p class="hint" style="padding:0 14px;margin:0 0 6px">Items matching these words are plant-wide cost drivers: managers are asked to request the price from you instead of estimating. Every other item is found on the price list, looked up online, or estimated by the manager. Mark the price you decide as <b>Standard ${S.cycle.year}</b>.</p>
+  return `<div class="card" style="margin-bottom:16px"><h3>Prices set by the plant</h3><p class="hint" style="padding:0 14px;margin:0 0 6px">Items matching these words (the board price index) are priced by you: managers ask instead of estimating. Fuel, exchange rate and electricity come from the <b>Cost outlook</b> page (computed 2027 prices). Every other item is found on the price list, looked up online, or estimated by the manager. Mark the price you decide as <b>Standard ${S.cycle.year}</b>.</p>
     <div style="padding:0 14px 12px"><textarea class="inp" id="psWords" rows="2">${esc((S.plantSet||PLANT_SET_DEFAULT).join(', '))}</textarea>
     <div class="row-flex" style="margin-top:6px"><button class="btn sm primary" onclick="savePlantSet()">Save</button><button class="btn sm ghost" onclick="$('#psWords').value=PLANT_SET_DEFAULT.join(', ')">Reset to default</button></div></div></div>`;
 }
@@ -4248,7 +4335,7 @@ async function itemsWithAI(){
     toast(`${S._items.length} items listed — check quantities and prices, then Save line`);
   } catch(e){ fail(e); } finally { btn.disabled = false; btn.textContent = t; }
 }
-function normAiItem(x){ const sp = stdFor(x.name) || stdPrices().find(p=>p.item.toLowerCase()===String(x.name||'').toLowerCase());
+function normAiItem(x){ const sp = stdFor(x.name, x.unit) || stdPrices().find(p=>p.item.toLowerCase()===String(x.name||'').toLowerCase());
   if (sp) return { name:x.name, spec:x.spec, unit:sp.unit||x.unit||'', qty:Number(x.qty)||0, price:Number(sp.unit_price), src:'price_list', ref:sp.item, adj:0, pid:sp.id, std:sp.budget_year, freq:x.freq||'monthly', m:Number(x.month ?? x.m)||1, ms:x.months || x.ms, why:x.why };
   return { name:x.name, spec:x.spec, unit:x.unit||'', qty:Number(x.qty)||0, price:Number(x.price)||0, src:x.src||'estimate', ref:x.ref, adj:Number(x.adj_pct ?? x.adj)||0, freq:x.freq||'monthly', m:Number(x.month ?? x.m)||1, ms:x.months || x.ms, why:x.why }; }
 // many lines at once (draft budget, or lines still without items); batches of 5 lines, 3 at a time
@@ -4287,7 +4374,7 @@ function preqCardHtml(){
   if (!list.length) return '';
   const open = list.filter(r=>r.status==='open');
   return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)"><h3>Requests for a standard price — ${open.length} waiting</h3>
-    <p class="hint" style="padding:0 14px;margin:0 0 6px">${R?'Managers ask only for plant-wide costs (fuel, exchange rate, boards, utilities). Your answer becomes the price everyone uses, and every budget line that asked is updated.':'Your questions to the Head of Plant Operations about plant-wide prices.'}</p>
+    <p class="hint" style="padding:0 14px;margin:0 0 6px">${R?'Managers ask only for board prices (the board price index). Your answer becomes the price everyone uses, and every budget line that asked is updated.':'Your questions to the Head of Plant Operations about board prices.'}</p>
     <div class="tbl-wrap"><table class="ledger" style="min-width:760px"><thead><tr><th>Item</th><th>Department</th><th class="r">Their estimate</th><th>Note</th><th>Answer</th></tr></thead><tbody>
     ${list.map(r=>`<tr><td class="act">${esc(r.item)}${r.unit?`<div class="item" style="text-transform:none">per ${esc(r.unit)}</div>`:''}${r.line_item?`<div class="item">${esc(r.line_item)}</div>`:''}</td><td style="font-size:12.5px">${esc(deptById(r.department_id)?.name||'')}<div class="item" style="text-transform:none">${fmtDate(r.created_at)}</div></td>
       <td class="r num">${r.suggested_price!=null?peso(r.suggested_price,2):'—'}</td><td style="font-size:12.5px;max-width:260px">${esc(r.note||'')}</td>
@@ -4561,7 +4648,7 @@ function pennyCard(p, i, j){
 }
 // standard prices win over whatever the assistant wrote
 function normPennyItem(x){ const it = { name:x.name, unit:x.unit||'', qty:Number(x.qty)||0, price:Number(x.price)||0, src:x.src||'estimate', adj:Number(x.adj ?? x.adj_pct)||0, freq:x.freq||'monthly', m:Number(x.m ?? x.month)||1, ms:x.ms||x.months, ref:x.ref };
-  const sp = typeof stdFor==='function' && (stdFor(it.name) || (S.prices||[]).find(p=>Number(p.budget_year)===S.cycle?.year && p.item.toLowerCase()===String(it.name).toLowerCase()));
+  const sp = typeof stdFor==='function' && (stdFor(it.name, it.unit) || (S.prices||[]).find(p=>Number(p.budget_year)===S.cycle?.year && p.item.toLowerCase()===String(it.name).toLowerCase()));
   return sp ? { ...it, price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item } : it; }
 async function pennyApplyCx(p, b, simNote){
   try {
@@ -4864,7 +4951,7 @@ const PT_SC = [
   { id:'price', who:'mgr', mins:3, title:PT('Find a price for an item','Hanapan ng presyo ang item'), desc:PT('Standard prices, the price list, an online lookup or your own estimate — and when to ask the Head of Plant Operations.','Standard prices, price list, online lookup o sariling tantiya — at kailan magtatanong sa Head of Plant Operations.'),
     steps:() => [
       { id:'open', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /Forklift diesel/.test(r.textContent)), done:()=>!!$q('.drawer .it-row'), say:PT('Open the line **Forklift diesel (sample)**.','Buksan ang line na **Forklift diesel (sample)**.') },
-      { id:'std', el:'.items-box', next:true, say:PT('Items marked **Standard 2027** are plant-wide costs — fuel, exchange rate, boards, utilities. The Head of Plant Operations sets one price for everyone (e.g. diesel ₱80/L); you can\'t change it.','Ang may **Standard 2027** ay gastos ng buong planta — fuel, exchange rate, boards, utilities. Isang presyo para sa lahat na itinakda ng Head of Plant Operations (hal. diesel ₱80/L); hindi ito mapapalitan.') },
+      { id:'std', el:'.items-box', next:true, say:PT('Items marked **Standard 2027** use one price for everyone. Fuel, exchange rate and electricity are worked out by Costline from the cost outlook and what WCLI actually pays; board prices are set by the Head of Plant Operations. You can\'t change them.','Ang may **Standard 2027** ay iisang presyo para sa lahat. Ang fuel, exchange rate at kuryente ay kinukuwenta ng Costline mula sa cost outlook at sa totoong binabayaran ng WCLI; ang presyo ng boards ay itinatakda ng Head of Plant Operations. Hindi ito mapapalitan.') },
       { id:'add', el:()=>btnIn('.items-box','Add item'), done:()=>(S._items||[]).length>=3, say:PT('Now a regular item. Tap **Add item**.','Ngayon, karaniwang item. I-tap ang **Add item**.') },
       { id:'name', el:()=>$q(`#itN${(S._items||[]).length-1}`), done:()=>(S._items?.[S._items.length-1]?.name||'').length>=5, say:PT('Type **Hydraulic hose assembly**. As you type, matches from the **price list and past purchases** show under the name — pick one if it fits.','I-type ang **Hydraulic hose assembly**. Habang nagta-type, lalabas sa ilalim ang tugma mula sa **price list at dating bili** — piliin kung bagay.'),
         act:{ label:PT('Type it for me','Ako na ang magta-type'), fn:()=>{ const k = S._items.length-1; S._items[k] = { ...S._items[k], name:'Hydraulic hose assembly', unit:'pc', qty:2, src:'estimate', adj:0, freq:'once', m:3 }; drawItems(); } } },
@@ -4873,7 +4960,7 @@ const PT_SC = [
       { id:'use', el:'.il-row button', done:()=>/^Online/.test(S._items?.[S._items.length-1]?.ref||''), say:PT('Pick a price that matches your item and tap **Use ₱…**.','Pumili ng presyong tugma sa item mo at i-tap ang **Use ₱…**.'),
         why:PT('Online prices are market references, not quotations. If you have a supplier quotation, set the source to **Quotation** instead — it is a stronger basis.','Market reference lang ang online prices, hindi quotation. Kung may quotation ka sa supplier, gawing **Quotation** ang source — mas matibay na basehan.') },
       { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>{ const l = SIMDB.bgt_opex_lines.find(x=>x.id===PRT.L1); return (l?.items||[]).some(x=>/^Online/.test(x.ref||'')); }, say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
-      { id:'fin', next:true, say:PT('Done! Only plant-wide costs (fuel, exchange rate, boards, utilities) show **Ask for the price to use** — those go to the Head of Plant Operations. Everything else you price yourself. 🎉','Tapos na! Ang gastos lang ng buong planta (fuel, exchange rate, boards, utilities) ang may **Ask for the price to use** — iyon ang itatanong sa Head of Plant Operations. Ang iba, ikaw ang magpe-presyo. 🎉') } ] },
+      { id:'fin', next:true, say:PT('Done! Only board prices show **Ask for the price to use** — those go to the Head of Plant Operations. Fuel, exchange rate and electricity already have outlook prices; everything else you price yourself. 🎉','Tapos na! Ang presyo lang ng boards ang may **Ask for the price to use** — iyon ang itatanong sa Head of Plant Operations. May outlook price na ang fuel, exchange rate at kuryente; ang iba, ikaw ang magpe-presyo. 🎉') } ] },
   { id:'capex', who:'mgr', mins:4, title:PT('CAPEX: similar projects and endorsing','CAPEX: magkaparehong proyekto at pag-endorse'), desc:PT('Add an asset, see the similar-project warning, then endorse it to the department that should own it.','Magdagdag ng asset, makita ang babala sa kaparehong proyekto, at i-endorse sa tamang department.'),
     steps:() => [
       { id:'tab', el:()=>[...document.querySelectorAll('.tabs button')].find(b=>/CAPEX/.test(b.textContent)), done:()=>S.tab==='capex', say:PT('Open the **CAPEX** tab.','Buksan ang **CAPEX** tab.') },

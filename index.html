@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 18:46</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 18:50</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:46</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:50</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2104,7 +2104,7 @@ async function exportPrices(){
   download(await wb.xlsx.writeBuffer(), `Price list - ${S.company.code}.xlsx`); toast('Price list downloaded');
 }
 function importPricesDialog(){
-  modal(`<h3>Import prices from Excel</h3><p>Use the columns from "Download list / template". Rows with the same item and supplier as an existing price are updated.</p>
+  modal(`<h3>Import prices from Excel</h3><p>Use the columns from "Download list / template", or an <b>Odoo purchase order lines export</b> (Order Reference, Partner, Product, Description, Quantity, Unit of Measure, Unit Price) — the latest price of each item is taken. Rows with the same item and supplier as an existing price are updated.</p>
     <div class="field"><input type="file" id="ipFile" accept=".xlsx" class="inp"></div><p id="ipMsg"></p>
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="ipGo">Import</button></div>`);
   $('#ipGo').onclick = async () => {
@@ -2112,7 +2112,9 @@ function importPricesDialog(){
     try {
       const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
       const cv = v => { if (v==null) return null; if (v instanceof Date) return v.toISOString().slice(0,10); if (typeof v==='object') { if ('result' in v) return v.result; if (v.richText) return v.richText.map(x=>x.text).join(''); if (v.text) return v.text; } return v; };
-      const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), idx = {};
+      const head0 = Array.from(ws.getRow(1).values, v=>String(cv(v)||'').trim().toLowerCase());
+      if (head0.some(h=>/order reference/.test(h)) && head0.some(h=>/unit price/.test(h))) return odooPoPrices(ws, cv, head0);
+      const head = Array.from(ws.getRow(1).values, v=>String(cv(v)||'').trim().toLowerCase()), idx = {};
       PRICE_COLS.forEach(([k,l]) => { const i = head.indexOf(l.toLowerCase()); if (i>0) idx[k] = i; });
       if (!idx.item || !idx.unit_price) { $('#ipMsg').textContent = 'The first row must have at least "Item" and "Unit price" headings.'; return; }
       await loadPrices(true);
@@ -2130,6 +2132,39 @@ function importPricesDialog(){
       closeModal(); toast(`${ins} added, ${upd} updated`); renderPrices();
     } catch(e){ fail(e); }
   };
+}
+/* Odoo "Purchase Order lines" export → price list: latest price per item, with how often and at what range it was bought.
+   Lines bought for customers' sales orders (reference "(S…" — MSSI cabinets, Steintek slabs) are resale, not plant purchases, and are left out. */
+const ODOO_GENERIC = [[/^factory supplies$/i,'SUPPLIES'],[/^office supplies$/i,'SUPPLIES'],[/^factory maintenance$/i,'REPAIRS AND MAINTENANCE - OFFICE / BUILDING / STRUCTURE'],[/^repairs? & maintenance machinery/i,'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT'],[/^repairs? & maintenance \(vehicle\)/i,'REPAIRS AND MAINTENANCE - COMPANY SERVICE VEHICLES'],[/professional fees/i,'PROFESSIONAL FEES'],[/^office equipment$/i,null],[/^diesel/i,'GAS AND OIL'],[/^gasoline/i,'GAS AND OIL']];
+async function odooPoPrices(ws, cv, head){
+  const col = re => head.findIndex(h=>re.test(h));
+  const C = { d:col(/created on|order date|date/), ref:col(/order reference/), sup:col(/partner|vendor/), prod:col(/product/), desc:col(/description/), q:col(/quantity/), u:col(/unit of measure|uom/), p:col(/unit price/) };
+  const by = {}; let resale = 0, zero = 0, n = 0;
+  for (let r=2; r<=ws.rowCount; r++) { const row = ws.getRow(r), g = k => C[k]>0 ? cv(row.getCell(C[k]).value) : null;
+    const prod = String(g('prod')||'').trim(), desc = String(g('desc')||'').trim(), price = Number(g('p'))||0, qty = Number(g('q'))||0, ref = String(g('ref')||''), sup = String(g('sup')||'').trim();
+    if (!prod && !desc) continue;
+    if (price <= 0 || qty <= 0 || /^amount adjustment$/i.test(prod)) { zero++; continue; }
+    if (/\(S\d/i.test(ref) || /^(module system|steintek)/i.test(sup)) { resale++; continue; }
+    const gen = ODOO_GENERIC.find(([re]) => re.test(prod)), name = (gen && desc ? desc : prod || desc).replace(/\s+/g,' ').trim(), unit = String(g('u')||'').trim() || null;
+    const dv = g('d'), d = dv instanceof Date ? dv : new Date(dv), ds = isNaN(d) ? null : d.toISOString().slice(0,10);
+    const k = name.toLowerCase()+'|'+(unit||'').toLowerCase(), x = (by[k] ||= { name, unit, n:0, lo:Infinity, hi:0, last:null, cat:gen?.[1]||null });
+    x.n++; n++; x.lo = Math.min(x.lo, price); x.hi = Math.max(x.hi, price);
+    if (!x.last || (ds||'') >= (x.last.ds||'')) x.last = { ds, price, sup, po:ref.split(/\s/)[0], prf:(ref.match(/\((PR[FS][^)]*)\)/i)||[])[1]||null };
+  }
+  const items = Object.values(by);
+  if (!items.length) { $('#ipMsg').innerHTML = `No plant purchases found${resale?` — ${resale} lines were bought for customers' sales orders (resale) and are left out`:''}.`; return; }
+  $('#ipMsg').innerHTML = `<b>Odoo purchase order lines.</b> ${n} plant purchase lines → <b>${items.length} items</b> with their latest price, supplier and PO.${resale?` ${resale} lines bought for customers' sales orders (MSSI, Steintek resale) are left out — they are not plant costs.`:''}${zero?` ${zero} lines without a price skipped.`:''} Items already on the price list from the same supplier are updated.`;
+  const go = $('#ipGo'); go.textContent = `Add ${items.length} prices`;
+  go.onclick = async () => { go.disabled = true;
+    try { await loadPrices(true); let ins = 0, upd = 0; const add = [];
+      for (const x of items) { const L = x.last;
+        const rec = { company_id:S.company.id, item:x.name, category:x.cat, unit:x.unit, unit_price:L.price, supplier:L.sup||null, quote_ref:`PO ${L.po}${L.prf?' · '+L.prf:''}`, quote_date:L.ds, as_of:L.ds, source_type:'po', active:true, updated_by:S.me.id,
+          notes:`Odoo PO: bought ${x.n} time${x.n>1?'s':''}${x.n>1&&x.hi>x.lo?`, ₱${x.lo.toLocaleString('en-PH')}–₱${x.hi.toLocaleString('en-PH')}`:''}; latest ${L.ds||''}` };
+        const ex = S.prices.find(p => p.item.toLowerCase()===x.name.toLowerCase() && (p.supplier||'').toLowerCase()===String(L.sup||'').toLowerCase() && !p.budget_year);
+        if (ex) { const r = await sb.from('bgt_price_items').update(rec).eq('id', ex.id); if (r.error) throw r.error; upd++; } else add.push(rec); }
+      for (let i=0;i<add.length;i+=200) { const r = await sb.from('bgt_price_items').insert(add.slice(i,i+200)); if (r.error) throw r.error; ins += add.slice(i,i+200).length; }
+      closeModal(); toast(`${ins} prices added, ${upd} updated from Odoo POs`); renderPrices();
+    } catch(e){ go.disabled = false; fail(e); } };
 }
 /* picker inside the line drawer */
 async function togglePricePick(kind){

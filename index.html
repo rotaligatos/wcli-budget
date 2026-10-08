@@ -502,7 +502,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 09:40</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 09:44</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -997,7 +997,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:40</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:44</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1053,7 +1053,20 @@ function installHelp(){
       <li>Still not there? Go to <b>Settings → Apps → Costline → Uninstall</b>, come back to this page and install again.</li></ul>
     <p><b>To install fresh:</b> ${ios ? 'in Safari tap <b>Share</b> → <b>Add to Home Screen</b>.' : sams ? 'in Samsung Internet tap the menu <b>≡</b> → <b>Add page to</b> → <b>Home screen</b>.' : 'in Chrome open the menu <b>⋮</b> → <b>Install app</b> (or <b>Add to Home screen</b>). On a computer, use the install icon at the right end of the address bar.'}</p>
     <p class="hint">Use the same browser you normally sign in with — an app installed from Chrome isn't visible to Samsung Internet, and the other way round.</p>
+    <details class="meta-line" id="pwaDiag"><summary>What this device reports (send a screenshot to Rommel)</summary><div id="pwaDiagBody" style="font-size:12.5px;padding:6px 0">Checking…</div></details>
     <div class="actions" style="justify-content:flex-end"><button class="btn primary" onclick="closeModal()">OK</button></div>`);
+  pwaDiag().then(h => { const e = document.getElementById('pwaDiagBody'); if (e) e.innerHTML = h; });
+}
+async function pwaDiag(){
+  const ua = navigator.userAgent, row = (k, v) => `<div><b>${k}:</b> ${esc(String(v))}</div>`;
+  const brand = (navigator.userAgentData?.brands||[]).map(b=>b.brand+' '+b.version).filter(x=>!/Not/.test(x)).join(', ');
+  let related = 'not supported'; try { if (navigator.getInstalledRelatedApps) { const r = await navigator.getInstalledRelatedApps(); related = r.length ? 'YES — this browser has Costline installed' : 'no'; } } catch(e){ related = 'error'; }
+  let sw = 'none'; try { const r = await navigator.serviceWorker?.getRegistration(); sw = r ? (navigator.serviceWorker.controller ? 'active' : 'registered') : 'none'; } catch(_){}
+  let man = '—'; try { const m = await (await fetch(document.querySelector('link[rel=manifest]').href, { cache:'no-store' })).json(); man = m.id; } catch(_){}
+  const dev = (ua.match(/\(([^)]+)\)/)||[])[1] || '';
+  return row('Device', dev) + row('Browser', /SamsungBrowser/.test(ua)?'Samsung Internet':/EdgA?\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome'+(brand?' ('+brand+')':''):/Safari/.test(ua)?'Safari':'other')
+    + row('Opened as app', isStandalone() ? 'yes' : 'no, in the browser') + row('Browser offered install', S._installEvt ? 'yes' : 'no')
+    + row('Browser says installed', related) + row('Service worker', sw) + row('App id', man) + row('Build', document.querySelector('.build-tag')?.textContent||'');
 }
 async function installApp(){ const e = S._installEvt; if (!e) { installHelp(); return; } e.prompt(); await e.userChoice.catch(()=>{}); S._installEvt = null; }
 

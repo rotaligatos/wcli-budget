@@ -246,6 +246,7 @@ main{padding:16px 28px 64px;min-width:0}
   .lc-ply{overflow-x:auto}
   .lc-total{display:flex;justify-content:space-between;padding:10px 12px;font-weight:600;border-top:2px solid var(--line-strong);margin-bottom:70px}
 }
+details.oi>summary{cursor:pointer;list-style:none;padding:12px 14px}details.oi>summary::-webkit-details-marker{display:none}.oi-row{padding:10px 14px;border-top:1px solid var(--line)}.oi-q{margin-bottom:6px;font-size:13.5px}.oi-done{padding:6px 0;border-top:1px solid var(--line);font-size:13px}.ab-q{margin:8px 0}.ab-q label{display:block;font-size:13.5px;margin-bottom:4px}
 td.proj{font-style:italic;color:var(--muted)}
 .build-tag{font-size:10.5px;opacity:.55;margin:6px 0 2px}
 .cxe-in{margin-bottom:14px;border-left:4px solid var(--teal)}
@@ -505,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 17:41</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 17:51</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1000,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:41</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:51</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1104,7 +1105,8 @@ async function openBudget(id){
       sb.from('bgt_opex_lines').select('*').eq('budget_id', id).order('sort').order('created_at'),
       sb.from('bgt_capex_lines').select('*').eq('budget_id', id).order('sort').order('created_at'),
       sb.from('bgt_comments').select('*').eq('budget_id', id).order('created_at'),
-      sb.from('bgt_events').select('*').eq('budget_id', id).order('created_at')
+      sb.from('bgt_events').select('*').eq('budget_id', id).order('created_at'),
+      loadOpenItems(id)
     ]);
     for (const r of [o,c,cm,ev]) if (r.error) throw r.error;
     S.opex = o.data; S.capex = c.data; S.comments = cm.data; S.events = ev.data;
@@ -1141,7 +1143,7 @@ function renderBudget(){
     return `<div class="${cls}"><b>${s[0]}</b><small>${done ? (b[s[1]] ? fmtDate(b[s[1]]) : 'Done') : (i===curIdx ? (b.status==='returned'?'Returned — needs changes':'In progress') : s[2])}</small></div>`; }).join('')}</div>
   ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
   ${b.status==='returned' && lastReturn ? `<div class="banner red"><b>Returned by ${esc(userName(lastReturn.actor_id))}:</b> ${esc(lastReturn.note)}</div>` : ''}
-  ${myPreqStrip(b)}${cxeBanner(b)}
+  ${myPreqStrip(b)}${cxeBanner(b)}${openItemsHtml(b)}
   <div class="stats">
     <div class="stat opex"><div class="eyebrow">OPEX</div><div class="v">${short(opexT)}</div><div class="s">${S.opex.length} line${S.opex.length===1?'':'s'} · ${peso(opexT)}</div></div>
     <div class="stat capex"><div class="eyebrow">CAPEX</div><div class="v">${short(capexT)}</div><div class="s">${S.capex.length} item${S.capex.length===1?'':'s'} · ${peso(capexT)}</div></div>
@@ -1216,6 +1218,7 @@ function runChecks(){
   const out = [], th = Number(S.cycle.capex_threshold)||20000;
   const add = (kind,id,sev,msg,name) => out.push({kind,id,sev,msg,name});
   const seen = {};
+  { const n = (S.oi||[]).filter(x=>x.status==='open' && x.budget_id===S.budgetId).length; if (n) add('budget',null,'warn',`${n} question${n>1?'s':''} or data gap${n>1?'s':''} from the assistant draft still open — answer them in “To confirm” at the top of the budget.`,'To confirm'); }
   S.opex.forEach(l => {
     const n = l.activity || l.line_item || 'Untitled line', m = months(l), t = sum(m);
     if (l.calc?.ai) add('opex',l.id,'warn','Drafted by the assistant and not yet confirmed — open the line, check it and save.',n);
@@ -3009,7 +3012,7 @@ function aiBudgetDialog(){
     <p style="margin-top:0">The assistant proposes every recurring expense line from your actual spending (Accounting and plant records), utility consumption, sales and volume targets, capacity use and the cost outlook — plus any CAPEX deferred into ${S.cycle.year}. You choose which lines to add; each one is then yours to check, adjust and justify.</p>
     <div class="field"><label for="abText">Anything it should know? (optional)</label><textarea class="inp" id="abText" rows="3" placeholder="e.g. Security contract renews in March at +8%; new 2nd-shift helpers from June; no more rented forklift after Q1"></textarea></div>
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="abGo">Draft my budget</button></div><div id="abBody"></div>`, 'wide');
-  $('#abGo').onclick = () => aiBudgetRun($('#abText').value.trim());
+  $('#abGo').onclick = () => { S._abText = $('#abText').value.trim(); S._abQA = []; aiBudgetRun(S._abText); };
 }
 async function aiBudgetRun(text){
   const go = $('#abGo'); if (go) go.disabled = true;
@@ -3034,12 +3037,21 @@ async function aiBudgetRun(text){
         <td><div class="item">CAPEX · ${esc(c.category)}</div><div class="act">${esc(c.asset)}</div>${c.carried_over?'<span class="chip pri-high" style="font-size:10.5px">deferred from an earlier year</span>':''}</td>
         <td class="r num">${peso((Number(c.qty)||1)*(Number(c.unit_cost)||0))}</td><td></td><td style="font-size:12px">${c.month?MONTHS[c.month-1]:''}</td><td style="font-size:12.5px">${esc(c.rationale||c.justification||'')}</td><td></td></tr>`).join('')}
       </tbody><tfoot><tr><td></td><td>Selected</td><td class="r num" id="abTot"></td><td colspan="4"></td></tr></tfoot></table></div>
-      ${listHtml('Data gaps the draft could not cover', r.gaps)}${listHtml('Please confirm', r.questions)}
-      <div class="actions" style="justify-content:space-between;margin-top:10px"><span class="hint">Lines are added as drafts marked "Assistant draft". Open each to confirm the amount, months and justification before you submit.</span>
+      ${listHtml('Data gaps the draft could not cover', r.gaps)}
+      ${(r.questions||[]).length?`<div class="ai-sec"><b>Please confirm</b> <span class="hint">— answer what you can now; leave the rest blank and answer later under “To confirm” on your budget.</span>
+        ${r.questions.map((q,i)=>`<div class="ab-q"><label for="abQ${i}">${esc(q)}</label><textarea class="inp" id="abQ${i}" rows="2" placeholder="Your answer (optional)"></textarea></div>`).join('')}
+        <div class="row-flex" style="margin-top:6px"><button class="btn" id="abRedo">Redraft with my answers</button><span class="hint">Takes one to two minutes; the lines are rebuilt using your answers.</span></div></div>`:''}
+      <div class="actions" style="justify-content:space-between;margin-top:10px"><span class="hint">Lines are added as drafts marked "Assistant draft". Open each to confirm the amount, months and justification before you submit. Questions and data gaps are kept with the budget under “To confirm”.</span>
         <span class="actions"><button class="btn ghost" onclick="closeModal()">Close</button><button class="btn primary" id="abAdd">Add selected to my budget</button></span></div></div>`;
     const tot = () => { let t = 0; document.querySelectorAll('.abc').forEach(e => { if (!e.checked) return; const i = Number(e.dataset.i); t += e.dataset.k==='o' ? Number(r.lines[i].annual)||0 : (Number(r.capex[i].qty)||1)*(Number(r.capex[i].unit_cost)||0); }); $('#abTot').textContent = peso(t); };
     document.querySelectorAll('.abc').forEach(e => e.onchange = tot); $('#abAll').onchange = e => { document.querySelectorAll('.abc').forEach(x=>x.checked=e.target.checked); tot(); }; tot();
     $('#abAdd').onclick = aiBudgetAdd;
+    const redo = $('#abRedo'); if (redo) redo.onclick = () => {
+      const qa = r.questions.map((q,i)=>({ q, a:($('#abQ'+i)?.value||'').trim() })).filter(x=>x.a);
+      if (!qa.length) { toast('Answer at least one question first.', true); return; }
+      S._abQA = [...(S._abQA||[]).filter(o=>!qa.some(n=>n.q===o.q)), ...qa];
+      aiBudgetRun([S._abText||'', 'Answers to your earlier questions:', ...S._abQA.map(x=>`- Q: ${x.q}\n  A: ${x.a}`)].filter(Boolean).join('\n'));
+    };
   } catch(e){ $('#abBody').innerHTML = `<div class="banner red" style="margin:8px 0 0">${esc(e.message)}</div>`; }
   finally { if (go) go.disabled = false; }
 }
@@ -3081,7 +3093,10 @@ async function aiBudgetAdd(){
   try {
     if (opex.length) { const x = await sb.from('bgt_opex_lines').insert(opex); if (x.error) throw x.error; }
     if (capex.length) { const x = await sb.from('bgt_capex_lines').insert(capex); if (x.error) throw x.error; }
-    closeModal(); toast(`${opex.length + capex.length} draft line${opex.length+capex.length>1?'s':''} added — review each before submitting`); openBudget(S.budgetId);
+    let nOi = 0; try { const ans = (r.questions||[]).map((q,i)=>($('#abQ'+i)?.value||'').trim() || (S._abQA||[]).find(x=>x.q===q)?.a || '');
+      const prior = (S._abQA||[]).filter(x=>!(r.questions||[]).includes(x.q));
+      nOi = await oiSaveFromDraft(b.id, [...(r.questions||[]), ...prior.map(x=>x.q)], [...ans, ...prior.map(x=>x.a)], r.gaps); } catch(e){ console.warn('open items', e); }
+    closeModal(); toast(`${opex.length + capex.length} draft line${opex.length+capex.length>1?'s':''} added${nOi?` · ${nOi} item${nOi>1?'s':''} to confirm saved`:''} — review each before submitting`); openBudget(S.budgetId);
   } catch(e){ fail(e); }
 }
 
@@ -5272,6 +5287,48 @@ async function ptNudge(){
   const n = document.createElement('div'); n.id = 'ptNudge'; n.className = 'pt-nudge';
   n.innerHTML = `${PENNY_FACE(36)}<div><b>New to Costline?</b> Take a 2-minute guided practice — sample data, nothing is saved.</div><button class="btn sm primary" onclick="this.parentElement.remove();practiceMenu()">Start practice</button><button class="btn sm ghost" onclick="try{localStorage.setItem('costline.practice.nudge','no')}catch(_){};this.parentElement.remove()">Not now</button>`;
   document.body.appendChild(n);
+}
+
+/* ================= TO CONFIRM — questions and data gaps from the assistant draft =================
+   Saved with the budget so the manager (or the plant head) can answer them later. An answer is a record;
+   "Ask Penny to update the lines" hands it to Penny, who proposes the line changes for the manager to apply. */
+S.oi = [];
+async function loadOpenItems(id){ try { const { data } = await sb.from('bgt_open_items').select('*').eq('budget_id', id).order('created_at'); S.oi = data||[]; } catch(e){ S.oi = []; } return S.oi; }
+const oiOpen = () => S.oi.filter(x=>x.status==='open');
+// save the draft's questions (with any answers typed) and data gaps; skip ones already on the budget
+async function oiSaveFromDraft(budgetId, questions, answers, gaps){
+  const have = new Set(S.oi.filter(x=>x.budget_id===budgetId).map(x=>x.body.trim().toLowerCase()));
+  const now = new Date().toISOString(), rows = [];
+  (questions||[]).forEach((q,i) => { const a = (answers[i]||'').trim(); if (have.has(q.trim().toLowerCase())) return;
+    rows.push({ budget_id:budgetId, kind:'question', body:q, answer:a||null, status:a?'answered':'open', created_by:S.me.id, answered_by:a?S.me.id:null, answered_at:a?now:null }); });
+  (gaps||[]).forEach(g => { if (have.has(g.trim().toLowerCase())) return; rows.push({ budget_id:budgetId, kind:'gap', body:g, status:'open', created_by:S.me.id }); });
+  if (!rows.length) return 0;
+  const { error } = await sb.from('bgt_open_items').insert(rows); if (error) throw error; return rows.length;
+}
+function openItemsHtml(b){
+  if (!S.oi.length) return '';
+  const can = S.cycle.status==='open' && (canEdit(b) || isReviewer()), op = oiOpen(), done = S.oi.filter(x=>x.status!=='open');
+  const row = x => `<div class="oi-row" id="oi_${x.id}"><div class="oi-q"><span class="chip ${x.kind==='gap'?'pri-med':'basis-working'}" style="font-size:10.5px;padding:1px 7px">${x.kind==='gap'?'Data gap':'Question'}</span> ${esc(x.body)}</div>
+    ${can?`<textarea class="inp" id="oiA_${x.id}" rows="2" placeholder="${x.kind==='gap'?'What do you know? e.g. quotation received at ₱…, or not needed in 2027':'Your answer'}"></textarea>
+    <div class="row-flex" style="margin-top:6px;flex-wrap:wrap;gap:6px"><button class="btn sm primary" onclick="oiAnswer('${x.id}', true)">Save and ask Penny to update the lines</button><button class="btn sm" onclick="oiAnswer('${x.id}', false)">Save answer only</button><button class="btn sm ghost" onclick="oiDrop('${x.id}')">Not needed</button></div>`:'<div class="hint">Waiting for the department to answer.</div>'}</div>`;
+  return `<details class="card oi" ${op.length?'open':''}><summary><h3 style="display:inline">To confirm${op.length?` — ${op.length} open`:''}</h3> <span class="hint">questions and data gaps from the assistant draft</span></summary>
+    <p class="hint" style="padding:0 14px;margin:4px 0 8px">Answer here so the budget keeps the reason. Penny can then change the affected lines for you to check and apply.</p>
+    ${op.map(row).join('') || '<div class="hint" style="padding:0 14px 10px">All answered.</div>'}
+    ${done.length?`<details style="padding:0 14px 12px"><summary class="hint" style="cursor:pointer">${done.length} answered or not needed</summary>${done.map(x=>`<div class="oi-done"><div>${esc(x.body)}</div><div class="hint">${x.status==='dropped'?'Not needed':`<b>Answer:</b> ${esc(x.answer||'')}`} · ${esc(userName(x.answered_by))}, ${fmtDate(x.answered_at)}${can&&x.status==='answered'?` · <a style="cursor:pointer;color:var(--teal)" onclick="oiPenny('${x.id}')">Ask Penny to update the lines</a>`:''}</div></div>`).join('')}</details>`:''}</details>`;
+}
+async function oiAnswer(id, penny){
+  const a = ($('#oiA_'+id)?.value||'').trim(); if (!a) { toast('Type the answer first.', true); return $('#oiA_'+id)?.focus(); }
+  const { error } = await sb.from('bgt_open_items').update({ answer:a, status:'answered', answered_by:S.me.id, answered_at:new Date().toISOString() }).eq('id', id); if (error) return fail(error);
+  const x = S.oi.find(o=>o.id===id); Object.assign(x, { answer:a, status:'answered', answered_by:S.me.id, answered_at:new Date().toISOString() });
+  renderBudget(); toast('Answer saved'); if (penny) oiPenny(id);
+}
+async function oiDrop(id){
+  const { error } = await sb.from('bgt_open_items').update({ status:'dropped', answered_by:S.me.id, answered_at:new Date().toISOString() }).eq('id', id); if (error) return fail(error);
+  Object.assign(S.oi.find(o=>o.id===id), { status:'dropped', answered_by:S.me.id, answered_at:new Date().toISOString() }); renderBudget(); toast('Marked not needed');
+}
+function oiPenny(id){
+  const x = S.oi.find(o=>o.id===id); if (!x) return;
+  pennyCall(); pennyAsk(`The budget draft ${x.kind==='gap'?'had this data gap':'asked'}: "${x.body}"\nMy answer: ${x.answer}\nPlease update the affected lines in this budget to reflect it (amount, months, items and justification), or tell me if nothing needs to change.`);
 }
 
 boot();

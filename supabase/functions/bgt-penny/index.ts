@@ -1,6 +1,7 @@
 // bgt-penny — Penny, the Costline assistant people talk to.
 // She reads data with the caller's own permissions (RLS), answers, and PROPOSES changes as cards;
-// nothing is written here — the user approves each change in the app. She never submits or approves budgets.
+// budget lines are never written here — the user approves each change in the app. The only write is record_answer
+// (an answer the user typed in chat to a "To confirm" item, under their own permissions). She never submits or approves budgets.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
@@ -60,6 +61,8 @@ const TOOLS = [
   { name:'propose_add_line', description:'Propose a new OPEX line with its items. Shown to the user as a card to approve; nothing is saved until they do.', input_schema:S({ line_item:{ type:'string' }, activity:{ type:'string' }, description:{ type:'string' }, purpose:{ type:'string' }, priority:{ type:'string', enum:PRIORITY_GUIDE.map(p => p.value) }, expense_type:{ type:'string' }, items:{ type:'array', items:ITEM }, reason:{ type:'string', description:'One sentence why' } }, ['line_item','activity','priority','items','reason']) },
   { name:'propose_update_line', description:'Propose changes to an existing OPEX line (by line_id from get_budget): priority, wording, or a full replacement item list. Shown as a card to approve.', input_schema:S({ line_id:{ type:'string' }, priority:{ type:'string', enum:PRIORITY_GUIDE.map(p => p.value) }, activity:{ type:'string' }, purpose:{ type:'string' }, line_item:{ type:'string' }, items:{ type:'array', items:ITEM, description:'Complete new item list (omit to keep items)' }, reason:{ type:'string' } }, ['line_id','reason']) },
   { name:'propose_remove_line', description:'Propose removing an OPEX line. Shown as a card to approve.', input_schema:S({ line_id:{ type:'string' }, reason:{ type:'string' } }, ['line_id','reason']) },
+  { name:'get_volume_outlook', description:'Plant volume by working day: the current year projected to year-end (boards sold, produced, trade boards imported/local, raw boards) from the rate per working day, the plant calendar (Mon–Sat, year-end shutdown) and working days per month of the budget year, with the budget year at the current run rate. Use for volume-driven lines and month spreading.', input_schema:S({}) },
+  { name:'record_answer', description:'Save the user\'s answer to an open "To confirm" item (question or data gap from the assistant draft, item_id from get_budget). Only when the user gave the answer in this chat.', input_schema:S({ item_id:{ type:'string' }, answer:{ type:'string' }, not_needed:{ type:'boolean' } }, ['item_id']) },
   { name:'get_status', description:'Where the department budget stands: due date, approval status and history, return reasons, comments from reviewers, price questions to the Head of Plant Operations (waiting/answered), and CAPEX endorsements to/from other departments.', input_schema:S({ department:{ type:'string' } }) },
   { name:'propose_add_capex', description:'Propose a new CAPEX item (asset/project). Only for items that pass the CAPEX test (unit cost at or above the threshold AND useful life over a year AND it creates or improves an asset). Shown as a card to approve.', input_schema:S({ category:{ type:'string', description:'Building, Building / Plant Improvement, Furniture & Fixtures, Intangible Asset, IT Equipment, Land, Machinery & Equipment, Software, Vehicle' }, asset:{ type:'string' }, description:{ type:'string' }, justification:{ type:'string', description:'WHY it is needed and the impact if not done' }, qty:{ type:'number' }, unit_cost:{ type:'number' }, priority:{ type:'string', enum:PRIORITY_GUIDE.map(p => p.value) }, month:{ type:'integer', minimum:1, maximum:12, description:'Month the payment is expected' }, reason:{ type:'string' } }, ['category','asset','justification','qty','unit_cost','priority','month','reason']) },
   { name:'propose_update_capex', description:'Propose changes to an existing CAPEX item (by line_id from get_budget). Shown as a card to approve.', input_schema:S({ line_id:{ type:'string' }, asset:{ type:'string' }, description:{ type:'string' }, justification:{ type:'string' }, qty:{ type:'number' }, unit_cost:{ type:'number' }, priority:{ type:'string', enum:PRIORITY_GUIDE.map(p => p.value) }, month:{ type:'integer', minimum:1, maximum:12 }, reason:{ type:'string' } }, ['line_id','reason']) },
@@ -97,13 +100,16 @@ async function runTool(c: Ctx, name: string, a: any): Promise<string> {
       if (!Number(l.annual)) issues.push(`${nm(l)} has no payment month/amount`); if (l.similar_dept && !l.similar_note) issues.push(`${nm(l)} is similar to a ${l.similar_dept} proposal with no explanation`); });
     const crit = sum([...r.ol, ...r.cl].filter((l: any) => l.priority === 'Critical / Mandatory').map((l: any) => Number(l.annual))), all = sum([...r.ol, ...r.cl].map((l: any) => Number(l.annual)));
     if (all && crit / all > 0.6) issues.push(`${Math.round(100 * crit / all)}% of the amount is Critical / Mandatory — not everything can be critical`);
+    const { data:oi } = await c.db.from('bgt_open_items').select('id,kind,body,answer,status').eq('budget_id', r.b.id).order('created_at');
     return `${d.name} ${c.Y} budget — status ${r.b.status}, version ${r.b.version}. Due to the MD ${c.due || 'n/a'}; CAPEX threshold ₱${thr.toLocaleString('en-PH')} per unit. OPEX ${peso(sum(r.ol.map((l: any) => Number(l.annual))))}, CAPEX ${peso(sum(r.cl.map((l: any) => Number(l.annual))))}.
 By priority: ${Object.entries(pr).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}
 OPEX LINES:
 ${r.ol.map((l: any) => `- [line_id ${l.id}] ${l.line_item || '?'} | ${l.activity || 'untitled'} | ${l.priority || 'no priority'} | ${l.expense_type || 'no type'} | basis ${l.basis || 'none'} | ${peso(Number(l.annual))} | months ${M.map((m, i) => Number(l['m' + (i + 1)]) ? m : '').filter(Boolean).join(',') || 'none'}${l.purpose ? ` | purpose: ${String(l.purpose).slice(0, 120)}` : ''}\n${(l.items || []).map((it: any) => '    • ' + itemTxt(it)).join('\n') || '    (no items)'}`).join('\n') || '(none)'}
 CAPEX:
 ${r.cl.map((l: any) => `- [line_id ${l.id}] ${l.category}: ${l.asset} | month ${M.map((m, i) => Number(l['m' + (i + 1)]) ? m : '').filter(Boolean).join(',') || 'none'} | ${l.priority || 'no priority'} | ${l.qty ?? '?'} × ${peso(Number(l.unit_cost))} = ${peso(Number(l.annual))}${l.similar_dept ? ` | similar to a ${l.similar_dept} proposal (${l.similar_note || 'no reason'})` : ''}`).join('\n') || '(none)'}
-OPEN ISSUES: ${issues.join('; ') || 'none'}`;
+OPEN ISSUES: ${issues.join('; ') || 'none'}
+TO CONFIRM (questions and data gaps from the assistant draft; answered on the budget page under "To confirm" or via record_answer):
+${(oi || []).map((x: any) => `- [item_id ${x.id}] ${x.kind} · ${x.status}: ${x.body}${x.answer ? ` → answer: ${x.answer}` : ''}`).join('\n') || '(none)'}`;
   }
   if (name === 'get_actuals') {
     const d = deptOf(c, a.department); if (!d) return 'No department found.';
@@ -159,6 +165,14 @@ OPEN ISSUES: ${issues.join('; ') || 'none'}`;
     const [{ data:ol }, { data:cl }] = await Promise.all([c.db.from('bgt_opex_lines').select('budget_id,annual,priority,items').in('budget_id', ids), c.db.from('bgt_capex_lines').select('budget_id,annual').in('budget_id', ids)]);
     return (bs || []).map((b: any) => { const o = (ol || []).filter((l: any) => l.budget_id === b.id), cp = (cl || []).filter((l: any) => l.budget_id === b.id);
       return `- ${c.depts.find(d => d.id === b.department_id)?.name}: ${b.status}; OPEX ${peso(sum(o.map((l: any) => Number(l.annual))))} in ${o.length} lines (${o.filter((l: any) => !(l.items || []).length).length} without items); CAPEX ${peso(sum(cp.map((l: any) => Number(l.annual))))}; critical ${peso(sum(o.filter((l: any) => l.priority === 'Critical / Mandatory').map((l: any) => Number(l.annual))))}`; }).join('\n');
+  }
+  if (name === 'get_volume_outlook') return await volumeOutlook(c);
+  if (name === 'record_answer') {
+    const { data:x } = await c.db.from('bgt_open_items').select('id,budget_id,body').eq('id', String(a.item_id)).maybeSingle(); if (!x) return 'That item was not found (use item_id from get_budget).';
+    const upd = a.not_needed ? { status:'dropped', answered_by:c.me.id, answered_at:new Date().toISOString() } : { status:'answered', answer:String(a.answer || '').slice(0, 2000), answered_by:c.me.id, answered_at:new Date().toISOString() };
+    if (!a.not_needed && !upd.answer) return 'No answer given.';
+    const { error } = await c.db.from('bgt_open_items').update(upd).eq('id', x.id); if (error) return 'Could not save: ' + error.message;
+    return `Saved ${a.not_needed ? 'as not needed' : 'the answer'} for: ${x.body}. Now propose the line changes it implies (or say none are needed).`;
   }
   if (name === 'get_status') {
     const d = deptOf(c, a.department); if (!d) return 'No department found.';
@@ -234,6 +248,8 @@ HOW COSTLINE WORKS (guide users step by step with the exact button names):
 - "Recommended for ${c.Y}" above the OPEX table lists lines unbudgeted last year or misaligned with Accounting; "Add" pre-fills a line.
 - "Draft budget with assistant" drafts several lines; "Import Excel" loads Finance's worksheet; "Export for Finance" makes the Finance workbook with a Details sheet.
 - Submitting: "Submit to Plant Head" (top right). Flow: Department → Head of Plant Operations → Managing Director → Finance; a returned budget shows the reason on top and can be edited again.
+- "Draft budget with assistant" ends with "Please confirm" questions: the user can type answers and tap "Redraft with my answers", or leave them blank. Questions and data gaps are saved on the budget under "To confirm" (top of the budget page) where they answer later — "Save and ask Penny to update the lines" sends the answer to you: propose the line changes it implies. Open items show as a To review check. If the user answers one in chat, save it with record_answer, then propose the changes.
+- Sales and plant performance page: monthly volume and plant figures, a projection to year-end by working day (italic = projected), and the budget year at the current run rate. Plant calendar: Mon–Sat, closed from Dec 24 to Jan 3 (last day Dec 23, back Jan 4) — December and January are short months, so volume-driven costs (fuel, consumables, power, overtime) are lower there; use get_volume_outlook for working days and volume.
 - 🎓 Practice (menu, or ask me "practice") runs guided practice on a sample budget — suggest it to new users.
 - Other pages: Actuals and projection (Accounting vs budget), Plant records (stores, POs), CAPEX tracker, Analysis and scenarios, Cost outlook, Price list.
 
@@ -244,6 +260,33 @@ How you work:
 - To change a budget, use the propose_* tools (OPEX lines and CAPEX items) — each becomes a card the user approves. If a CAPEX idea fails the CAPEX test, propose it as an OPEX line. Use get_status for due date, return reasons, reviewer comments, price questions and endorsements. Propose only what the user asked for or clearly agreed to; give complete item lists (qty each time, base price, allowance %, how often). You cannot submit, approve or return budgets.
 - Priorities: Critical / Mandatory, High, Medium, Low / Discretionary — use get_priority_guide to explain meaning and consequences.
 ${c.rev ? '- When asked about a submitted budget, judge alignment with the plant direction (get_plant_direction: SWOT, risks, scenarios, recommendations): what supports it, what conflicts, gaps (missing recurring costs, unbudgeted spending last year), priority quality, items and prices, and what to ask the department.' : '- Never reveal other departments\' figures, plant peso totals or peso sales. Plant direction only in boards, percentages and direction.\n- When the manager asks for a check before submitting: review completeness (items, priorities, purposes), last year\'s actuals vs this budget (missing or unbudgeted lines, big changes), price consistency, timing, priority honesty and alignment with the plant direction; end with a short "before you submit" checklist and offer specific changes.'}`;
+
+/* working days (Mon–Sat less the year-end shutdown and listed dates) and the volume projection, same rules as the app */
+function workDays(y: number, m: number, cal: any) {
+  const n = new Date(y, m, 0).getDate(), off = new Set(cal.off || []); let d = 0;
+  const [lm, ld] = cal.last.split('-').map(Number), [rm, rd] = cal.resume.split('-').map(Number);
+  for (let i = 1; i <= n; i++) { const w = new Date(y, m - 1, i).getDay(); if (w === 0 || (w === 6 && !cal.sat)) continue;
+    if (m === 12 && m * 100 + i > lm * 100 + ld) continue; if (m === 1 && m * 100 + i < rm * 100 + rd) continue;
+    if (off.has(`${y}-${String(m).padStart(2, '0')}-${String(i).padStart(2, '0')}`)) continue; d++; }
+  return d;
+}
+async function volumeOutlook(c: any) {
+  const { data:cs } = await c.svc.from('bgt_settings').select('value').eq('key', 'plant_calendar').maybeSingle();
+  const cal = { sat:true, last:'12-23', resume:'01-04', off:[], ...(cs?.value || {}) }, y0 = c.Y - 1;
+  const keys = [['volume_sold','boards sold'],['production_output','boards produced'],['volume_imported','trade boards imported'],['volume_local_trade','trade boards bought locally'],['raw_boards_sold','raw boards sold as-is'],['raw_boards_imported','raw boards imported (for production)']];
+  const { data:k } = await c.svc.from('bgt_kpis').select('year,month,metric,value').eq('year', y0).gt('month', 0).in('metric', keys.map(x => x[0]));
+  const wd0 = M.map((_, i) => workDays(y0, i + 1, cal)), wd1 = M.map((_, i) => workDays(c.Y, i + 1, cal));
+  const lines = keys.map(([m, l]) => { const r = (k || []).filter((x: any) => x.metric === m).sort((a: any, b: any) => a.month - b.month); if (!r.length) return '';
+    const use = r.slice(-6), rate = sum(use.map((x: any) => Number(x.value))) / (sum(use.map((x: any) => wd0[x.month - 1])) || 1), last = r[r.length - 1].month;
+    const act = sum(r.map((x: any) => Number(x.value))), proj = sum(wd0.slice(last).map(d => d * rate)), nxt = sum(wd1.map(d => d * rate));
+    return `- ${l}: ${Math.round(rate).toLocaleString('en-PH')} per working day (${M[use[0].month - 1]}–${M[use[use.length - 1].month - 1]} ${y0}); ${y0} actual Jan–${M[last - 1]} ${Math.round(act).toLocaleString('en-PH')} + projected ${Math.round(proj).toLocaleString('en-PH')} = ${Math.round(act + proj).toLocaleString('en-PH')} full year; ${c.Y} at this rate ${Math.round(nxt).toLocaleString('en-PH')}`; }).filter(Boolean);
+  return `PLANT CALENDAR: Mon–${cal.sat ? 'Sat' : 'Fri'}; last working day in December ${M[11]} ${Number(cal.last.split('-')[1])}, work resumes ${M[0]} ${Number(cal.resume.split('-')[1])}${(cal.off || []).length ? `; other non-working dates ${(cal.off || []).join(', ')}` : ''}.
+WORKING DAYS ${y0}: ${M.map((m, i) => `${m} ${wd0[i]}`).join(', ')} (total ${sum(wd0)})
+WORKING DAYS ${c.Y}: ${M.map((m, i) => `${m} ${wd1[i]}`).join(', ')} (total ${sum(wd1)})
+VOLUME BY WORKING DAY (rate = latest up to 6 months ÷ their working days; months without figures projected as rate × working days):
+${lines.join('\n') || '(no monthly volume figures)'}
+Trade boards = boards sold − boards produced (imported, bought locally, or raw boards sold as-is). Production, engineering and QA costs follow boards produced; warehouse and logistics follow boards sold.`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers:cors });

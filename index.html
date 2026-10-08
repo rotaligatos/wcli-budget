@@ -502,7 +502,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 09:51</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 09:58</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -997,7 +997,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:51</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:58</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -4498,7 +4498,21 @@ async function pennyAsk(text){
   S.penny.busy = false; pennySave(); pennyRender();
 }
 /* ---------- proposal cards ---------- */
+function pennyCxCard(p, i, j){
+  const cur = p.current||{}, qty = Number(p.qty ?? cur.qty)||0, uc = Number(p.unit_cost ?? cur.unit_cost)||0;
+  const title = p.kind==='add_capex' ? `Add CAPEX: ${esc(p.asset)}` : p.kind==='remove_capex' ? `Remove CAPEX: ${esc(cur.asset||'item')}` : `Change CAPEX: ${esc(cur.asset||'item')}`;
+  const d = [];
+  if (p.kind==='add_capex') d.push(`${esc(p.category||'')} · ${esc(p.priority||'')}`, `${qty} × ${peso(uc)} = <b>${peso(qty*uc)}</b>${p.month?` · paid ${MONTHS[p.month-1]}`:''}`, p.justification?`Why: ${esc(p.justification)}`:'');
+  if (p.kind==='update_capex') { if (p.priority && p.priority!==cur.priority) d.push(`Priority: ${esc(cur.priority||'none')} → <b>${esc(p.priority)}</b>`);
+    if (p.qty!=null || p.unit_cost!=null) d.push(`Amount: ${peso(cur.annual||0)} → <b>${peso(qty*uc)}</b>`); if (p.month) d.push(`Payment month: <b>${MONTHS[p.month-1]}</b>`);
+    if (p.asset && p.asset!==cur.asset) d.push(`Name: <b>${esc(p.asset)}</b>`); if (p.justification) d.push(`Why: ${esc(p.justification)}`); }
+  const sim = (p.similar||[])[0];
+  return `<div class="pn-card ${p.state}"><div class="pn-card-t">${title}</div>${p.reason?`<div class="pn-card-r">${esc(p.reason)}</div>`:''}<div class="pn-card-d">${d.filter(Boolean).join('<br>')}</div>
+    ${sim?`<div class="pn-card-r" style="color:var(--amber)">Similar to a ${esc(sim.department)} proposal: ${esc(sim.asset)} — talk to them first.</div>`:''}
+    <div class="pn-card-a">${p.state==='open' ? `<button class="btn sm primary" onclick="pennyApply(${i},${j})">${p.kind==='remove_capex'?'Remove item':'Apply'}</button><button class="btn sm ghost" onclick="pennyDismiss(${i},${j})">Dismiss</button>` : `<span class="hint">${p.state==='done'?'Applied ✓':'Dismissed'}</span>`}</div></div>`;
+}
 function pennyCard(p, i, j){
+  if (/capex/.test(p.kind||'')) return pennyCxCard(p, i, j);
   const items = (p.items||[]).map(normPennyItem), tot = sum(items.map(itemAnnual));
   const title = p.kind==='add_line' ? `Add line: ${esc(p.activity||p.line_item)}` : p.kind==='remove_line' ? `Remove: ${esc(p.current?.activity||p.current?.line_item||'line')}` : `Change: ${esc(p.current?.activity||p.current?.line_item||'line')}`;
   const diff = [];
@@ -4515,11 +4529,45 @@ function pennyCard(p, i, j){
 function normPennyItem(x){ const it = { name:x.name, unit:x.unit||'', qty:Number(x.qty)||0, price:Number(x.price)||0, src:x.src||'estimate', adj:Number(x.adj ?? x.adj_pct)||0, freq:x.freq||'monthly', m:Number(x.m ?? x.month)||1, ms:x.ms||x.months, ref:x.ref };
   const sp = typeof stdFor==='function' && (stdFor(it.name) || (S.prices||[]).find(p=>Number(p.budget_year)===S.cycle?.year && p.item.toLowerCase()===String(it.name).toLowerCase()));
   return sp ? { ...it, price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item } : it; }
+async function pennyApplyCx(p, b, simNote){
+  try {
+    const qty = p.qty!=null ? Number(p.qty) : null, uc = p.unit_cost!=null ? Number(p.unit_cost) : null, row = {};
+    const months = (m, amt) => { for (let k=1;k<=12;k++) row['m'+k] = k===m ? amt : 0; };
+    let r;
+    if (p.kind==='add_capex') {
+      if (uc < Number(S.cycle.capex_threshold||20000)) { toast(`Below the ₱${Number(S.cycle.capex_threshold||20000).toLocaleString()} CAPEX threshold — add it as an OPEX line instead.`, true); return; }
+      const { data:sim } = await sb.rpc('bgt_capex_similar', { p_cycle:S.cycle.id, p_dept:b.department_id, p_asset:p.asset, p_exclude:null });
+      if ((sim||[]).length && !simNote) {
+        modal2(`<h3>Similar project in ${esc(sim[0].department)}</h3><p>${esc(sim[0].department)} proposed <b>${esc(sim[0].asset)}</b>. Talk to them first — one project may serve both. If yours is still needed, say how it is different (reviewers see this).</p>
+          <textarea class="inp" id="pnSim" rows="3" placeholder="e.g. Ours is for the delivery bay, theirs for the press line"></textarea>
+          <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="pnSimGo">Add with this explanation</button></div>`);
+        $('#pnSimGo').onclick = () => { const n = $('#pnSim').value.trim(); if (!n) return toast('Explain the difference first.', true); closeModal2(); p._sim = sim[0]; pennyApplyCx(p, b, n); };
+        return;
+      }
+      const { data:mx } = await sb.from('bgt_capex_lines').select('sort').eq('budget_id', b.id).order('sort', { ascending:false }).limit(1);
+      Object.assign(row, { budget_id:b.id, category:p.category, asset:p.asset, description:p.description||null, justification:p.justification||null, qty, unit_cost:uc, priority:p.priority||null,
+        remarks:`Added with Penny: ${p.reason||''}`.trim(), sort:((mx||[])[0]?.sort||0)+1, ...(p._sim ? { similar_to:p._sim.line_id, similar_dept:p._sim.department, similar_note:simNote } : {}) });
+      months(Number(p.month)||1, (qty||0)*(uc||0));
+      r = await sb.from('bgt_capex_lines').insert(row);
+    } else if (p.kind==='update_capex') {
+      const cur = S.capex?.find(x=>x.id===p.line_id) || {};
+      ['asset','description','justification','priority'].forEach(k => { if (p[k]) row[k] = p[k]; });
+      if (qty!=null) row.qty = qty; if (uc!=null) row.unit_cost = uc;
+      if (qty!=null || uc!=null || p.month) { const q = qty ?? Number(cur.qty ?? p.current?.qty) ?? 0, u = uc ?? Number(cur.unit_cost ?? p.current?.unit_cost) ?? 0;
+        const m = Number(p.month) || (cur.id ? (Array.from({length:12},(_,k)=>k+1).find(k=>Number(cur['m'+k])) || 1) : 1); months(m, q*u); }
+      r = await sb.from('bgt_capex_lines').update(row).eq('id', p.line_id);
+    } else r = await sb.from('bgt_capex_lines').delete().eq('id', p.line_id);
+    if (r.error) throw r.error;
+    p.state = 'done'; pennySave(); pennyRender(); toast('Done — Penny\'s CAPEX change is in the budget');
+    if (S.view==='budget' && S.budgetId===b.id) { S.tab = 'capex'; openBudget(b.id); }
+  } catch(e){ fail(e); }
+}
 function pennyDismiss(i, j){ S.penny.msgs[i].proposals[j].state = 'dismissed'; pennySave(); pennyRender(); }
 async function pennyApply(i, j){
   const p = S.penny.msgs[i]?.proposals?.[j]; if (!p) return;
   const b = budgetById(p.budget_id);
   if (!b || !canEdit(b)) { toast('This budget cannot be edited right now (only drafts or returned budgets, by its department or the Head of Plant Operations).', true); return; }
+  if (/capex/.test(p.kind||'')) return pennyApplyCx(p, b);
   try { await loadPrices().catch(()=>{});
     const items = cleanItems((p.items||[]).map(normPennyItem)), row = {};
     if (items.length) { row.items = items; itemsMonths(items).forEach((v,k)=>row['m'+(k+1)] = v); }

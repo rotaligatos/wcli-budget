@@ -254,6 +254,23 @@ main{padding:16px 28px 64px;min-width:0}
 #pvBar{position:sticky;top:0;z-index:90;display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#6B3FA0;color:#fff;padding:7px 14px;font-size:13px}
 #pvBar button{border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}#pvBar .pv-exit{background:#fff;color:#6B3FA0;font-weight:700}
 .pv-acts{display:flex;gap:6px}.pv-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:10px 0}.pv-list .btn{justify-content:flex-start;text-align:left}
+#ptBar{position:sticky;top:0;z-index:90;display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#B5651D;color:#fff;padding:7px 14px;font-size:13px}
+#ptBar button{border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}#ptBar .pv-exit{background:#fff;color:#B5651D;font-weight:700}
+#ptRing{position:fixed;z-index:95;pointer-events:none;border:3px solid #E8A33A;border-radius:10px;box-shadow:0 0 0 4000px rgba(0,0,0,.12),0 0 18px rgba(232,163,58,.8);transition:all .2s;animation:ptPulse 1.6s infinite}
+@keyframes ptPulse{50%{border-color:#FFD27A}}
+#ptCard{position:fixed;z-index:96;left:16px;bottom:16px;width:min(380px,calc(100vw - 32px));background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow),0 18px 50px rgba(0,0,0,.25);padding:12px 14px}
+@media (max-width:900px){#ptCard{left:8px;right:8px;width:auto;bottom:72px}}
+.pt-top{display:flex;align-items:center;gap:8px}.pt-meta b{display:block;font-size:13px}.pt-meta small{color:var(--muted);font-size:11.5px}.pt-x{border:1px solid var(--line);background:none;color:var(--ink);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:12px}
+.pt-bar{height:4px;background:var(--line);border-radius:3px;margin:8px 0}.pt-bar i{display:block;height:100%;background:#E8A33A;border-radius:3px;transition:width .3s}
+.pt-say{font-size:14px;line-height:1.45}.pt-why{font-size:12.5px;color:var(--muted);background:var(--bg);border-radius:8px;padding:7px 9px;margin-top:6px}.pt-wl{font-size:12.5px;cursor:pointer;color:var(--teal);display:inline-block;margin-top:5px}
+.pt-lost{font-size:12.5px;color:var(--amber-text,var(--amber));margin-top:6px}.pt-lost a{cursor:pointer;text-decoration:underline}
+.pt-acts{display:flex;align-items:center;gap:8px;margin-top:10px}.pt-flag{font-size:12px;color:var(--faint);cursor:pointer}.pt-wait{font-size:12px;color:var(--muted);font-style:italic}
+.pt-menu-h{display:flex;gap:12px;align-items:center;margin-bottom:8px}.pt-lang{display:flex;gap:6px;align-items:center;margin:6px 0 10px;font-size:12.5px}.pt-lb{border:1px solid var(--line);background:none;color:var(--ink);border-radius:14px;padding:2px 10px;cursor:pointer;font-size:12px}.pt-lb.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.pt-list{display:flex;flex-direction:column;gap:8px}.pt-sc{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:var(--surface)}.pt-sc:hover,.pt-sc:focus-visible{border-color:var(--teal)}
+.pt-t{font-weight:600}.pt-ok{color:var(--green);font-weight:600;font-size:12px}.pt-d{font-size:12.5px;color:var(--muted)}.pt-m{font-size:11.5px;color:var(--faint)}
+.pt-nudge{position:fixed;z-index:57;right:16px;bottom:96px;max-width:360px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;font-size:13px}
+@media (max-width:900px){.pt-nudge{left:8px;right:8px;bottom:150px;max-width:none}}
+body.practicing #penny .penny-tag::after{content:' · coach'}
 .banner{border-radius:var(--r);padding:8px 12px;margin-bottom:12px;border:1px solid;font-size:13.5px}
 .banner.red{background:var(--red-wash);border-color:var(--red-line);color:var(--red-text)}
 .banner.blue{background:var(--blue-wash);border-color:var(--blue-line);color:var(--blue-text)}
@@ -484,8 +501,8 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="site-name" id="siteName">Pasig Plant</div>
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
-      <div class="me-acts"><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 09:23</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
+      <div class="build-tag">Build 2026-10-08 09:40</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -836,7 +853,7 @@ async function bootInner(){
     const { data:me, error } = await sb.rpc('bgt_login'); if (error) throw error;
     S.me = me; previewSetup(me);
     if (!me.active || me.role === 'pending') { $('#pendingEmail').textContent = me.email; show('pending'); return; }
-    show('app'); try { pennyInit(); } catch(e){ console.error(e); } await loadMaster(); previewBar(); route();
+    show('app'); try { pennyInit(); } catch(e){ console.error(e); } await loadMaster(); previewBar(); route(); setTimeout(()=>ptNudge().catch(()=>{}), 2500);
   } catch(e){ fail(e); show('login'); }
 }
 sb.auth.onAuthStateChange((ev) => {
@@ -976,10 +993,11 @@ function openMeSheet(){
   sheet(`<div style="padding:4px 2px 8px"><b>${esc(S.me.full_name||S.me.email)}</b><div class="hint" style="color:var(--muted);font-size:12.5px">${esc($('#meRole').textContent)}</div></div>
     <div class="eyebrow">Theme</div><div id="themeBox" style="padding:6px 0 4px">${themeControls()}</div>
     ${isStandalone() ? '' : `<a onclick="closeSheet();installApp()">${S._installEvt?'Install Costline on this device':'Install Costline / find the installed app'}</a>`}
+    <a onclick="closeSheet();practiceMenu()">🎓 Practice (training mode)</a>
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:23</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:40</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -4422,9 +4440,9 @@ function pennyContext(){
 function pennyChips(){
   const c = pennyContext(), b = c.budget_id && budgetById(c.budget_id), R = isReviewer();
   if (b && R && b.status!=='draft') return ['Is this budget aligned with the 2027 direction and SWOT?', 'What should I ask this department before approving?', 'Which lines could be deferred if we must cut 10%?'];
-  if (b && canEdit(b)) return ['Check my budget before I submit', 'What did we spend last year that is not in this budget?', 'What do the priorities mean?', 'List the items for my lines without items'];
+  if (b && canEdit(b)) return ['Check my budget before I submit', 'What did we spend last year that is not in this budget?', 'What do the priorities mean?', 'List the items for my lines without items', '🎓 Practice with me (training mode)'];
   if (R && S.view==='overview') return ['Which departments need my attention?', 'Summarise the budgets submitted so far against the plant direction', 'What do the priorities mean?'];
-  return ['What do the priorities mean?', 'How do I list the items for a line?', 'What is the cost outlook for 2027?'];
+  return ['🎓 Practice with me (training mode)', 'What do the priorities mean?', 'How do I list the items for a line?', 'What is the cost outlook for 2027?'];
 }
 function pennyMd(t){
   const lines = esc(t||'').split('\n'); let out = '', list = '';
@@ -4442,7 +4460,7 @@ function pennyRender(){
   const p = document.getElementById('pennyPanel'); if (!p) return;
   const M = S.penny.msgs;
   p.innerHTML = `<header class="pn-head">${PENNY_FACE(34, S.penny.busy?'think':'')}<div><b>Penny</b><small>${S.penny.busy?'Looking into it…':'Every peso counts'}</small></div><span class="grow"></span>
-      ${M.length?`<button class="btn ghost sm" onclick="pennyClear()" title="Start over">New chat</button>`:''}<button class="btn ghost sm" onclick="pennyToggle(false)" aria-label="Close">✕</button></header>
+      <button class="btn ghost sm" onclick="pennyToggle(false);practiceMenu()" title="Practice / training mode">🎓</button>${M.length?`<button class="btn ghost sm" onclick="pennyClear()" title="Start over">New chat</button>`:''}<button class="btn ghost sm" onclick="pennyToggle(false)" aria-label="Close">✕</button></header>
     <div class="pn-body" id="pnBody">
       ${!M.length ? `<div class="pn-msg a"><p>Hi${S.me?.full_name?' '+esc(S.me.full_name.split(' ')[0]):''}! I'm Penny. I can check your budget, find what's missing, explain priorities, look up prices and draft lines with items for you to approve. What do you need?</p></div>` : ''}
       ${M.map((m,i)=>`<div class="pn-msg ${m.role==='user'?'u':'a'}">${m.role==='user'?`<p>${esc(m.content)}</p>`:pennyMd(m.content)}${(m.proposals||[]).map((pr,j)=>pennyCard(pr,i,j)).join('')}</div>`).join('')}
@@ -4455,6 +4473,7 @@ function pennyRender(){
 function pennyClear(){ S.penny.msgs = []; pennySave(); pennyRender(); }
 async function pennyAsk(text){
   text = String(text||'').trim(); if (!text || S.penny.busy) return;
+  if (!PRT.on && /^(🎓|start practice|practice|training|train me|tutorial)/i.test(text)) { pennyToggle(false); practiceMenu(); return; }
   S.penny.msgs.push({ role:'user', content:text }); S.penny.busy = true; pennySave(); pennyRender();
   try {
     const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ page:pennyContext(), messages:S.penny.msgs.map(m=>({ role:m.role, content:m.content })) } });
@@ -4583,6 +4602,347 @@ function cxeDecline(id){
 async function cxeCancel(id){
   const { error } = await sb.rpc('bgt_capex_endorse_cancel', { p_id:id }); if (error) return fail(error);
   closeDrawer(); await loadEndorse(); toast('Endorsement withdrawn'); renderNav(); renderBudget();
+}
+
+/* ================= 🎓 PRACTICE MODE (Rommel 2026-10-08) =================
+   Same idea as HATID's practice mode: guided scenarios on the REAL Costline screens with a sample budget that lives only in
+   this browser tab — nothing is saved, nobody is notified. Penny is the coach: a guide card says what to do, highlights where,
+   waits until it is done and explains why (English or Taglish, remembered per device). Finished scenarios are recorded
+   (bgt_training) so reviewers see who has practised (Team progress). A step whose target can't be found lets the person skip and
+   is reported (bgt_training_flags 'broken'); anyone can mark a step confusing. Assistant and Penny answers are sample answers. */
+const PRT = { on:false, sc:null, i:-1, lang:'en', t0:0, tick:null, el:null, lost:0, lostShown:false, adv:false, reported:new Set(), real:null, done:{}, why:false, msgs0:0 };
+try { PRT.lang = localStorage.getItem('costline.practice.lang') || 'en'; } catch(_){}
+let SIMDB = null;
+const SIM_T = ['bgt_dept_budgets','bgt_opex_lines','bgt_capex_lines','bgt_comments','bgt_events','bgt_price_requests','bgt_capex_endorsements'];
+const PT = (en, tl) => ({ en, tl });
+const ptL = x => x == null ? '' : typeof x === 'string' ? x : (x[PRT.lang] || x.en || '');
+const ptFmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+const ptSafe = f => { try { return f(); } catch { return false; } };
+const $q = s => document.querySelector(s);
+const btnIn = (scope, txt) => [...document.querySelectorAll(`${scope} button, ${scope} a, ${scope} summary`)].find(b => b.textContent.trim().startsWith(txt) && b.getClientRects().length);
+const simUid = () => 'sim-' + Math.random().toString(36).slice(2, 10);
+
+/* ---------- in-browser sandbox for the budget tables ---------- */
+const simAnn = r => { let s = 0; for (let i = 1; i <= 12; i++) s += Number(r['m'+i]) || 0; return s; };
+const simRow = (t, r) => (t==='bgt_opex_lines' || t==='bgt_capex_lines') ? { ...r, annual:simAnn(r) } : { ...r };
+class SimQ {
+  constructor(t){ this.t = t; this.f = []; this.op = 'select'; this.one = 0; this.ord = []; }
+  select(){ return this; } eq(k,v){ this.f.push(r=>r[k]===v); return this; } neq(k,v){ this.f.push(r=>r[k]!==v); return this; }
+  in(k,v){ this.f.push(r=>(v||[]).includes(r[k])); return this; } is(k,v){ this.f.push(r=>(r[k]??null)===v); return this; }
+  gt(k,v){ this.f.push(r=>r[k]>v); return this; } gte(k,v){ this.f.push(r=>r[k]>=v); return this; } lt(k,v){ this.f.push(r=>r[k]<v); return this; } lte(k,v){ this.f.push(r=>r[k]<=v); return this; }
+  not(){ return this; } ilike(){ return this; } or(){ return this; } limit(){ return this; } range(a,b){ this.rg = [a,b]; return this; }
+  order(k,o){ this.ord.push([k, o?.ascending!==false]); return this; } single(){ this.one = 1; return this; } maybeSingle(){ this.one = 2; return this; }
+  insert(x){ this.op = 'insert'; this.p = x; return this; } upsert(x){ this.op = 'insert'; this.p = x; return this; } update(x){ this.op = 'update'; this.p = x; return this; } delete(){ this.op = 'delete'; return this; }
+  then(a,b){ return Promise.resolve().then(()=>this.exec()).then(a,b); }
+  exec(){
+    const T = SIMDB[this.t] ||= [], m = r => this.f.every(f=>f(r)), now = new Date().toISOString(), out = d => ({ data:this.one ? (d[0] ?? null) : d, error:null });
+    if (this.op==='insert') { const rows = (Array.isArray(this.p)?this.p:[this.p]).map(p => { const r = { id:simUid(), created_at:now, updated_at:now, ...(this.t.endsWith('_lines') ? { m1:0,m2:0,m3:0,m4:0,m5:0,m6:0,m7:0,m8:0,m9:0,m10:0,m11:0,m12:0, sort:T.length+1 } : {}), ...p }; delete r.annual; T.push(r); return r; });
+      return out(rows.map(r=>simRow(this.t,r))); }
+    if (this.op==='update') { const rows = T.filter(m); rows.forEach(r=>{ Object.assign(r, this.p); delete r.annual; r.updated_at = now; }); return out(rows.map(r=>simRow(this.t,r))); }
+    if (this.op==='delete') { SIMDB[this.t] = T.filter(r=>!m(r)); return { data:null, error:null }; }
+    let d = T.filter(m).map(r=>simRow(this.t,r));
+    for (const [k,a] of [...this.ord].reverse()) d.sort((x,y)=>(x[k]>y[k]?1:x[k]<y[k]?-1:0)*(a?1:-1));
+    if (this.rg) d = d.slice(this.rg[0], this.rg[1]+1);
+    return out(d);
+  }
+}
+const ptBlocked = (what) => { toast(`Practice: ${what||'this'} isn't saved in practice mode.`); return { data:null, error:{ message:'Practice mode — nothing is saved.' } }; };
+const ptFake = (what) => { const r = Promise.resolve().then(()=>ptBlocked(what)); const px = new Proxy(function(){}, { get:(t,k)=> k==='then' ? r.then.bind(r) : k==='catch' ? r.catch.bind(r) : k==='finally' ? r.finally.bind(r) : () => px, apply:()=>px }); return px; };
+function ptWrap(){
+  if (sb._ptWrapped) return; sb._ptWrapped = true;
+  const from = sb.from.bind(sb), rpc = sb.rpc.bind(sb), inv = sb.functions.invoke.bind(sb.functions);
+  PRT.rpc = rpc; PRT.from = from;
+  sb.from = t => { if (!PRT.on) return from(t); if (SIM_T.includes(t)) return new SimQ(t);
+    const q = from(t); ['insert','update','upsert','delete'].forEach(m => { q[m] = () => ptFake(); }); return q; };
+  sb.rpc = (fn, a={}, o) => PRT.on ? ptRpc(fn, a, rpc) : rpc(fn, a, o);
+  sb.functions.invoke = (fn, o={}) => PRT.on ? ptInvoke(fn, o.body||{}) : inv(fn, o);
+}
+async function ptRpc(fn, a, rpc){
+  const B = id => SIMDB.bgt_dept_budgets.find(x=>x.id===id);
+  if (['bgt_item_catalog','bgt_item_catalog2','bgt_login','bgt_set_ui_prefs'].includes(fn)) return rpc(fn, a);
+  if (fn==='bgt_transition') { const b = B(a.p_budget), map = { submit:'submitted', plant_approve:'plant_approved', md_approve:'md_approved', finance_accept:'finance_accepted', return:'returned', reopen:'draft' };
+    const from = b.status; b.status = map[a.p_action]; if (b.status==='submitted') b.submitted_at = new Date().toISOString(); if (b.status==='plant_approved') b.plant_approved_at = new Date().toISOString();
+    SIMDB.bgt_events.push({ id:simUid(), budget_id:b.id, actor_id:S.me.id, action:a.p_action, from_status:from, to_status:b.status, note:a.p_note, created_at:new Date().toISOString() });
+    return { data:{ ...b }, error:null }; }
+  if (fn==='bgt_capex_similar') { const w = String(a.p_asset||'').toLowerCase(); if (!/forklift|lifter|truck/.test(w)) return { data:[], error:null };
+    const other = S.depts.find(d => d.id!==a.p_dept && /warehouse/i.test(d.name)) || S.depts.find(d => d.id!==a.p_dept && /production/i.test(d.name)) || S.depts.find(d=>d.id!==a.p_dept);
+    return { data:[{ line_id:'sim-other', department:other?.name||'Warehouse', asset:'Forklift 3-ton diesel (loading bay) — sample', category:'Machinery & Equipment', status:'submitted' }], error:null }; }
+  if (fn==='bgt_capex_endorse') { const l = SIMDB.bgt_capex_lines.find(x=>x.id===a.p_line), b = B(l.budget_id);
+    const e = { id:simUid(), cycle_id:b.cycle_id, line_id:l.id, from_dept:b.department_id, to_dept:a.p_to_dept, note:a.p_note, snapshot:{ category:l.category, asset:l.asset, justification:l.justification, qty:l.qty, unit_cost:l.unit_cost, annual:simAnn(l), priority:l.priority }, status:'pending', created_by:S.me.id, created_at:new Date().toISOString() };
+    SIMDB.bgt_capex_endorsements.push(e); return { data:e.id, error:null }; }
+  if (fn==='bgt_capex_endorse_decide') { const e = SIMDB.bgt_capex_endorsements.find(x=>x.id===a.p_id); if (!a.p_accept && !a.p_reply) return { data:null, error:{ message:'Give a reason' } };
+    if (a.p_accept) { const t = SIMDB.bgt_dept_budgets.find(x=>x.department_id===e.to_dept); const l = SIMDB.bgt_capex_lines.find(x=>x.id===e.line_id); if (t && l) l.budget_id = t.id; }
+    Object.assign(e, { status:a.p_accept?'accepted':'declined', reply:a.p_reply, decided_at:new Date().toISOString() }); return { data:null, error:null }; }
+  if (fn==='bgt_capex_endorse_cancel') { const e = SIMDB.bgt_capex_endorsements.find(x=>x.id===a.p_id); if (e) e.status = 'cancelled'; return { data:null, error:null }; }
+  return ptBlocked();
+}
+// sample assistant / Penny answers built from the sample budget
+function ptItemsFor(l){
+  const li = String(l.line_item||'').toUpperCase(), std = n => stdFor(n);
+  const it = (name, unit, qty, price, src, freq='monthly', why='') => { const sp = std(name); return sp ? { name:sp.item, unit:sp.unit||unit, qty, price:Number(sp.unit_price), src:'price_list', adj:0, freq, m:1, std:sp.budget_year, pid:sp.id, why } : { name, unit, qty, price, src, adj:src==='estimate'?0:5, freq, m:1, ref:src==='stores'?'Stores 2026 (sample)':'', why }; };
+  if (/SUPPL/.test(li)) return [it('Bond paper A4 (ream)','ream',10,230,'stores','monthly','About 10 reams a month in 2026'), it('Ballpen, black (box of 12)','box',2,150,'stores','monthly','2 boxes a month'), it('Toner cartridge','pc',1,3500,'po','quarterly','One every 3 months')];
+  if (/GAS|FUEL/.test(li)) return [it('Diesel','liter',600,80,'price_list','monthly','600 L a month for the forklifts'), it('Engine oil 15W-40 (pail)','pail',1,6800,'stores','quarterly','Oil change every 3 months')];
+  if (/CLEAN|JANITOR/.test(li)) return [it('Floor cleaner (gallon)','gallon',4,420,'stores'), it('Trash bags XL (pack)','pack',6,180,'stores')];
+  return [it('Sample service','month',1,5000,'estimate','monthly','Sample item — practice only')];
+}
+async function ptInvoke(fn, body){
+  await new Promise(r=>setTimeout(r, 700));
+  if (fn==='bgt-ai' && body.mode==='draft_items') return { data:{ result:{ lines:(body.lines||[]).map(l=>({ key:l.key, note:'Practice: sample items from stores usage', items:ptItemsFor(l).map(x=>({ ...x, adj_pct:x.adj, month:x.m })) })) } }, error:null };
+  if (fn==='bgt-penny') return { data:{ reply:ptPennyReply(body), proposals:[], tools:['get_budget'], model:'practice' }, error:null };
+  return { data:{ error:'In practice mode this assistant feature gives no answer — try it for real after practice.' }, error:null };
+}
+function ptPennyReply(body){
+  const b = budgetById(S.budgetId) || SIMDB.bgt_dept_budgets[0], L = SIMDB.bgt_opex_lines.filter(l=>l.budget_id===b.id), C = SIMDB.bgt_capex_lines.filter(l=>l.budget_id===b.id);
+  const noItems = L.filter(l=>!(l.items||[]).length), noPri = [...L,...C].filter(l=>!l.priority), tot = sum(L.map(simAnn)) + sum(C.map(simAnn));
+  if (isReviewer()) return `**Practice answer** (sample data)\n\n**${deptById(b.department_id)?.name} — ${peso(tot)}**, ${L.length} OPEX lines, ${C.length} CAPEX.\n- **Supports the direction:** forklift upkeep keeps loading capacity for the volume plan.\n- **Ask them:** why diesel is up while boards moved are flat; whether the roof repair has a quotation.\n- **Gap:** no line for customer delivery, but last year's Accounting shows spending on it.\n\nIn real use I read the plant analysis (SWOT, scenarios) and their actuals before answering.`;
+  return `**Practice answer** (sample data)\n\nYour budget: **${peso(tot)}** in ${L.length} OPEX lines and ${C.length} CAPEX items.\n${noItems.length ? `- **${noItems.length} line${noItems.length>1?'s':''} without items** — open and list what they cover.\n` : '- Every line lists its items ✓\n'}${noPri.length ? `- **${noPri.length} without a priority.**\n` : '- Priorities set ✓\n'}- Prices: standard prices used where they exist ✓\n- Last year you spent on **customer delivery** with no line for it — add one if it continues.\n\n**Before you submit:** fix the must-fix checks, then tap **Submit to Plant Head**.\n\nIn real use I look at your actual spending, stores withdrawals and the plant direction before answering.`;
+}
+
+/* ---------- personas and sample data ---------- */
+function ptDept(){ const me = PRT.real.me; return me.department_id && S.depts.find(d=>d.id===me.department_id) || S.depts.find(d=>/warehouse/i.test(d.name)) || S.depts[0]; }
+function ptAs(kind){
+  const me = PRT.real.me;
+  S.me = kind==='rev' ? { ...me, role:'plant_head', department_id:null } : { ...me, role:'dept_manager', department_id:ptDept().id };
+  const r = $('#meRole'); if (r) r.textContent = `Practice: ${ROLE_LABEL[S.me.role]}${S.me.department_id ? ' · ' + deptById(S.me.department_id)?.name : ''}`;
+}
+function ptSeed(sc){
+  const cy = S.cycle, d0 = ptDept(), now = new Date().toISOString();
+  SIMDB = { bgt_dept_budgets:[], bgt_opex_lines:[], bgt_capex_lines:[], bgt_comments:[], bgt_events:[], bgt_price_requests:[], bgt_capex_endorsements:[] };
+  S.depts.forEach(d => SIMDB.bgt_dept_budgets.push({ id:'sim-b-'+d.id, cycle_id:cy.id, department_id:d.id, status:'draft', version:1, updated_at:now }));
+  const B = 'sim-b-'+d0.id; PRT.B = B;
+  const L = (o) => { const r = { id:simUid(), budget_id:B, created_at:now, sort:SIMDB.bgt_opex_lines.length+1, m1:0,m2:0,m3:0,m4:0,m5:0,m6:0,m7:0,m8:0,m9:0,m10:0,m11:0,m12:0, ...o }; if (r.items) itemsMonths(r.items).forEach((v,k)=>r['m'+(k+1)] = v); SIMDB.bgt_opex_lines.push(r); return r; };
+  const li = n => S.items.opex.find(x => x.toUpperCase().includes(n)) || S.items.opex[0];
+  const done = { expense_type:'Recurring / Contractual', basis:'Usage / Volume-based', purpose:'Keep operations running', priority:'High' };
+  PRT.L1 = L({ ...done, line_item:li('GAS AND OIL'), activity:'Forklift diesel (sample)', items:ptItemsFor({ line_item:'GAS AND OIL' }) }).id;
+  if (sc.id!=='submit') { PRT.L2 = L({ line_item:li('SUPPLIES'), activity:'Office supplies (sample)', expense_type:'Activity-Based', priority:'Medium' }).id;
+    if (sc.id==='assist') L({ line_item:li('CLEAN'), activity:'Cleaning materials (sample)', expense_type:'Activity-Based', priority:'Low / Discretionary' }); }
+  else L({ ...done, line_item:li('SUPPLIES'), activity:'Office supplies (sample)', priority:'Medium', items:ptItemsFor({ line_item:'SUPPLIES' }) });
+  if (sc.id==='review') {
+    const rd = S.depts.find(d => /warehouse/i.test(d.name)) || S.depts[0], RB = 'sim-b-'+rd.id, b = SIMDB.bgt_dept_budgets.find(x=>x.id===RB);
+    Object.assign(b, { status:'submitted', submitted_at:now }); PRT.RB = RB;
+    SIMDB.bgt_opex_lines.filter(l=>l.budget_id===B).forEach(l => l.budget_id = RB);
+    const x = { id:simUid(), budget_id:RB, created_at:now, sort:9, line_item:li('REPAIRS AND MAINTENANCE'), activity:'Roof repair bays 3–5 (sample)', expense_type:'One-Time', priority:'Critical / Mandatory', items:[{ name:'Roofing works (contract)', unit:'lot', qty:1, price:480000, src:'estimate', adj:0, freq:'once', m:4 }] };
+    itemsMonths(x.items).forEach((v,k)=>x['m'+(k+1)] = v); SIMDB.bgt_opex_lines.push(x);
+    SIMDB.bgt_events.push({ id:simUid(), budget_id:RB, actor_id:'sample', action:'submit', from_status:'draft', to_status:'submitted', note:'Sample submission', created_at:now });
+  }
+}
+
+/* ---------- scenarios ---------- */
+const PT_SC = [
+  { id:'tour', who:'all', mins:2, title:PT('Quick tour of Costline','Mabilis na tour ng Costline'), desc:PT('Where everything is: menu, approval path, outlook, checks, Penny.','Nasaan ang lahat: menu, approval path, outlook, checks, si Penny.'),
+    steps:() => [
+      { id:'nav', el:()=> innerWidth<900 ? $q('#botbar') : $q('#navMain'), next:true, say:PT('This is the **menu**. Your budget is under **My budget**; actuals, CAPEX tracker and analysis are below it. On a phone it is the bar at the bottom.','Ito ang **menu**. Nasa **My budget** ang budget mo; nasa ibaba ang actuals, CAPEX tracker at analysis. Sa phone, nasa bar sa ibaba.') },
+      { id:'head', el:'.ph', next:true, say:PT('The top shows the **department, status** and the **due date**. Buttons on the right; less-used ones are under **More ▾**.','Sa taas makikita ang **department, status** at **due date**. Nasa kanan ang mga button; nasa **More ▾** ang iba.') },
+      { id:'track', el:'.track', next:true, say:PT('The **approval path**: you submit → Head of Plant Operations → Managing Director → Finance. If it comes back, you see the reason here.','Ang **approval path**: i-submit mo → Head of Plant Operations → Managing Director → Finance. Kapag ibinalik, makikita mo dito ang dahilan.') },
+      { id:'ol', el:'#olStrip', next:true, say:PT('The **2027 cost outlook** everyone uses: inflation, peso, diesel, minimum wage. Tap **Details** for the % per expense line.','Ang **2027 cost outlook** na gamit ng lahat: inflation, piso, diesel, minimum wage. I-tap ang **Details** para sa % kada expense line.') },
+      { id:'stats', el:'.stats', next:true, say:PT('Your totals. **Checks** counts what must be fixed before you can submit — for example a line with no items.','Ang totals mo. Binibilang ng **Checks** ang dapat ayusin bago mag-submit — halimbawa, line na walang items.') },
+      { id:'tabs', el:'.tabs', next:true, say:PT('**OPEX** = running costs, **CAPEX** = assets (₱ threshold and over a year of use), **Checks**, and **Comments and history**.','**OPEX** = gastos sa operasyon, **CAPEX** = assets, **Checks**, at **Comments and history**.') },
+      { id:'penny', el:'#penny', next:true, say:PT('This is me, **Penny**. Drag me anywhere. Ask me to check your budget, explain priorities or look up prices — I propose changes and you approve them.','Ako si **Penny**. I-drag mo ako kahit saan. Puwede mo akong utusan na i-check ang budget mo, ipaliwanag ang priorities o maghanap ng presyo — magmumungkahi ako at ikaw ang mag-aapprove.') },
+      { id:'me', el:()=> innerWidth<900 ? $q('.topbar') : $q('.me'), next:true, say:PT('Your name, **🎓 Practice** (come back anytime), **Theme** (light/dark) and **Install app**. That is the tour! 🎉','Nandito ang pangalan mo, **🎓 Practice** (balikan anytime), **Theme** (light/dark) at **Install app**. Tapos na ang tour! 🎉') } ] },
+  { id:'line', who:'mgr', mins:5, title:PT('Add a budget line with items','Magdagdag ng budget line na may items'), desc:PT('Line item, activity, items with quantity, price and timing, priority, save.','Line item, activity, items na may dami, presyo at timing, priority, save.'),
+    steps:() => [
+      { id:'add', el:()=>btnIn('#tabBody','Add OPEX line'), done:()=>!!$q('.drawer #f_activity') && !$q('.drawer #f_activity').value, say:PT('Tap **Add OPEX line**.','I-tap ang **Add OPEX line**.') },
+      { id:'li', el:'#f_line_item', done:()=>/SUPPL/i.test($q('#f_line_item')?.value||''), say:PT('Choose the expense line item **SUPPLIES**.','Piliin ang expense line item na **SUPPLIES**.'),
+        why:PT('Line items follow Accounting\'s chart of accounts, so the budget can be compared with actual spending every month.','Sinusunod ng line items ang chart of accounts ng Accounting para maikumpara ang budget sa totoong gastos buwan-buwan.') },
+      { id:'act', el:'#f_activity', done:()=>($q('#f_activity')?.value||'').trim().length>=3, say:PT('Type what it is for, e.g. **Pantry and office supplies**.','I-type kung para saan, hal. **Pantry and office supplies**.') },
+      { id:'additem', el:()=>btnIn('.items-box','Add item'), done:()=>(S._items||[]).length>0, say:PT('Now list what you will buy. Tap **Add item**.','Ilista ang bibilhin. I-tap ang **Add item**.'),
+        why:PT('Items are the basis of the amount — the Plant Head and Finance see exactly what the money is for.','Ang items ang basehan ng halaga — nakikita ng Plant Head at Finance kung saan mapupunta ang pera.') },
+      { id:'name', el:'#itN0', done:()=>(S._items?.[0]?.name||'').length>=3 && Number(S._items?.[0]?.price)>0, say:PT('Type **bond paper** and pick it from the list (price list or past purchases). No match? Type the name and your estimated price.','I-type ang **bond paper** at piliin sa listahan (price list o dating bili). Walang lumabas? I-type ang pangalan at tantiyang presyo.'),
+        act:{ label:PT('Fill it in for me','Ako na ang maglalagay'), fn:()=>{ S._items[0] = { ...S._items[0], name:'Bond paper A4 (ream)', unit:'ream', price:230, src:'stores', adj:5, ref:'Stores 2026 (sample)' }; drawItems(); } } },
+      { id:'qty', el:()=>$q('.it-row[data-i="0"] .it-grid'), done:()=>Number(S._items?.[0]?.qty)>0, say:PT('**Qty each time**: type **10** (reams per month).','**Qty each time**: i-type ang **10** (reams kada buwan).') },
+      { id:'often', el:()=>$q('.it-row[data-i="0"]'), next:true, say:PT('**How often** + **From**: monthly from Jan = 12 purchases. The amount on the right = qty × price × (1 + allowance) × times. The allowance is the 2027 outlook for this line.','**How often** + **From**: monthly mula Jan = 12 beses. Ang halaga sa kanan = dami × presyo × (1 + allowance) × ilang beses. Ang allowance ay ang 2027 outlook para sa line na ito.') },
+      { id:'pri', el:'#f_priority', done:()=>!!$q('#f_priority')?.value, say:PT('Set the **priority**. Tap **What do these mean?** to see what happens if it is cut.','Itakda ang **priority**. I-tap ang **What do these mean?** para makita ang epekto kapag tinanggal.'),
+        why:PT('If the plant must save, Low and Medium lines are cut first. Be honest — Critical means operations stop without it.','Kapag kailangang magtipid, Low at Medium ang unang tatanggalin. Maging tapat — ang Critical ay titigil ang operasyon kung wala ito.') },
+      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>SIMDB.bgt_opex_lines.some(l=>l.budget_id===PRT.B && /SUPPL/i.test(l.line_item||'') && l.id!==PRT.L2 && (l.items||[]).length), say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
+      { id:'row', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /SUPPL/i.test(r.textContent) && !/Office supplies \(sample\)/.test(r.textContent)), next:true, say:PT('Your line is in the budget. The months come from the items, so you never type monthly amounts. 🎉','Nasa budget na ang line mo. Galing sa items ang monthly amounts — hindi mo na kailangang i-type. 🎉') } ] },
+  { id:'assist', who:'mgr', mins:3, title:PT('Let the assistant list the items','Ipalista sa assistant ang items'), desc:PT('Lines without items get a starting list from your past usage; you check and save.','Ang mga line na walang items ay bibigyan ng listahan mula sa dating gamit; ikaw ang magche-check.'),
+    steps:() => [
+      { id:'btn', el:()=>btnIn('#tabBody','List items with assistant'), done:()=>!!$q('#fmGo'), say:PT('Two sample lines have no items. Tap **List items with assistant**.','May dalawang sample line na walang items. I-tap ang **List items with assistant**.') },
+      { id:'go', el:'#fmGo', done:()=>!SIMDB.bgt_opex_lines.some(l=>l.budget_id===PRT.B && !(l.items||[]).length), say:PT('Tap **List the items**.','I-tap ang **List the items**.'),
+        why:PT('The assistant reads your department\'s **stores withdrawals and POs**, last year\'s **Accounting** spending, the **price list** (standard prices first), the **2027 outlook** and the plant\'s **volume plan in boards**.','Binabasa ng assistant ang **stores withdrawals at POs** ng department mo, gastos sa **Accounting** noong nakaraang taon, ang **price list** (standard prices muna), ang **2027 outlook** at ang **volume plan** ng planta.') },
+      { id:'open', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /Assistant draft/.test(r.textContent)), done:()=>!!$q('.drawer .it-row'), say:PT('Lines marked **Assistant draft** need your check. Open one.','Kailangang i-check ang mga line na may **Assistant draft**. Buksan ang isa.') },
+      { id:'check', el:'.items-box', next:true, say:PT('Check each item: change the quantity or price, remove what you don\'t need (✕), add what is missing. You know your department best.','I-check ang bawat item: palitan ang dami o presyo, tanggalin ang hindi kailangan (✕), idagdag ang kulang. Ikaw ang mas nakakaalam.') },
+      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>SIMDB.bgt_opex_lines.some(l=>l.budget_id===PRT.B && (l.items||[]).length && !l.calc?.ai && l.id!==PRT.L1), say:PT('Tap **Save line** — the draft mark goes away once you have checked it.','I-tap ang **Save line** — mawawala ang draft mark kapag na-check mo na.') },
+      { id:'fin', next:true, say:PT('Do the same for the other draft lines. That\'s it! 🎉','Gawin din sa ibang draft line. Tapos na! 🎉') } ] },
+  { id:'price', who:'mgr', mins:2, title:PT('Ask for a standard price','Humingi ng standard price'), desc:PT('When an item has no known price, ask the Head of Plant Operations; the line updates when answered.','Kapag walang presyo ang item, magtanong sa Head of Plant Operations; mag-a-update ang line pag nasagot.'),
+    steps:() => [
+      { id:'open', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /Forklift diesel/.test(r.textContent)), done:()=>!!$q('.drawer .it-row'), say:PT('Open the line **Forklift diesel (sample)**.','Buksan ang line na **Forklift diesel (sample)**.') },
+      { id:'std', el:'.items-box', next:true, say:PT('Items marked **Standard 2027** use the price the Head of Plant Operations set for everyone — e.g. diesel at ₱80/L. You can\'t change those prices.','Ang may **Standard 2027** ay presyong itinakda ng Head of Plant Operations para sa lahat — hal. diesel ₱80/L. Hindi ito mapapalitan.') },
+      { id:'add', el:()=>btnIn('.items-box','Add item'), done:()=>(S._items||[]).length>=3, say:PT('Tap **Add item** for something without a known price.','I-tap ang **Add item** para sa bagay na walang alam na presyo.') },
+      { id:'est', el:()=>$q(`#itN${(S._items||[]).length-1}`)?.closest('.it-row'), done:()=>{ const it = S._items?.[S._items.length-1]; return (it?.name||'').length>=3 && Number(it?.price)>0; },
+        say:PT('Type **Hydraulic hose assembly**, unit **pc**, qty **2**, and your estimate **₱3,500** as the price.','I-type ang **Hydraulic hose assembly**, unit **pc**, qty **2**, at tantiyang presyo **₱3,500**.'),
+        act:{ label:PT('Fill it in for me','Ako na ang maglalagay'), fn:()=>{ const i = S._items.length-1; S._items[i] = { ...S._items[i], name:'Hydraulic hose assembly', unit:'pc', qty:2, price:3500, src:'estimate', adj:0, freq:'once', m:3 }; drawItems(); } } },
+      { id:'ask', el:()=>[...document.querySelectorAll('.it-std a')].find(a=>/ask the Head/i.test(a.textContent)), done:()=>!!$q('#rqGo'), say:PT('Tap **No known price — ask the Head of Plant Operations…**','I-tap ang **No known price — ask the Head of Plant Operations…**') },
+      { id:'send', el:'#rqGo', done:()=>SIMDB.bgt_price_requests.length>0, say:PT('Add a note (specs, where your estimate came from), then **Send request**.','Maglagay ng note (specs, saan galing ang tantiya), tapos **Send request**.'),
+        why:PT('Your estimate is used until the answer comes. When the standard price is set, every line that asked updates by itself, and you get a badge on **Price list**.','Gagamitin ang tantiya mo hanggang may sagot. Kapag naitakda ang standard price, kusang mag-a-update ang lahat ng line na nagtanong, at may badge sa **Price list**.') },
+      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>{ const l = SIMDB.bgt_opex_lines.find(x=>x.id===PRT.L1); return (l?.items||[]).some(x=>x.req); }, say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
+      { id:'fin', el:'.preq-strip', next:true, say:PT('Your question shows here as **Waiting**. That\'s it! 🎉','Makikita dito ang tanong mo bilang **Waiting**. Tapos na! 🎉') } ] },
+  { id:'capex', who:'mgr', mins:4, title:PT('CAPEX: similar projects and endorsing','CAPEX: magkaparehong proyekto at pag-endorse'), desc:PT('Add an asset, see the similar-project warning, then endorse it to the department that should own it.','Magdagdag ng asset, makita ang babala sa kaparehong proyekto, at i-endorse sa tamang department.'),
+    steps:() => [
+      { id:'tab', el:()=>[...document.querySelectorAll('.tabs button')].find(b=>/CAPEX/.test(b.textContent)), done:()=>S.tab==='capex', say:PT('Open the **CAPEX** tab.','Buksan ang **CAPEX** tab.') },
+      { id:'add', el:()=>btnIn('#tabBody','Add CAPEX item'), done:()=>!!$q('.drawer #f_asset'), say:PT('Tap **Add CAPEX item**.','I-tap ang **Add CAPEX item**.') },
+      { id:'asset', el:'#f_asset', done:()=>/forklift/i.test($q('#f_asset')?.value||'') && !!$q('#simBox')?.textContent.trim(), say:PT('Type **Forklift 3-ton diesel** as the asset, then tap outside the box.','I-type ang **Forklift 3-ton diesel** bilang asset, tapos mag-tap sa labas ng box.') },
+      { id:'sim', el:'#simBox', next:true, say:PT('Costline found a **similar project** from another department. Talk to them first — maybe one forklift serves both, so the plant doesn\'t buy twice.','May nakitang **kaparehong proyekto** sa ibang department. Kausapin muna sila — baka isang forklift na lang para sa dalawa, para hindi dalawang beses bumili.') },
+      { id:'cost', el:'#f_qty', done:()=>Number($q('#f_qty')?.value)>0 && Number($q('#f_unit_cost')?.value)>0, say:PT('Fill **Qty 1** and **Unit cost ₱1,500,000**.','Ilagay ang **Qty 1** at **Unit cost ₱1,500,000**.'),
+        act:{ label:PT('Fill it in for me','Ako na ang maglalagay'), fn:()=>{ $q('#f_qty').value = 1; $q('#f_unit_cost').value = 1500000; $q('#f_qty').dispatchEvent(new Event('input',{bubbles:true})); } } },
+      { id:'note', el:'#f_simnote', done:()=>($q('#f_simnote')?.value||'').trim().length>=6, say:PT('If yours is still needed, explain how it is different — e.g. **For the press line, not the loading bay**. Required to save.','Kung kailangan pa rin, ipaliwanag kung paano naiiba — hal. **Para sa press line, hindi loading bay**. Kailangan ito para ma-save.') },
+      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>SIMDB.bgt_capex_lines.some(l=>/forklift/i.test(l.asset||'')), say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
+      { id:'reopen', el:()=>[...document.querySelectorAll('#tabBody tr.row')].find(r=>/forklift/i.test(r.textContent)), done:()=>!!btnIn('.drawer','Endorse to another department'), say:PT('Now suppose you agreed the other department should own it. Open the forklift item again.','Ngayon, ipagpalagay na napagkasunduan na sa kanila dapat ito. Buksan ulit ang forklift item.') },
+      { id:'endorse', el:()=>btnIn('.drawer','Endorse to another department'), done:()=>!!$q('#cxeGo'), say:PT('Tap **Endorse to another department**.','I-tap ang **Endorse to another department**.') },
+      { id:'send', el:'#cxeGo', done:()=>SIMDB.bgt_capex_endorsements.some(e=>e.status==='pending'), say:PT('Choose the department, write why it belongs to them, then **Endorse**.','Piliin ang department, isulat kung bakit sa kanila, tapos **Endorse**.'),
+        why:PT('It stays in your budget until they accept. If they decline, you see their reason on the item.','Mananatili ito sa budget mo hanggang tanggapin nila. Kapag tinanggihan, makikita mo ang dahilan sa item.') },
+      { id:'fin', el:()=>[...document.querySelectorAll('#tabBody tr.row')].find(r=>/forklift/i.test(r.textContent)), next:true, say:PT('It shows **waiting for them to accept**. That\'s it! 🎉','Makikita na **waiting for them to accept**. Tapos na! 🎉') } ] },
+  { id:'submit', who:'mgr', mins:3, title:PT('Check with Penny and submit','Mag-check kay Penny at mag-submit'), desc:PT('Read the checks, ask Penny for a second look, then submit to the Plant Head.','Basahin ang checks, ipa-check kay Penny, tapos i-submit sa Plant Head.'),
+    steps:() => [
+      { id:'checks', el:()=>[...document.querySelectorAll('.tabs button')].find(b=>/Checks/.test(b.textContent)), done:()=>S.tab==='checks', say:PT('Open the **Checks** tab.','Buksan ang **Checks** tab.') },
+      { id:'read', el:'#tabBody', next:true, say:PT('**Must fix** items block submitting (e.g. a line without items). **To review** are warnings — fix or explain them.','Hinaharangan ng **Must fix** ang pag-submit (hal. line na walang items). Ang **To review** ay babala — ayusin o ipaliwanag.') },
+      { id:'penny', el:'#penny', done:()=>S.penny.msgs.length>PRT.msgs0 && S.penny.msgs[S.penny.msgs.length-1].role==='assistant', say:PT('Ask me for a second look: tap me and choose **Check my budget before I submit**.','Ipa-check sa akin: i-tap ako at piliin ang **Check my budget before I submit**.'),
+        act:{ label:PT('Ask Penny for me','Itanong kay Penny'), fn:()=>{ pennyToggle(true); pennyAsk('Check my budget before I submit'); } } },
+      { id:'reply', el:'#pennyPanel', next:true, say:PT('I list what to fix and offer changes as cards you approve. Close the chat with ✕ when done.','Ililista ko ang dapat ayusin at magmumungkahi ng pagbabago na ikaw ang mag-aapprove. Isara ang chat sa ✕.') },
+      { id:'sub', el:()=>btnIn('.ph','Submit to Plant Head') || btnIn('.ph','More'), done:()=>!!$q('#actGo'), say:PT('Tap **Submit to Plant Head**.','I-tap ang **Submit to Plant Head**.') },
+      { id:'go', el:'#actGo', done:()=>SIMDB.bgt_dept_budgets.find(b=>b.id===PRT.B)?.status==='submitted', say:PT('Add a note if you like, then **Submit**.','Maglagay ng note kung gusto, tapos **Submit**.') },
+      { id:'fin', el:'.track', next:true, say:PT('Submitted! It now waits for the **Head of Plant Operations**. If it comes back, the reason shows on top and you can edit again. 🎉','Na-submit na! Hinihintay na ng **Head of Plant Operations**. Kapag ibinalik, makikita sa taas ang dahilan at puwede mo ulit i-edit. 🎉') } ] },
+  { id:'review', who:'rev', mins:4, title:PT('Review and approve a department budget','I-review at i-approve ang budget ng department'), desc:PT('Open a submitted budget, ask Penny for an alignment check, comment on a line, then approve or return.','Buksan ang na-submit na budget, ipa-alignment check kay Penny, mag-comment sa line, tapos i-approve o ibalik.'),
+    steps:() => [
+      { id:'open', el:()=>[...document.querySelectorAll('#navDepts a, #main [onclick]')].find(a=>a.getClientRects().length && (a.getAttribute('onclick')||'').includes(`go('budget','${PRT.RB}')`)), done:()=>S.view==='budget' && S.budgetId===PRT.RB && !!$q('.track'),
+        say:PT(`You are the **Head of Plant Operations**. A sample budget was submitted — open **${esc(deptById(SIMDB?.bgt_dept_budgets.find(b=>b.id===PRT.RB)?.department_id)?.name||'')}**.`,`Ikaw ang **Head of Plant Operations**. May sample budget na na-submit — buksan ang **${esc(deptById(SIMDB?.bgt_dept_budgets.find(b=>b.id===PRT.RB)?.department_id)?.name||'')}**.`),
+        act:{ label:PT('Open it for me','Buksan para sa akin'), fn:()=>go('budget', PRT.RB) } },
+      { id:'align', el:()=>btnIn('.ph','Alignment check') || btnIn('.ph','More'), done:()=>S.penny.msgs.length>PRT.msgs0 && S.penny.msgs[S.penny.msgs.length-1].role==='assistant', say:PT('Tap **Alignment check (Penny)** (under **More ▾** if hidden).','I-tap ang **Alignment check (Penny)** (nasa **More ▾** kung nakatago).'),
+        why:PT('Penny compares the budget with the 2027 direction, SWOT, scenarios and last year\'s actuals, and suggests what to ask the department.','Ikinukumpara ni Penny ang budget sa 2027 direction, SWOT, scenarios at actuals noong nakaraang taon, at nagmumungkahi ng itatanong.') },
+      { id:'close', next:true, say:PT('Read the answer, then close the chat (✕).','Basahin ang sagot, tapos isara ang chat (✕).') },
+      { id:'line', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /Roof repair/.test(r.textContent)), done:()=>!!$q('#lineCmt'), say:PT('Open the line **Roof repair bays 3–5**.','Buksan ang line na **Roof repair bays 3–5**.') },
+      { id:'cmt', el:'#lineCmt', done:()=>SIMDB.bgt_comments.length>0, say:PT('Ask a question, e.g. **Do we have a quotation?**, then **Post**.','Magtanong, hal. **May quotation na ba?**, tapos **Post**.') },
+      { id:'closed', el:()=>btnIn('.drawer','Close'), done:()=>!$q('.drawer'), say:PT('Close the line.','Isara ang line.') },
+      { id:'decide', el:'.ph .actions', done:()=>['plant_approved','returned'].includes(SIMDB.bgt_dept_budgets.find(b=>b.id===PRT.RB)?.status), say:PT('Decide: **Approve and send to MD**, or **Return to department** with a reason (under **More ▾** if hidden). Confirm in the window.','Magpasya: **Approve and send to MD**, o **Return to department** na may dahilan (nasa **More ▾** kung nakatago). I-confirm sa window.') },
+      { id:'fin', el:'.track', next:true, say:PT('Done. The department sees your decision and comments right away. 🎉','Tapos na. Makikita agad ng department ang desisyon at comments mo. 🎉') } ] },
+];
+
+/* ---------- menu, team progress ---------- */
+async function ptLoadDone(){ try { const { data } = await (PRT.from||sb.from.bind(sb))('bgt_training').select('scenario,completed_at').eq('user_id', (PRT.real?.me||S.me).id); PRT.done = {}; (data||[]).forEach(r=>{ if (!PRT.done[r.scenario] || r.completed_at > PRT.done[r.scenario]) PRT.done[r.scenario] = r.completed_at; }); } catch(_){} return PRT.done; }
+function ptForMe(sc){ const R = REVIEWERS.includes((PRT.real?.me||S.me).role); return sc.who==='all' || sc.who==='mgr' || (sc.who==='rev' && R); }
+async function practiceMenu(){
+  if (S.preview) return toast('Exit the manager preview first, then start practice.', true);
+  if (PRT.on) ptExit(true);
+  await ptLoadDone();
+  const R = REVIEWERS.includes(S.me.role), list = PT_SC.filter(ptForMe);
+  const card = sc => `<button class="pt-sc" onclick="closeModal();ptStart('${sc.id}')"><span class="pt-t">${esc(ptL(sc.title))}${PRT.done[sc.id]?' <span class="pt-ok">✓ done</span>':''}</span><span class="pt-d">${esc(ptL(sc.desc))}</span><span class="pt-m">${sc.mins} min${sc.who==='rev'?' · reviewers':''}</span></button>`;
+  modal(`<div class="pt-menu-h">${PENNY_FACE(40)}<div><h3 style="margin:0">🎓 Practice with Penny</h3><p class="hint" style="margin:2px 0 0">A sample budget on the real screens. Nothing is saved and nobody is notified — try anything.</p></div></div>
+    <div class="pt-lang">${PT_LANGS()}</div>
+    <div class="pt-list">${list.map(card).join('')}</div>
+    <div class="actions" style="justify-content:space-between;margin-top:10px">${R?'<button class="btn ghost" onclick="ptTeam()">Team progress</button>':'<span></span>'}<button class="btn ghost" onclick="closeModal()">Close</button></div>`);
+}
+const PT_LANGS = () => `<span class="hint">Guide language:</span> ${[['en','English'],['tl','Taglish']].map(([k,l])=>`<button class="pt-lb ${PRT.lang===k?'on':''}" onclick="ptLang('${k}')">${l}</button>`).join('')}`;
+function ptLang(k){ PRT.lang = k; try { localStorage.setItem('costline.practice.lang', k); } catch(_){} if (PRT.on) ptCard(); else practiceMenu(); }
+async function ptTeam(){
+  const { data, error } = await (PRT.rpc||sb.rpc.bind(sb))('bgt_training_board'); if (error) return fail(error);
+  const P = data.people||[], F = data.flags||[], scs = PT_SC;
+  modal(`<h3>Team progress — practice</h3><p class="hint">Who has finished which practice scenario. Managers should at least do the tour, adding a line, and submitting.</p>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:${300+scs.length*90}px"><thead><tr><th>Person</th>${scs.map(s=>`<th style="font-size:11px">${esc(ptL(s.title))}</th>`).join('')}</tr></thead><tbody>
+    ${P.map(p=>`<tr><td><b>${esc(p.name)}</b><div class="item" style="text-transform:none">${esc(ROLE_LABEL[p.role]||p.role)}${p.dept?' · '+esc(p.dept):''}${p.last_login?'':' · never signed in'}</div></td>${scs.map(s=>`<td style="text-align:center">${p.done?.[s.id]?`<span title="${fmtDate(p.done[s.id])}" style="color:var(--green)">✓</span>`:(s.who==='rev' && !REVIEWERS.includes(p.role))?'<span class="hint">—</span>':'<span class="hint">·</span>'}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>
+    <h3 style="margin-top:16px">Steps people flagged (${F.length})</h3>
+    ${F.length ? `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Scenario / step</th><th>Kind</th><th>Note</th><th>By</th><th></th></tr></thead><tbody>${F.map(f=>`<tr><td>${esc(f.scenario)} / ${esc(f.step)}</td><td>${f.kind==='broken'?'<span class="pri pri-high">Broken</span>':'<span class="pri pri-med">Confusing</span>'}</td><td style="font-size:12.5px">${esc(f.note||'')}</td><td style="font-size:12.5px">${esc(f.by||'')}<div class="hint">${fmtDate(f.at)}</div></td><td>${canManageData()?`<button class="btn sm" onclick="ptResolve('${f.id}')">Resolved</button>`:''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">None — the guide is working for everyone.</p>'}
+    <div class="actions" style="justify-content:flex-end;margin-top:10px"><button class="btn ghost" onclick="practiceMenu()">Back</button><button class="btn" onclick="closeModal()">Close</button></div>`, 'wide');
+}
+async function ptResolve(id){ const { error } = await (PRT.rpc||sb.rpc.bind(sb))('bgt_training_resolve', { p_id:id }); if (error) return fail(error); ptTeam(); }
+
+/* ---------- run a scenario ---------- */
+async function ptStart(id){
+  const sc = PT_SC.find(s=>s.id===id); if (!sc) return;
+  ptWrap();
+  const open = S.cycles.find(c=>c.status==='open');
+  if (!open) return toast('Practice needs an open budget year.', true);
+  if (S.cycle.id!==open.id) { S.cycle = open; $('#cycleSel') && ($('#cycleSel').value = open.id); }
+  PRT.real = { me:S.me, budgets:S.budgets, budgetId:S.budgetId, view:S.view, tab:S.tab, preqs:S.preqs, cxe:S.cxe, penny:[...S.penny.msgs] };
+  PRT.on = true; PRT.sc = sc; sc._steps = null; PRT.reported = new Set();
+  ptAs(sc.who==='rev' ? 'rev' : 'mgr'); ptSeed(sc);
+  S.budgets = SIMDB.bgt_dept_budgets.map(b=>({ ...b })); S.preqs = []; S.cxe = []; S.penny.msgs = []; PRT.msgs0 = 0; pennyRender();
+  document.body.classList.add('practicing'); ptBar(); pennyToggle(false);
+  closeDrawer(); closeModal2?.(); S.tab = 'opex';
+  if (sc.who==='rev') go('overview'); else go('budget', PRT.B);
+  PRT.t0 = Date.now(); ptGo(0); clearInterval(PRT.tick); PRT.tick = setInterval(ptLoop, 300);
+}
+function ptBar(){
+  let el = $q('#ptBar'); if (!PRT.on) { el?.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'ptBar'; document.body.prepend(el); }
+  el.innerHTML = `<span>🎓 <b>Practice</b> — ${esc(ptL(PRT.sc.title))}. Sample budget only: nothing is saved, nobody is notified.</span><span class="pv-acts"><button onclick="ptStart('${PRT.sc.id}')">Restart</button><button class="pv-exit" onclick="ptExit()">Exit practice</button></span>`;
+}
+function ptSteps(){ return PRT.sc._steps || (PRT.sc._steps = PRT.sc.steps()); }
+function ptStep(){ return ptSteps()[PRT.i] || null; }
+function ptFind(st){
+  if (!st?.el) return null; let el = null;
+  try { el = typeof st.el === 'function' ? st.el() : [...document.querySelectorAll(st.el)].find(x=>x.getClientRects().length) || null; } catch {}
+  return el && el.getClientRects().length ? el : null;
+}
+function ptGo(i){
+  PRT.i = i; PRT.lost = 0; PRT.lostShown = false; PRT.el = null; PRT.adv = false; PRT.why = false; PRT.scrolled = false;
+  if (!ptStep()) return ptFinish();
+  ptCard();
+}
+function ptLoop(){
+  if (!PRT.on) return; const st = ptStep(); if (!st) return;
+  if (st.done && !PRT.adv && ptSafe(st.done)) { PRT.adv = true; ptRing(null); setTimeout(()=>{ if (PRT.on && ptStep()===st) ptGo(PRT.i+1); }, 450); return; }
+  const el = ptFind(st); PRT.el = el; ptRing(el);
+  if (el && !PRT.scrolled) { PRT.scrolled = true; const r = el.getBoundingClientRect(); if (r.top < 60 || r.bottom > innerHeight - 120) el.scrollIntoView({ block:'center', behavior:'smooth' }); }
+  if (st.el && !el && document.visibilityState==='visible') PRT.lost += 300; else PRT.lost = 0;
+  const lost = PRT.lost > 8000; if (lost !== PRT.lostShown) { PRT.lostShown = lost; ptCard(); }
+  if (PRT.lost > 20000 && !PRT.reported.has(st.id)) { PRT.reported.add(st.id); PRT.rpc('bgt_training_flag', { p_scenario:PRT.sc.id, p_step:st.id, p_kind:'broken', p_note:`Highlighted item not found (view ${S.view}, tab ${S.tab}, width ${innerWidth})` }).then(()=>{}, ()=>{}); }
+}
+function ptRing(el){
+  let r = $q('#ptRing'); if (!el) { r?.remove(); return; }
+  if (!r) { r = document.createElement('div'); r.id = 'ptRing'; document.body.appendChild(r); }
+  const b = el.getBoundingClientRect(); Object.assign(r.style, { left:(b.left-5)+'px', top:(b.top-5)+'px', width:(b.width+10)+'px', height:(b.height+10)+'px' });
+}
+function ptCard(){
+  let c = $q('#ptCard'); if (!PRT.on) { c?.remove(); return; }
+  if (!c) { c = document.createElement('section'); c.id = 'ptCard'; c.setAttribute('role','dialog'); c.setAttribute('aria-label','Practice guide'); document.body.appendChild(c); }
+  const st = ptStep(), n = ptSteps().length; if (!st) return;
+  const why = ptL(st.why);
+  c.innerHTML = `<div class="pt-top">${PENNY_FACE(34)}<div class="pt-meta"><b>${esc(ptL(PRT.sc.title))}</b><small>Step ${PRT.i+1} of ${n}</small></div><span class="grow"></span>
+      <button class="pt-x" onclick="ptLang(PRT.lang==='en'?'tl':'en')" title="Language">${PRT.lang==='en'?'TL':'EN'}</button><button class="pt-x" onclick="ptExit()" aria-label="Exit practice">✕</button></div>
+    <div class="pt-bar"><i style="width:${Math.round(100*PRT.i/n)}%"></i></div>
+    <div class="pt-say">${ptFmt(ptL(st.say))}</div>
+    ${why ? (PRT.why ? `<div class="pt-why">${ptFmt(why)}</div>` : `<a class="pt-wl" onclick="PRT.why=true;ptCard()">Why?</a>`) : ''}
+    ${PRT.lostShown ? `<div class="pt-lost">Can't find it on your screen? ${st.act?'Use the button below, or ':''}<a onclick="ptGo(PRT.i+1)">skip this step</a>.</div>` : ''}
+    <div class="pt-acts">${st.act ? `<button class="btn sm" onclick="ptAct()">${esc(ptL(st.act.label))}</button>` : ''}<span class="grow"></span>
+      <a class="pt-flag" onclick="ptConfusing()">😕 Confusing?</a>
+      ${st.next ? `<button class="btn sm primary" onclick="ptGo(PRT.i+1)">${PRT.i+1===n?'Finish':'Next'}</button>` : `<span class="pt-wait">Waiting for you…</span>`}</div>`;
+}
+function ptAct(){ const st = ptStep(); if (st?.act) { try { st.act.fn(); } catch(e){ console.error(e); } } }
+function ptConfusing(){
+  const st = ptStep(); if (!st) return;
+  modal2(`<h3>What was confusing?</h3><p class="hint">Rommel sees this and rewords the step.</p><textarea class="inp" id="ptCf" rows="3" placeholder="e.g. I couldn't find the Save button on my phone"></textarea>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="ptCfGo">Send</button></div>`);
+  $('#ptCfGo').onclick = async () => { await PRT.rpc('bgt_training_flag', { p_scenario:PRT.sc.id, p_step:st.id, p_kind:'confusing', p_note:$('#ptCf').value.trim()||null }).catch(()=>{}); closeModal2(); toast('Thanks — sent.'); };
+}
+async function ptFinish(){
+  const sc = PRT.sc, secs = Math.round((Date.now()-PRT.t0)/1000);
+  let saved = false; try { const r = await PRT.rpc('bgt_training_done', { p_scenario:sc.id, p_secs:secs, p_lang:PRT.lang }); saved = !r?.error; } catch(_){}
+  ptExit(true);
+  await ptLoadDone();
+  const next = PT_SC.filter(ptForMe).find(s=>!PRT.done[s.id]);
+  modal(`<div class="pt-menu-h">${PENNY_FACE(44)}<div><h3 style="margin:0">Well done! 🎉</h3><p class="hint" style="margin:2px 0 0">${esc(ptL(sc.title))} — ${Math.max(1,Math.round(secs/60))} min. ${saved?'Saved to your practice record.':''}</p></div></div>
+    <p>Everything you did was sample data — your real budget is unchanged.</p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Close</button>${next?`<button class="btn primary" onclick="closeModal();ptStart('${next.id}')">Next: ${esc(ptL(next.title))}</button>`:'<button class="btn" onclick="practiceMenu()">All scenarios</button>'}</div>`);
+}
+function ptExit(silent){
+  if (!PRT.on) return;
+  clearInterval(PRT.tick); PRT.on = false; ptRing(null); ptCard(); ptBar();
+  document.body.classList.remove('practicing');
+  const R = PRT.real; S.me = R.me; S.budgets = R.budgets; S.budgetId = R.budgetId; S.preqs = R.preqs; S.cxe = R.cxe; S.penny.msgs = R.penny; S.tab = R.tab || 'opex'; SIMDB = null;
+  closeDrawer(); closeModal2?.(); pennyToggle(false);
+  const r = $('#meRole'); if (r) r.textContent = ROLE_LABEL[S.me.role] + (S.me.department_id ? ' · ' + (deptById(S.me.department_id)?.name||'') : '');
+  S.view = R.view; renderNav(); route();
+  if (!silent) toast('Practice closed — back to your real budget.');
+}
+// gentle nudge for people who have not practised yet
+async function ptNudge(){
+  if (S.preview || PRT.on) return; try { if (localStorage.getItem('costline.practice.nudge')==='no') return; } catch(_){}
+  await ptLoadDone(); if (Object.keys(PRT.done).length) return;
+  if ($q('#ptNudge')) return;
+  const n = document.createElement('div'); n.id = 'ptNudge'; n.className = 'pt-nudge';
+  n.innerHTML = `${PENNY_FACE(36)}<div><b>New to Costline?</b> Take a 2-minute guided practice — sample data, nothing is saved.</div><button class="btn sm primary" onclick="this.parentElement.remove();practiceMenu()">Start practice</button><button class="btn sm ghost" onclick="try{localStorage.setItem('costline.practice.nudge','no')}catch(_){};this.parentElement.remove()">Not now</button>`;
+  document.body.appendChild(n);
 }
 
 boot();

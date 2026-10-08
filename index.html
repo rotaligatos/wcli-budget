@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 18:26</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 18:46</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:26</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:46</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3594,14 +3594,21 @@ function importRecordsDialog(){
         const dep = S.depts.find(x=>String(x.code).toLowerCase()===String(g('dept')||'').trim().toLowerCase() || x.name.toLowerCase()===String(g('dept')||'').trim().toLowerCase());
         const plantLvl = !dep && /^(|plant|whole plant)$/i.test(String(g('dept')||'').trim()) && ['admin','plant_head'].includes(S.me.role);
         if (!plantLvl && (!dep || !canEditRecords(dep.id))) { bad.push(i); continue; }
-        const isPO = !/cons/i.test(String(g('t')||'PO')), num = k => { const x = g(k); return x==null || x==='' || isNaN(Number(x)) ? null : Number(x); };
+        const tt = String(g('t')||'PO'), isIss = /withdraw|issue|stores|wrf/i.test(tt), isPO = !isIss && !/cons/i.test(tt), num = k => { const x = g(k); return x==null || x==='' || isNaN(Number(x)) ? null : Number(x); };
         const it = g('it') ? String(g('it')).trim() : null, res = RESOURCES.find(r=>r[0].toLowerCase()===String(it||'').toLowerCase());
+        if (isIss) { rows.push({ company_id:S.company.id, department_id:plantLvl ? null : dep.id, kind:'issue', rec_date:d.toISOString().slice(0,10), ref_no:g('ref')?String(g('ref')):null, line_item:g('li')?String(g('li')).trim().toUpperCase():null, item:it, supplier:null, qty:num('q'), unit:g('u')?String(g('u')):null, unit_price:num('p'), amount:num('a'), status:null, notes:g('n')?String(g('n')):null }); continue; }
         rows.push({ company_id:S.company.id, department_id:plantLvl ? null : dep.id, kind:isPO?'po':'consumption', rec_date:d.toISOString().slice(0,10), ref_no:g('ref')?String(g('ref')):null,
           line_item:isPO ? (g('li')?String(g('li')).trim().toUpperCase():null) : (res?.[2]||null), item:isPO?it:null, resource:isPO?null:(res?.[0]||it), supplier:g('sup')?String(g('sup')).trim():null,
           qty:num('q'), unit:g('u')?String(g('u')):(res?.[1]||null), unit_price:num('p'), amount:num('a') ?? (num('q')!=null&&num('p')!=null ? num('q')*num('p') : null), status:isPO?(g('st')||'Ordered'):null, notes:g('n')?String(g('n')):null }); }
+      // skip rows already in Costline (same department, kind, date, line, reference, item and amount) — e.g. re-importing a downloaded file
+      let dup = 0; if (rows.length) { const ds = rows.map(r=>r.rec_date).sort(), ex = [];
+        for (let f=0;;f+=1000) { const { data } = await sb.from('bgt_plant_records').select('department_id,kind,rec_date,line_item,ref_no,item,resource,amount').gte('rec_date', ds[0]).lte('rec_date', ds[ds.length-1]).range(f,f+999); ex.push(...(data||[])); if (!data || data.length<1000) break; }
+        const key = r => [r.department_id||'', r.kind, r.rec_date, r.line_item||'', r.ref_no||'', r.item||r.resource||'', Math.round(Number(r.amount||0))].join('|'), have = new Set(ex.map(key));
+        const n0 = rows.length; for (let i=rows.length-1;i>=0;i--) if (have.has(key(rows[i]))) rows.splice(i,1); dup = n0 - rows.length; }
+      if (!rows.length && dup) { $('#riMsg').innerHTML = `<b>Nothing new:</b> all ${dup} rows are already in Costline (this looks like a file downloaded from Costline). For newer stores withdrawals use <b>Import stores report</b> with the stores system's consumption report.`; return; }
       if (!rows.length) { $('#riMsg').textContent = 'No rows found.' + (bad.length ? ` Rows skipped (bad date or department, or not your department): ${bad.slice(0,12).join(', ')}` : ''); return; }
       for (let i=0; i<rows.length; i+=500) { const r = await sb.from('bgt_plant_records').insert(rows.slice(i,i+500)); if (r.error) throw r.error; }
-      S.rc.cache = {}; closeModal(); toast(`${rows.length} records imported${bad.length?`, ${bad.length} skipped`:''}`); renderRecords();
+      S.rc.cache = {}; closeModal(); toast(`${rows.length} records imported${dup?`, ${dup} already in Costline`:''}${bad.length?`, ${bad.length} skipped`:''}`); renderRecords();
     } catch(e){ fail(e); }
   };
 }
@@ -3810,6 +3817,10 @@ function importStoresDialog(){
     $('#stMsg').innerHTML = '<p class="hint">Reading…</p>';
     try {
       const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); parsed = parseStoresWorkbook(wb);
+      const h0 = Array.from(wb.worksheets[0]?.getRow(1).values||[], v=>String(v??'').toLowerCase());
+      if (!parsed.rows.length && h0.some(x=>x.startsWith('type (po'))) { const ws = wb.worksheets[0]; let n = 0, a = 0, d0 = null, d1 = null;
+          ws.eachRow((r,i)=>{ if (i<2) return; const t = String(r.getCell(3).value||''); if (!/withdraw/i.test(t)) return; n++; a += Number(r.getCell(11).value)||0; const d = r.getCell(1).value; if (d instanceof Date) { d0 = !d0||d<d0?d:d0; d1 = !d1||d>d1?d:d1; } });
+          $('#stMsg').innerHTML = `<p><b>This is Costline's own download of plant records</b>, not the stores consumption report.${n?` It holds ${n} stores-withdrawal summary rows (${peso(a)}${d0?`, ${fmtDay(d0.toISOString().slice(0,10))} to ${fmtDay(d1.toISOString().slice(0,10))}`:''}) — the same figures already loaded.`:''} For newer withdrawals, export the <b>consumption report</b> from the stores system (the file with the WRF / WRS transactions sheet: date, department, section, item, total) and import that here.</p>`; return; }
       if (!parsed.rows.length) { $('#stMsg').innerHTML = '<p>No withdrawal transactions found. The file needs a sheet named "transaction…" with a date column (DATE or MONTH/DATE), DEPARTMENT, SECTION, ITEM CATEGORY and TOTAL.</p>'; return; }
       const ys = {}; parsed.rows.forEach(r => { const y = (ys[r.y] ||= { m:new Set(), n:0, a:0 }); y.m.add(r.m); y.n++; y.a += r.amount; });
       const nd = Object.entries(parsed.skipped.noDept);

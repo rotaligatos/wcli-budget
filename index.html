@@ -504,7 +504,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 15:14</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 16:14</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -999,7 +999,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 15:14</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 16:14</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2720,13 +2720,16 @@ async function olpData(y){
     sb.from('bgt_settings').select('value').eq('key','outlook_prices').maybeSingle(),
     sb.from('bgt_indicator_history').select('key,year,value,basis').in('key',['diesel','usdphp']),
     sb.from('bgt_plant_records').select('rec_date,qty,amount,item').eq('kind','issue').ilike('item','%diesel%').gt('qty',0).gt('amount',0).limit(5000)]);
+  // WCLI's own utility rate from its main bills (Plant records → Electricity and water): latest 6 billed months
+  const { data:ub } = await sb.from('bgt_plant_records').select('resource,rec_date,qty,amount,department_id').eq('kind','consumption').in('resource',['Electricity','Water']).gt('qty',0).gt('amount',0).gte('rec_date', `${y-2}-01-01`).order('rec_date', { ascending:false }).limit(200);
+  const billRate = res => { const b = (ub||[]).filter(r=>r.resource===res && !r.department_id).slice(0,6); return b.length ? { rate:sum(b.map(r=>Number(r.amount)))/sum(b.map(r=>Number(r.qty))), n:b.length, from:b[b.length-1].rec_date.slice(0,7), to:b[0].rec_date.slice(0,7) } : null; };
   const P = { ...OLP_DEF, ...(st?.value||{}) };
   // internal factor: what WCLI paid for diesel vs the Metro Manila pump average, per year where both exist
   const paid = {}; (pr||[]).forEach(r => { const yy = Number(String(r.rec_date).slice(0,4)); const x = (paid[yy] ||= { q:0, a:0 }); x.q += Number(r.qty); x.a += Number(r.amount); });
   const pairs = Object.entries(paid).map(([yy,x]) => { const pump = (h||[]).find(z=>z.key==='diesel' && z.year===Number(yy) && z.basis==='avg'); return pump ? { y:Number(yy), wcli:x.a/x.q, pump:Number(pump.value) } : null; }).filter(Boolean);
   const ratio = P.ratio ?? (pairs.length ? sum(pairs.map(p=>p.wcli/p.pump))/pairs.length : 0.975);
   const fxNext = Number((h||[]).find(z=>z.key==='usdphp' && z.year===y && z.basis==='forecast')?.value) || Number(A('usdphp')?.value) || null;
-  return { o, A, P, pairs, ratio, fxNext };
+  return { o, A, P, pairs, ratio, fxNext, bill:{ elec:billRate('Electricity'), water:billRate('Water') } };
 }
 function olpCompute(d){
   const { A, P, ratio, fxNext } = d, r2 = x => Math.round(x*100)/100, rows = [];
@@ -2740,10 +2743,11 @@ function olpCompute(d){
   }
   if (fxNow && fxNext) rows.push({ key:'usd', item:'US dollar exchange rate', unit:'US$', category:null, price:r2((fxNow+fxNext)/2*(1+P.fx_buffer/100)),
     how:`Average of today's ₱${fxNow} and the 12-month forecast ₱${fxNext}, + ${P.fx_buffer}% buffer — use it for anything priced in dollars` });
-  const eBase = Number(P.elec_wcli) || meralco;
+  const eb = d.bill?.elec, wb = d.bill?.water, eBase = Number(P.elec_wcli) || (eb ? eb.rate : meralco);
   if (eBase) rows.push({ key:'electricity', item:'Electricity', unit:'kWh', category:'UTILITIES - ELECTRICITY', price:r2(eBase*(1+P.elec_adj/100)),
-    how:`${P.elec_wcli ? `WCLI's own rate from its bill ₱${eBase}` : `Meralco overall rate ₱${eBase} (published benchmark — enter WCLI's rate from a bill for a closer figure)`} + ${P.elec_adj}% for ${S.cycle.year}`, approx:!P.elec_wcli });
-  if (Number(P.water_rate)) rows.push({ key:'water', item:'Water', unit:'m³', category:'UTILITIES - WATER', price:r2(Number(P.water_rate)*(1+P.water_adj/100)), how:`WCLI's water rate ₱${P.water_rate}/m³ from its bill + ${P.water_adj}% inflation` });
+    how:`${P.elec_wcli ? `WCLI's rate entered in settings ₱${eBase}` : eb ? `WCLI's own bills: ₱${eb.rate.toFixed(2)}/kWh over ${eb.n} month${eb.n>1?'s':''} (${eb.from}–${eb.to}, Plant records)` : `Meralco overall rate ₱${eBase} (published benchmark — import WCLI's bills in Plant records → Electricity and water for a closer figure)`} + ${P.elec_adj}% for ${S.cycle.year}`, approx:!P.elec_wcli && !eb });
+  const wBase = Number(P.water_rate) || (wb ? wb.rate : null);
+  if (wBase) rows.push({ key:'water', item:'Water', unit:'m³', category:'UTILITIES - WATER', price:r2(wBase*(1+P.water_adj/100)), how:`${P.water_rate ? `WCLI's water rate entered in settings ₱${wBase}` : `WCLI's own bills: ₱${wb.rate.toFixed(2)}/m³ over ${wb.n} month${wb.n>1?'s':''} (${wb.from}–${wb.to})`} + ${P.water_adj}% inflation` });
   return rows;
 }
 async function olpCardHtml(y){
@@ -2758,7 +2762,7 @@ async function olpCardHtml(y){
       <td style="font-size:12px">${p ? (Math.abs(Number(p.unit_price)-r.price)<0.005 ? '<span style="color:var(--green)">✓ in use</span>' : `<span style="color:var(--amber)">in use: ${peso(p.unit_price,2)}</span>`) : '<span class="hint">not yet</span>'}</td></tr>`; }).join('')}
     </tbody></table></div>
     ${d.pairs.length?`<p class="hint" style="padding:6px 14px 0;margin:0">WCLI paid ${d.pairs.map(p=>`₱${p.wcli.toFixed(2)}/L in ${p.y} vs pump ₱${p.pump.toFixed(2)}`).join('; ')} → factor ${d.ratio.toFixed(3)}.</p>`:''}
-    ${!d.P.water_rate?'<p class="hint" style="padding:4px 14px 0;margin:0">Water: enter WCLI\'s ₱/m³ from a bill under Settings to publish a water price; until then managers estimate it.</p>':''}
+    ${!d.P.water_rate && !d.bill?.water?'<p class="hint" style="padding:4px 14px 0;margin:0">Water: import WCLI\'s water bills in <b>Plant records → Electricity and water</b> (or enter the ₱/m³ under Settings) to publish a water price; until then managers estimate it.</p>':''}
     ${ed?`<div class="row-flex" style="padding:10px 14px"><button class="btn primary" onclick="olpPublish()">Publish as ${y} standard prices</button><button class="btn ghost" onclick="olpSettings()">Settings</button></div>`:''}</div>`;
 }
 async function olpPublish(){
@@ -2778,7 +2782,7 @@ async function olpPublish(){
 async function olpSettings(){
   const P = S._olp?.d?.P || OLP_DEF, f = (k, l, h) => `<div class="field"><label for="op_${k}">${l}</label><input class="inp num" id="op_${k}" type="number" step="any" value="${P[k]??''}" placeholder="${h||''}"></div>`;
   modal(`<h3>How the outlook prices are worked out</h3>
-    <div class="g2">${f('crude_now','Crude this year (US$/bbl)')}${f('share','Share of the pump price that follows oil (%)')}${f('fuel_buffer','Fuel volatility buffer (%)')}${f('ratio','WCLI vs pump price factor','auto from records')}${f('gas_ratio','Gasoline ÷ diesel price')}${f('fx_buffer','Exchange-rate buffer (%)')}${f('elec_wcli','WCLI electricity rate ₱/kWh (from a bill)','uses Meralco benchmark')}${f('elec_adj','Electricity change next year (%)')}${f('water_rate','WCLI water rate ₱/m³ (from a bill)','not set')}${f('water_adj','Water change next year (%)')}</div>
+    <div class="g2">${f('crude_now','Crude this year (US$/bbl)')}${f('share','Share of the pump price that follows oil (%)')}${f('fuel_buffer','Fuel volatility buffer (%)')}${f('ratio','WCLI vs pump price factor','auto from records')}${f('gas_ratio','Gasoline ÷ diesel price')}${f('fx_buffer','Exchange-rate buffer (%)')}${f('elec_wcli','WCLI electricity rate ₱/kWh (overrides the bills)','from imported bills, else Meralco')}${f('elec_adj','Electricity change next year (%)')}${f('water_rate','WCLI water rate ₱/m³ (overrides the bills)','from imported bills')}${f('water_adj','Water change next year (%)')}</div>
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="olpSaveSettings()">Save</button></div>`, 'wide');
 }
 async function olpSaveSettings(){
@@ -3360,7 +3364,7 @@ async function renderRecords(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
       <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
-      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button></div></div>
+      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(['admin','plant_head'].includes(S.me.role) || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
@@ -3472,7 +3476,7 @@ function importRecordsDialog(){
     try {
       const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
       const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : (v && typeof v==='object' && 'text' in v) ? v.text : v;
-      const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), col = name => head.findIndex(h=>h.startsWith(name.toLowerCase()));
+      const head = Array.from(ws.getRow(1).values, v=>String(cv(v)||'').trim().toLowerCase()), col = name => head.findIndex(h=>h.startsWith(name.toLowerCase()));
       const C = { d:col('date'), dept:col('department'), t:col('type'), ref:col('po'), li:col('expense line'), it:col('item'), sup:col('supplier'), q:col('quantity'), u:col('unit'), p:col('unit price'), a:col('amount'), st:col('status'), n:col('notes') };
       if (C.d<1 || C.dept<1) { $('#riMsg').textContent = 'The first row needs at least "Date" and "Department code" columns.'; return; }
       const rows = [], bad = [];
@@ -3784,6 +3788,65 @@ function rcTab(k, btn){
   document.querySelectorAll('.tabs button[role=tab]').forEach(b => b.classList.toggle('on', b===btn));
   const body = $('#rcBody'); if (body) body.innerHTML = '<div class="loading">Loading…</div>';
   renderRecords();
+}
+
+/* ---------- electricity and water bills: Excel template and import (one row per month per bill / meter) ---------- */
+const UT_COLS = ['Year','Month','Utility','Bill / meter','Consumption','Billed amount (₱)','Bill / account no.'];
+async function utilTemplate(){
+  const Y = S.rc.year, all = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource));
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Utility bills ${Y}`); const h = ws.addRow(UT_COLS); h.font = { bold:true };
+  const meters = [...(['admin','plant_head'].includes(S.me.role) || isReviewer() ? [['PLANT', null]] : []), ...S.depts.filter(d=>canEditRecords(d.id)).map(d=>[d.code, d.id])];
+  for (const res of ['Electricity','Water']) for (const [code, id] of meters) {
+    const mine = all.filter(r=>r.resource===res && (r.department_id||null)===id);
+    if (code!=='PLANT' && !mine.length) continue;   // department sub-meters only when they already have data; add rows for others as needed
+    for (let m=1; m<=12; m++) { const v = mine.filter(r=>r.month===m); ws.addRow([Y, MONTHS[m-1], res, code, v.length?sum(v.map(r=>Number(r.qty)||0)):null, v.length&&v.some(r=>r.amount!=null)?sum(v.map(r=>Number(r.amount)||0)):null, v.map(r=>r.ref_no).filter(Boolean).join(', ')||null]); } }
+  [8,8,12,14,14,18,22].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(5).numFmt='#,##0.##'; ws.getColumn(6).numFmt='#,##0.00';
+  const g = wb.addWorksheet('Guide');
+  [['How to fill'],['One row per bill per month. Consumption: kWh for Electricity, m³ for Water — as printed on the bill. Billed amount: the total on the bill.'],
+   ['Bill / meter: PLANT = the plant\'s main bill. For a department sub-meter or agreed share use its code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')+'.'],
+   ['Month: Jan…Dec or 1–12. Rows with no consumption and no amount are ignored. Importing replaces the figures already entered for the same utility, bill / meter and month.']].forEach(r=>g.addRow(r));
+  g.getColumn(1).width = 130;
+  download(await wb.xlsx.writeBuffer(), `Utility bills ${Y} - ${S.company.code}.xlsx`); toast('Template downloaded — fill it and use Import Excel');
+}
+function importUtilDialog(){
+  modal(`<h3>Import electricity and water bills</h3><p>Use the file from <b>Download template</b>: one row per bill per month (Year, Month, Utility, Bill / meter, Consumption, Billed amount, Bill no.). Figures for the same month and meter are replaced.</p>
+    <div class="field"><input type="file" id="uiFile" accept=".xlsx" class="inp"></div><div id="uiMsg"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="uiChk">Check file</button><button class="btn primary" id="uiGo" disabled>Import</button></div>`);
+  let parsed = null;
+  const read = async () => {
+    const f = $('#uiFile').files[0]; if (!f) { toast('Choose a file first.', true); return null; }
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.worksheets[0];
+    const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : (v && typeof v==='object' && 'text' in v) ? v.text : (v && typeof v==='object' && 'richText' in v) ? v.richText.map(t=>t.text).join('') : v;
+    const head = Array.from(ws.getRow(1).values, v=>String(cv(v)||'').trim().toLowerCase()), col = k => head.findIndex(h=>h.startsWith(k));
+    const C = { y:col('year'), m:col('month'), u:col('utility'), b:col('bill / meter')>0?col('bill / meter'):col('meter'), q:col('consumption'), a:col('billed'), r:col('bill / account')>0?col('bill / account'):col('bill no') };
+    if (C.m<1 || C.q<1) throw new Error('The first row needs at least "Month" and "Consumption" columns — use Download template.');
+    const rows = [], bad = [];
+    for (let i=2; i<=ws.rowCount; i++) { const row = ws.getRow(i), g = k => C[k]>0 ? cv(row.getCell(C[k]).value) : null;
+      const num = k => { const x = g(k); if (x==null || x==='') return null; const n = Number(String(x).replace(/[₱,\s]/g,'')); return isNaN(n) ? NaN : n; };
+      const q = num('q'), a = num('a'); if (q==null && a==null) continue;
+      const mv = g('m'), m = typeof mv==='number' ? mv : mv instanceof Date ? mv.getMonth()+1 : (MONTHS.findIndex(x=>String(mv||'').trim().toLowerCase().startsWith(x.toLowerCase()))+1 || Number(mv));
+      const y = Number(g('y')) || S.rc.year, res = /water/i.test(String(g('u')||'')) ? 'Water' : /elec|power|meralco/i.test(String(g('u')||'Electricity')) ? 'Electricity' : null;
+      const code = String(g('b')||'PLANT').trim(), dep = /^(|plant|whole plant|main)$/i.test(code) ? null : S.depts.find(d=>d.code.toLowerCase()===code.toLowerCase() || d.name.toLowerCase()===code.toLowerCase());
+      const allowed = dep===null ? ['admin','plant_head'].includes(S.me.role) : dep && canEditRecords(dep.id);
+      if (!(m>=1 && m<=12) || !res || dep===undefined || !allowed || Number.isNaN(q) || Number.isNaN(a) || y<2000) { bad.push(i); continue; }
+      rows.push({ y, m, res, dep:dep?dep.id:null, q, a, ref:g('r')?String(g('r')).trim():null }); }
+    return { rows, bad };
+  };
+  $('#uiChk').onclick = async () => { try { parsed = await read(); if (!parsed) return;
+      const by = {}; parsed.rows.forEach(r => { const k = `${r.res} · ${r.dep?deptById(r.dep)?.name:'Whole plant'} · ${r.y}`; (by[k] ||= []).push(r); });
+      $('#uiMsg').innerHTML = parsed.rows.length ? `<div class="banner green"><b>${parsed.rows.length} monthly bill${parsed.rows.length>1?'s':''} ready:</b><ul style="margin:4px 0">${Object.entries(by).map(([k,v])=>`<li>${esc(k)}: ${v.length} month${v.length>1?'s':''}, ${Math.round(sum(v.map(x=>x.q||0))).toLocaleString('en-PH')} ${v[0].res==='Electricity'?'kWh':'m³'}, ${peso(sum(v.map(x=>x.a||0)),2)}</li>`).join('')}</ul></div>${parsed.bad.length?`<p class="hint">Skipped rows (bad month or utility, unknown meter, or not yours): ${parsed.bad.slice(0,15).join(', ')}${parsed.bad.length>15?'…':''}</p>`:''}`
+        : `<div class="banner red">No bill rows found.${parsed.bad.length?` Skipped rows: ${parsed.bad.slice(0,15).join(', ')}`:''}</div>`;
+      $('#uiGo').disabled = !parsed.rows.length; } catch(e){ $('#uiMsg').innerHTML = `<div class="banner red">${esc(e.message)}</div>`; } };
+  $('#uiGo').onclick = async () => { if (!parsed?.rows.length) return; $('#uiGo').disabled = true;
+    try { const years = [...new Set(parsed.rows.map(r=>r.y))]; let n = 0;
+      for (const y of years) { const ex = (await loadRecords(y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource));
+        for (const r of parsed.rows.filter(x=>x.y===y)) {
+          const old = ex.filter(e=>e.resource===r.res && (e.department_id||null)===r.dep && e.month===r.m);
+          if (old.length) { const d = await sb.from('bgt_plant_records').delete().in('id', old.map(e=>e.id)); if (d.error) throw d.error; }
+          const ins = await sb.from('bgt_plant_records').insert({ company_id:S.company.id, department_id:r.dep, kind:'consumption', resource:r.res, unit:r.res==='Electricity'?'kWh':'m³', line_item:r.res==='Electricity'?'UTILITIES - ELECTRICITY':'UTILITIES - WATER', rec_date:`${y}-${String(r.m).padStart(2,'0')}-01`, qty:r.q, amount:r.a, ref_no:r.ref });
+          if (ins.error) throw ins.error; n++; } }
+      S.rc.cache = {}; closeModal(); toast(`${n} monthly bill${n>1?'s':''} imported`); renderRecords();
+    } catch(e){ fail(e); $('#uiGo').disabled = false; } };
 }
 
 /* ================= COSTS KEPT OUT OF PLANT OPEX (value-added resale, pass-through) =================

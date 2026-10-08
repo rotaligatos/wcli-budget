@@ -217,6 +217,16 @@ CAPEX ENDORSEMENTS: ${(cx || []).map((x: any) => `${x.snapshot?.asset || 'item'}
       c.proposals.push({ kind:'add_line', budget_id:r.b.id, department:d.name, ...a });
     }
     const p = c.proposals[c.proposals.length - 1];
+    if ((p.items || []).length && !/^confirmed increase/i.test(String(p.reason || ''))) {   // guard: a yearly amount entered as a monthly (or quarterly) price
+      const tot = sum(p.items.map(itemAnnual)), dId = name === 'propose_add_line' ? d?.id : (await c.db.from('bgt_dept_budgets').select('department_id').eq('id', p.budget_id).maybeSingle()).data?.department_id;
+      const li = p.line_item || p.current?.line_item; let ref = 0;
+      if (dId && li) { const { data:ac } = await c.db.from('bgt_actuals').select('month,amount').eq('year', c.Y - 1).eq('department_id', dId).eq('line_item', li).eq('kind', 'opex').eq('excluded', false);
+        const mx = Math.max(0, ...(ac || []).map((x: any) => x.month)); if (mx) ref = sum((ac || []).map((x: any) => Number(x.amount))) / mx * 12; }
+      const base = [Number(p.current?.annual) || 0, ref].filter(x => x >= 10000);
+      const bad = (p.items as any[]).find(it => { const k = itemMonthList(it).length, once = itemAnnual(it) / (k || 1); return k >= 2 && base.some(b => once >= 0.5 * b && once * k >= 2.5 * b); });
+      if (base.length && (bad || base.every(b => tot >= 6 * b))) { c.proposals.pop();
+        return `NOT PROPOSED — check the prices: the items come to ${peso(tot)} a year, ${Math.round(tot / Math.min(...base))}× ${p.current?.annual ? 'the line\'s current amount' : 'last year\'s spending'} (${peso(Math.min(...base))})${bad ? `; "${bad.name}" alone costs ${peso(itemAnnual(bad) / itemMonthList(bad).length)} each time` : ''}. A yearly amount was probably entered as a monthly price: price is per occurrence (monthly price = yearly ÷ 12). Fix and call the tool again. Only if the user confirmed the increase is real, call again with reason starting "Confirmed increase:" and why.`; }
+    }
     const tot = (p.items || []).length ? ` New annual amount from items: ${peso(sum(p.items.map(itemAnnual)))}.` : '';
     return `Proposal card shown to the user (they approve or dismiss it; nothing saved yet).${tot}`;
   }
@@ -258,6 +268,7 @@ How you work:
 - Be brief and practical: short paragraphs or bullets, numbers first, pesos as ₱. Plain English; a friendly touch is fine.
 - Standard prices (fuel, exchange rate and electricity from the outlook; board prices from the Head of Plant Operations) must be used exactly by everyone; dollar-priced items convert at the standard exchange rate. For any other item, search_prices first (price list, last PO, stores); if nothing is found, use a reasonable estimate, say it is an estimate and suggest "look up online" or a supplier quotation. Suggest asking the Head of Plant Operations ONLY for board prices without a standard price.
 - To change a budget, use the propose_* tools (OPEX lines and CAPEX items) — each becomes a card the user approves. If a CAPEX idea fails the CAPEX test, propose it as an OPEX line. Use get_status for due date, return reasons, reviewer comments, price questions and endorsements. Propose only what the user asked for or clearly agreed to; give complete item lists (qty each time, base price, allowance %, how often). You cannot submit, approve or return budgets.
+- Item prices are per occurrence: a monthly item's price is the MONTHLY amount (yearly bill ÷ 12; quarterly ÷ 4). Never put a yearly or annualised figure as a monthly price. Before proposing, check the items' yearly total against last year's spending (get_actuals) and the line's current amount — about 12× too high means yearly prices were used as monthly. When a user says an amount looks too high, check for exactly this first.
 - Priorities: Critical / Mandatory, High, Medium, Low / Discretionary — use get_priority_guide to explain meaning and consequences.
 ${c.rev ? '- When asked about a submitted budget, judge alignment with the plant direction (get_plant_direction: SWOT, risks, scenarios, recommendations): what supports it, what conflicts, gaps (missing recurring costs, unbudgeted spending last year), priority quality, items and prices, and what to ask the department.' : '- Never reveal other departments\' figures, plant peso totals or peso sales. Plant direction only in boards, percentages and direction.\n- When the manager asks for a check before submitting: review completeness (items, priorities, purposes), last year\'s actuals vs this budget (missing or unbudgeted lines, big changes), price consistency, timing, priority honesty and alignment with the plant direction; end with a short "before you submit" checklist and offer specific changes.'}`;
 

@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 17:51</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 18:26</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:51</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:26</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1106,7 +1106,8 @@ async function openBudget(id){
       sb.from('bgt_capex_lines').select('*').eq('budget_id', id).order('sort').order('created_at'),
       sb.from('bgt_comments').select('*').eq('budget_id', id).order('created_at'),
       sb.from('bgt_events').select('*').eq('budget_id', id).order('created_at'),
-      loadOpenItems(id)
+      loadOpenItems(id),
+      loadLyRef(id)
     ]);
     for (const r of [o,c,cm,ev]) if (r.error) throw r.error;
     S.opex = o.data; S.capex = c.data; S.comments = cm.data; S.events = ev.data;
@@ -1243,9 +1244,19 @@ function runChecks(){
     if (/salar|wage|13th month|sss|philhealth|pag-?ibig/i.test((l.activity||'')+' '+(l.description||''))) add('opex',l.id,'warn','Salaries and benefits are prepared by HR — remove them from this budget.',n);
     const u = l.calc && Number(l.calc.rate);
     if (u >= th && /unit|pc|set|piece/i.test(l.calc?.unit||'unit')) add('opex',l.id,'info',`Unit cost ${peso(u)} is at or above the ₱${th.toLocaleString()} CAPEX threshold. If it lasts more than a year, move it to CAPEX.`,n);
+    { const ref = (S.lyRef[S.budgetId]||{})[l.line_item] || 0;
+      if (ref >= 10000) (l.items||[]).forEach(it => { const k2 = itemMonthList(it).length, once = itemUnit(it);
+        if (k2 >= 2 && once >= 0.5*ref && once*k2 >= 2.5*ref) add('opex',l.id,'warn',`"${it.name}" costs ${peso(once)} each time, ${k2} times a year — one time is about a full year of last year's ${l.line_item} (${peso(ref)}). Is a yearly amount entered as a ${it.freq==='monthly'?'monthly':'per-time'} price?`,n); });
+      const tg = Number(l.calc?.ai_target)||0;
+      if (l.calc?.ai && tg > 0 && t > 0 && (t > 1.5*tg || t < 0.5*tg)) add('opex',l.id,'warn',`The items add up to ${peso(t)}, but the assistant's draft estimated ${peso(tg)} for this line. Check the quantities, prices and how often.`,n); }
     const k = (l.line_item||'')+'|'+(l.activity||'').trim().toLowerCase();
     if (l.activity && seen[k]) add('opex',l.id,'warn','Looks like a duplicate of another line with the same line item and activity.',n); seen[k]=1;
   });
+  { const ref = S.lyRef[S.budgetId]||{}, by = {};
+    S.opex.forEach(l => { if (!l.line_item) return; (by[l.line_item] ||= []).push(l); });
+    Object.entries(by).forEach(([li, ls]) => { const r = ref[li]||0, t = sum(ls.map(annual)); if (r < 10000 || t <= 4*r || t-r < 50000) return;
+      const big = ls.slice().sort((a,b)=>annual(b)-annual(a))[0];
+      add('opex', big.id, 'warn', `${li} adds up to ${peso(t)} — ${Math.round(t/r)}× last year's full-year pace of ${peso(r)}. If that is not a real change, a yearly amount may have been entered as a monthly price.`, big.activity || li); }); }
   S.capex.forEach(l => {
     const n = l.asset || l.category || 'Untitled asset', t = annual(l), q = Number(l.qty)||0, uc = Number(l.unit_cost)||0;
     if (!l.category) add('capex',l.id,'err','Choose a CAPEX category.',n);
@@ -2910,7 +2921,7 @@ async function aiDraft(kind){
   try {
     const r = await ai({ mode:'draft_line', kind, budget_id:S.budgetId, text:text || 'Improve this line: complete missing fields, check the amount and timing.', current:has?cur:undefined });
     const set = (id, v) => { const e = $('#'+id); if (e && v != null && v !== '') { if (e.tagName==='SELECT' && ![...e.options].some(o=>o.value===v)) e.insertAdjacentHTML('beforeend', `<option>${esc(v)}</option>`); e.value = v; } };
-    if (kind==='opex') { ['line_item','expense_type','activity','description','purpose','basis','priority'].forEach(k=>set('f_'+k, r[k])); if ((r.items||[]).length) { await loadPrices().catch(()=>{}); S._items = r.items.map(normAiItem); } }
+    if (kind==='opex') { ['line_item','expense_type','activity','description','purpose','basis','priority'].forEach(k=>set('f_'+k, r[k])); if ((r.items||[]).length) { await loadPrices().catch(()=>{}); S._items = r.items.map(normAiItem); const fx = fixAnnualAsMonthly(S._items, [cur.annual]); if (fx) toast(`${fx} price${fx>1?'s':''} corrected — a yearly amount was entered as monthly`); } }
     else { ['category','asset','description','justification','priority'].forEach(k=>set('f_'+k, r[k])); set('f_qty', r.qty); set('f_unit_cost', r.unit_cost); }
     if (kind==='opex' && (S._items||[]).length) drawItems(); else (r.months||[]).slice(0,12).forEach((v,i)=> $('#m'+(i+1)).value = Number(v) ? Math.round(Number(v)*100)/100 : '');
     if (r.remarks) { const rem = $('#f_remarks'); rem.value = rem.value && !rem.value.includes(r.remarks) ? rem.value.trim() + ' ' + r.remarks : r.remarks; }
@@ -3087,7 +3098,7 @@ async function aiBudgetAdd(){
     const st = document.createElement('div'); st.id = 'abItems'; $('#abBody').prepend(st);
     const res = await aiItemsFor(opex.map((o,j)=>({ key:String(j), line_item:o.line_item, activity:o.activity, description:o.description, annual:sum(MONTHS.map((_,k)=>Number(o['m'+(k+1)])||0)) })),
       (d,n) => { st.innerHTML = AI_BUSY(`Listing the items for each line… ${d} of ${n}`); });
-    opex.forEach((o,j) => { const its = res[String(j)]; if (!its) return; o.items = cleanItems(its); itemsMonths(o.items).forEach((v,k)=>o['m'+(k+1)] = v); });
+    opex.forEach((o,j) => { const its = res[String(j)]; if (!its) return; o.calc.ai_target = sum(MONTHS.map((_,k)=>Number(o['m'+(k+1)])||0)); o.items = cleanItems(its); itemsMonths(o.items).forEach((v,k)=>o['m'+(k+1)] = v); });
     st.remove();
   }
   try {
@@ -4480,6 +4491,35 @@ function cleanItems(items){
     src:it.src||'estimate', ref:it.ref||undefined, adj:Number(it.adj)||0, pid:it.pid||undefined, std:it.std||undefined, req:it.req||undefined, freq:it.freq||'monthly', m:Number(it.m)||1, ms:it.freq==='months'?(it.ms||[]):undefined, why:it.why||undefined }));
 }
 
+/* ---------- guard: an annual amount entered as a monthly (or quarterly…) price ----------
+   Signature of the mistake: ONE occurrence of an item already costs about a full year of the line
+   (the amount the assistant was asked to detail). Then the price is divided by the number of times a year,
+   and the item says so. Last year's pace is only used for the budget check (it can't tell a new contract apart). */
+S.lyRef = {};
+async function loadLyRef(budgetId){
+  if (S.lyRef[budgetId]) return S.lyRef[budgetId];
+  const b = budgetById(budgetId), out = {}; if (!b) return out;
+  try { const M = actModel(await loadYearData(S.cycle.year-1, b.department_id), 'budget');
+    M.rows.forEach(r => { const pace = M.closed ? r.actYTD/M.closed*12 : 0; out[r.item] = Math.max(pace, M.closed ? 0 : r.budFY); }); } catch(e){}
+  return (S.lyRef[budgetId] = out);
+}
+function fixAnnualAsMonthly(items, bases){
+  const B = (bases||[]).map(Number).filter(x=>x>0); if (!B.length) return 0;
+  let n = 0; const T = B[0], note = (it, k, once, why) => { it.price = Math.round(Number(it.price)/k*100)/100; n++;
+    it.why = `Price corrected by Costline: ${why}, so ₱${Math.round(once).toLocaleString('en-PH')} each time was read as a full-year amount and divided by ${k}. ${it.why||''}`.trim(); };
+  // 1. the whole line comes out ~12× its amount (e.g. two agencies, each entered at its yearly bill)
+  const tot = sum((items||[]).map(itemAnnual));
+  if (tot >= 6*T && tot <= 18*T) {
+    const big = (items||[]).filter(it => itemMonthList(it).length >= 2 && itemAnnual(it) >= 0.1*T);
+    const alt = tot - sum(big.map(it => itemAnnual(it) * (1 - 1/itemMonthList(it).length)));
+    if (big.length && alt >= 0.5*T && alt <= 2*T) { big.forEach(it => note(it, itemMonthList(it).length, itemUnit(it), `the line came to ${Math.round(tot/T)}× its amount of ₱${Math.round(T).toLocaleString('en-PH')}`)); return n; }
+  }
+  // 2. one item: a single occurrence already costs about a full year of the line
+  (items||[]).forEach(it => { const k = itemMonthList(it).length; if (k < 2) return; const once = itemUnit(it);
+    if (once >= 0.5*T && once*k >= 2.5*T) note(it, k, once, `one time cost about a full year of the line (₱${Math.round(T).toLocaleString('en-PH')})`); });
+  return n;
+}
+
 /* ---------- assistant: list the items ---------- */
 // one line in the drawer
 async function itemsWithAI(){
@@ -4491,8 +4531,9 @@ async function itemsWithAI(){
     const r = await ai({ mode:'draft_items', budget_id:S.budgetId, lines:[{ key:'x', line_item:li, activity:act, description:$('#f_description')?.value, annual:sum(Object.values(readMonths())), items:cleanItems(S._items) }] });
     const got = (r.lines||[])[0];
     if (!got?.items?.length) { toast('The assistant found nothing to list for this line.', true); return; }
-    S._items = got.items.map(normAiItem); drawItems();
-    toast(`${S._items.length} items listed — check quantities and prices, then Save line`);
+    S._items = got.items.map(normAiItem);
+    const fx = fixAnnualAsMonthly(S._items, [sum(Object.values(readMonths()))]); drawItems();
+    toast(`${S._items.length} items listed${fx?` · ${fx} price${fx>1?'s':''} corrected (a yearly amount was entered as monthly)`:''} — check quantities and prices, then Save line`);
   } catch(e){ fail(e); } finally { btn.disabled = false; btn.textContent = t; }
 }
 function normAiItem(x){ const sp = stdFor(x.name, x.unit) || stdPrices().find(p=>p.item.toLowerCase()===String(x.name||'').toLowerCase());
@@ -4504,7 +4545,8 @@ async function aiItemsFor(lines, onProgress){
   const out = {}, chunks = []; for (let i=0;i<lines.length;i+=5) chunks.push(lines.slice(i,i+5));
   let done = 0;
   const run = async ch => { try { const r = await ai({ mode:'draft_items', budget_id:S.budgetId, lines:ch });
-      (r.lines||[]).forEach(x => { if (x.key!=null && (x.items||[]).length) out[x.key] = x.items.map(normAiItem); }); } catch(e){ console.error(e); }
+      (r.lines||[]).forEach(x => { if (x.key==null || !(x.items||[]).length) return; const L = ch.find(l=>String(l.key)===String(x.key)) || {};
+        const its = x.items.map(normAiItem); out.fixed = (out.fixed||0) + fixAnnualAsMonthly(its, [L.annual]); out[x.key] = its; }); } catch(e){ console.error(e); }
     done += ch.length; onProgress && onProgress(done, lines.length); };
   for (let i=0;i<chunks.length;i+=3) await Promise.all(chunks.slice(i,i+3).map(run));
   return out;
@@ -4520,7 +4562,7 @@ async function fillMissingItems(){
     const res = await aiItemsFor(todo.map(l => ({ key:l.id, line_item:l.line_item, activity:l.activity, description:l.description, annual:annual(l) })), (d,n) => { const e = $('#fmBusy'); if (e) e.innerHTML = AI_BUSY(`Listing items… ${d} of ${n} lines`); });
     let n = 0;
     for (const l of todo) { const items = res[l.id]; if (!items) continue;
-      const row = { items:cleanItems(items), calc:{ ...(l.calc||{}), ai:true } }; itemsMonths(row.items).forEach((v,k)=>row['m'+(k+1)] = v);
+      const row = { items:cleanItems(items), calc:{ ...(l.calc||{}), ai:true, ai_target:annual(l)||null } }; itemsMonths(row.items).forEach((v,k)=>row['m'+(k+1)] = v);
       const r = await sb.from('bgt_opex_lines').update(row).eq('id', l.id).select().single(); if (!r.error) { Object.assign(l, r.data); n++; } }
     closeModal(); toast(n ? `Items listed for ${n} line${n>1?'s':''} — open each to check and save` : 'The assistant could not list items — try again or add them by hand.', !n); renderBudget();
   };

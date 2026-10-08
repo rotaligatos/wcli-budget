@@ -246,6 +246,13 @@ main{padding:16px 28px 64px;min-width:0}
   .lc-total{display:flex;justify-content:space-between;padding:10px 12px;font-weight:600;border-top:2px solid var(--line-strong);margin-bottom:70px}
 }
 .build-tag{font-size:10.5px;opacity:.55;margin:6px 0 2px}
+.cxe-in{margin-bottom:14px;border-left:4px solid var(--teal)}
+.cxe-row{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.cxe-main{flex:1;min-width:240px}.cxe-main .act{font-weight:600}.cxe-meta{font-size:12.5px;color:var(--muted);margin:3px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.cxe-why{font-size:12.5px;margin-top:3px}.cxe-why .muted{color:var(--faint)}.cxe-act{display:flex;gap:6px;flex-wrap:wrap}
+#pvBar{position:sticky;top:0;z-index:90;display:flex;gap:8px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#6B3FA0;color:#fff;padding:7px 14px;font-size:13px}
+#pvBar button{border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}#pvBar .pv-exit{background:#fff;color:#6B3FA0;font-weight:700}
+.pv-acts{display:flex;gap:6px}.pv-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:10px 0}.pv-list .btn{justify-content:flex-start;text-align:left}
 .banner{border-radius:var(--r);padding:8px 12px;margin-bottom:12px;border:1px solid;font-size:13.5px}
 .banner.red{background:var(--red-wash);border-color:var(--red-line);color:var(--red-text)}
 .banner.blue{background:var(--blue-wash);border-color:var(--blue-line);color:var(--blue-text)}
@@ -476,8 +483,8 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="site-name" id="siteName">Pasig Plant</div>
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
-      <div class="me-acts"><button onclick="pennyCall()">Ask Penny</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-07 23:20</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="me-acts"><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
+      <div class="build-tag">Build 2026-10-08 09:15</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -786,6 +793,37 @@ $('#formMagic').onsubmit = async e => {
 };
 async function signOut(){ await sb.auth.signOut(); location.href = location.origin + location.pathname; }
 
+/* ---------- admin preview: see the app exactly as a department manager does (read-only) ---------- */
+const PREVIEW_READ_RPC = ['bgt_login','bgt_item_catalog','bgt_item_catalog2','bgt_capex_similar','bgt_set_view_as','bgt_set_ui_prefs'];
+function previewSetup(me){
+  S.realRole = me.role; S.preview = (me.role==='admin' && me.view_as?.department_id) ? me.view_as : null;
+  if (!S.preview) return;
+  S.me = { ...me, role:'dept_manager', department_id:S.preview.department_id };
+  const blocked = () => { toast('Preview only — nothing is saved. Exit the preview to make changes.', true); return { data:null, error:{ message:'Preview only — nothing is saved.' } }; };
+  const fake = () => { const r = Promise.resolve().then(blocked); const px = new Proxy(function(){}, { get:(t,k)=> k==='then' ? r.then.bind(r) : k==='catch' ? r.catch.bind(r) : k==='finally' ? r.finally.bind(r) : () => px, apply:()=>px }); return px; };
+  if (!sb._pvWrapped) { sb._pvWrapped = true;
+    const from = sb.from.bind(sb); sb.from = t => { const q = from(t); ['insert','update','upsert','delete'].forEach(m => { q[m] = () => fake(); }); return q; };
+    const rpc = sb.rpc.bind(sb); sb.rpc = (fn, args, o) => PREVIEW_READ_RPC.includes(fn) ? rpc(fn, args, o) : fake();
+    const inv = sb.functions.invoke.bind(sb.functions); sb.functions.invoke = (fn, o={}) => fn==='bgt-penny' ? inv(fn, o) : Promise.resolve(blocked());
+  }
+}
+function previewBar(){
+  let el = document.getElementById('pvBar'); if (!S.preview) { el?.remove(); document.body.classList.remove('previewing'); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'pvBar'; document.body.prepend(el); } document.body.classList.add('previewing');
+  el.innerHTML = `<span>👁 Previewing as <b>${esc(deptById(S.preview.department_id)?.name||'department')} manager</b> — exactly what they see. Read-only: nothing is saved.</span>
+    <span class="pv-acts"><button onclick="previewPick()">Switch department</button><button class="pv-exit" onclick="previewSet(null)">Exit preview</button></span>`;
+}
+function previewPick(){
+  const list = (S.depts||[]).filter(d => (S.users||[]).some(u=>u.department_id===d.id && ['dept_manager','preparer'].includes(u.role)) || (S.budgets||[]).some(b=>b.department_id===d.id));
+  modal(`<h3>View the app as a department manager</h3><p class="hint">You'll see only what that department's manager sees: their budget, their analysis, their price questions, Penny's answers as them. Read-only — nothing is saved while previewing.</p>
+    <div class="pv-list">${list.map(d=>{ const m = (S.users||[]).find(u=>u.department_id===d.id && u.role==='dept_manager'); return `<button class="btn" onclick="previewSet('${d.id}')"><b>${esc(d.name)}</b>${m?`<span class="hint"> · ${esc(m.full_name||m.email)}</span>`:''}</button>`; }).join('')}</div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`);
+}
+async function previewSet(dept){
+  const { error } = await sb.rpc('bgt_set_view_as', { p_dept:dept }); if (error) return fail(error);
+  try { sessionStorage.removeItem('costline.penny'); } catch(_){}
+  location.reload();
+}
 async function boot(){
   if (S._booting) return; S._booting = true;
   try { await bootInner(); } finally { S._booting = false; }
@@ -795,9 +833,9 @@ async function bootInner(){
   if (!session) { show('login'); return; }
   try {
     const { data:me, error } = await sb.rpc('bgt_login'); if (error) throw error;
-    S.me = me;
+    S.me = me; previewSetup(me);
     if (!me.active || me.role === 'pending') { $('#pendingEmail').textContent = me.email; show('pending'); return; }
-    show('app'); try { pennyInit(); } catch(e){ console.error(e); } await loadMaster(); route();
+    show('app'); try { pennyInit(); } catch(e){ console.error(e); } await loadMaster(); previewBar(); route();
   } catch(e){ fail(e); show('login'); }
 }
 sb.auth.onAuthStateChange((ev) => {
@@ -827,14 +865,16 @@ async function loadMaster(){
   $('#meName').textContent = S.me.full_name || S.me.email;
   $('#meBtnM').textContent = String(S.me.full_name || S.me.email || '?').split(/[\s.@]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   applyTheme(themePrefs());
-  $('#meRole').textContent = ROLE_LABEL[S.me.role] + (S.me.department_id ? ' · ' + (deptById(S.me.department_id)?.name||'') : '');
+  $('#meRole').textContent = (S.preview?'Preview: ':'') + ROLE_LABEL[S.me.role] + (S.me.department_id ? ' · ' + (deptById(S.me.department_id)?.name||'') : '');
+  const pb = $('#btnPreview'); if (pb) { pb.classList.toggle('hidden', S.realRole!=='admin'); pb.textContent = S.preview ? 'Exit preview' : 'View as manager'; pb.onclick = S.preview ? () => previewSet(null) : previewPick; }
+  const ib = $('#btnInstall'); if (ib) ib.classList.toggle('hidden', isStandalone());
   await loadBudgets();
   { const { data } = await sb.from('bgt_users').select('*').order('email'); S.users = data||[]; }
 }
 async function loadBudgets(){
   const { data, error } = await sb.from('bgt_dept_budgets').select('*').eq('cycle_id', S.cycle.id); if (error) throw error;
   S.budgets = data.sort((a,b)=> (deptById(a.department_id)?.sort||0) - (deptById(b.department_id)?.sort||0));
-  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{})]);
+  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{}), loadEndorse()]);
   renderNav();
 }
 const deptById = id => S.depts.find(d=>d.id===id);
@@ -934,10 +974,11 @@ function openNavSheet(){
 function openMeSheet(){
   sheet(`<div style="padding:4px 2px 8px"><b>${esc(S.me.full_name||S.me.email)}</b><div class="hint" style="color:var(--muted);font-size:12.5px">${esc($('#meRole').textContent)}</div></div>
     <div class="eyebrow">Theme</div><div id="themeBox" style="padding:6px 0 4px">${themeControls()}</div>
-    ${S._installEvt ? `<a onclick="closeSheet();installApp()">Install Costline on this phone</a>` : (/iphone|ipad/i.test(navigator.userAgent) && !navigator.standalone ? `<div style="font-size:12.5px;color:var(--muted);padding:10px 2px">To install: tap <b>Share</b> then <b>Add to Home Screen</b>.</div>` : '')}
+    ${isStandalone() ? '' : `<a onclick="closeSheet();installApp()">${S._installEvt?'Install Costline on this device':'Install Costline / find the installed app'}</a>`}
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
+    ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-07 23:20</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:15</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -982,8 +1023,20 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(r => r.update()).catch(console.error));
 }
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); S._installEvt = e; document.getElementById('btnInstall')?.classList.remove('hidden'); });
-addEventListener('appinstalled', () => { S._installEvt = null; document.getElementById('btnInstall')?.classList.add('hidden'); toast('Costline installed'); });
-async function installApp(){ const e = S._installEvt; if (!e) { toast('Use your browser menu: Install app / Add to Home Screen.'); return; } e.prompt(); await e.userChoice.catch(()=>{}); S._installEvt = null; document.getElementById('btnInstall')?.classList.add('hidden'); }
+addEventListener('appinstalled', () => { S._installEvt = null; toast('Costline installed — find it in your app list or home screen'); });
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
+function installHelp(){
+  const ios = /iphone|ipad|macintosh/i.test(navigator.userAgent) && 'ontouchend' in document, sams = /SamsungBrowser/i.test(navigator.userAgent);
+  modal(`<h3>Install Costline</h3>
+    <p><b>If the browser says it's already installed</b>, Costline is on this device but its icon may not be on the home screen:</p>
+    <ul><li>Open your <b>app list</b> (swipe up on the home screen) and search <b>Costline</b>. Press and hold the icon → <b>Add to Home</b>.</li>
+      <li>Or in Chrome, open the menu <b>⋮</b> → <b>Open in Costline</b>.</li>
+      <li>Still not there? Go to <b>Settings → Apps → Costline → Uninstall</b>, come back to this page and install again.</li></ul>
+    <p><b>To install fresh:</b> ${ios ? 'in Safari tap <b>Share</b> → <b>Add to Home Screen</b>.' : sams ? 'in Samsung Internet tap the menu <b>≡</b> → <b>Add page to</b> → <b>Home screen</b>.' : 'in Chrome open the menu <b>⋮</b> → <b>Install app</b> (or <b>Add to Home screen</b>). On a computer, use the install icon at the right end of the address bar.'}</p>
+    <p class="hint">Use the same browser you normally sign in with — an app installed from Chrome isn't visible to Samsung Internet, and the other way round.</p>
+    <div class="actions" style="justify-content:flex-end"><button class="btn primary" onclick="closeModal()">OK</button></div>`);
+}
+async function installApp(){ const e = S._installEvt; if (!e) { installHelp(); return; } e.prompt(); await e.userChoice.catch(()=>{}); S._installEvt = null; }
 
 /* page actions: keep the main one or two visible, the rest go under "More" */
 function compactActions(){
@@ -1052,7 +1105,7 @@ function renderBudget(){
     return `<div class="${cls}"><b>${s[0]}</b><small>${done ? (b[s[1]] ? fmtDate(b[s[1]]) : 'Done') : (i===curIdx ? (b.status==='returned'?'Returned — needs changes':'In progress') : s[2])}</small></div>`; }).join('')}</div>
   ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
   ${b.status==='returned' && lastReturn ? `<div class="banner red"><b>Returned by ${esc(userName(lastReturn.actor_id))}:</b> ${esc(lastReturn.note)}</div>` : ''}
-  ${myPreqStrip(b)}
+  ${myPreqStrip(b)}${cxeBanner(b)}
   <div class="stats">
     <div class="stat opex"><div class="eyebrow">OPEX</div><div class="v">${short(opexT)}</div><div class="s">${S.opex.length} line${S.opex.length===1?'':'s'} · ${peso(opexT)}</div></div>
     <div class="stat capex"><div class="eyebrow">CAPEX</div><div class="v">${short(capexT)}</div><div class="s">${S.capex.length} item${S.capex.length===1?'':'s'} · ${peso(capexT)}</div></div>
@@ -1107,14 +1160,14 @@ function opexTableHtml(checks){
 }
 function renderCapexTable(ed, checks){
   const list = filterLines(S.capex, ['category','asset','description','priority']);
-  const tb = `<div class="toolbar">${ed?'<button class="btn primary" onclick="editLine(\'capex\')">Add CAPEX item</button>':''}<span class="grow"></span><span style="color:var(--faint);font-size:12.5px">CAPEX: ₱${Number(S.cycle.capex_threshold).toLocaleString()} or more per unit and used for more than a year</span></div>`;
+  const tb = cxeIncomingHtml(budgetById(S.budgetId)) + `<div class="toolbar">${ed?'<button class="btn primary" onclick="editLine(\'capex\')">Add CAPEX item</button>':''}<span class="grow"></span><span style="color:var(--faint);font-size:12.5px">CAPEX: ₱${Number(S.cycle.capex_threshold).toLocaleString()} or more per unit and used for more than a year</span></div>`;
   if (!S.capex.length) return tb + `<div id="capexCarry"></div><div class="empty"><b>No CAPEX items yet</b>${ed?'Add assets or projects such as machinery, vehicles, IT equipment or plant improvements.':'This department has not added CAPEX items.'}</div>`;
   const AC = S.cx.cache.ac; if (!AC) { loadAssetClasses().then(()=>{ if (S.tab==='capex') renderBudget(); }).catch(console.error); }
   const dp = l => AC ? lineDepr({ ...l, year:S.cycle.year }, AC) : null, dT = AC ? sum(list.map(l=>dp(l).inYear)) : 0, dY = AC ? sum(list.map(l=>dp(l).yr)) : 0;
   const locked = S.cycle.status==='locked', b = budgetById(S.budgetId), canSt = b && canSetCapexStatus(b.department_id);
   return tb + `<div id="capexCarry"></div><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th class="r" title="Straight-line depreciation, from the month after purchase">Depreciation<br>${S.cycle.year} / full year</th>${locked?'<th>Status</th>':''}<th></th></tr></thead><tbody>
   ${list.map(l=>{ const d = dp(l); return `<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
-    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}</td>
+    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}${cxeRowNote(l)}</td>
     <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}</td>
     <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${d?(d.life?`${short(d.inYear)} / ${short(d.yr)}`:'<span class="hint">not depreciated</span>'):''}</td>
     ${locked?`<td onclick="event.stopPropagation()">${capexChip(l.impl_status)}${canSt?` <a class="hint" style="cursor:pointer;color:var(--teal)" onclick="S.cx.cache={};capexStatusDialog('${l.id}')">Update</a>`:''}</td>`:''}<td>${flagFor(checks,'capex',l.id)}</td></tr>`; }).join('')}
@@ -1294,7 +1347,7 @@ function editLine(kind, id){
       <div class="row-flex" style="margin-top:8px"><input class="inp" id="lineCmt" placeholder="Ask a question or leave a note" style="flex:1"><button class="btn" onclick="addComment('${kind}','${id}','lineCmt')">Post</button></div>`:''}
     </div>
     <footer>
-      <div class="actions">${ed&&id?`<button class="btn danger" onclick="deleteLine('${kind}','${id}')">Delete</button><button class="btn ghost" onclick="duplicateLine('${kind}','${id}')">Duplicate</button>`:''}</div>
+      <div class="actions">${ed&&id?`<button class="btn danger" onclick="deleteLine('${kind}','${id}')">Delete</button><button class="btn ghost" onclick="duplicateLine('${kind}','${id}')">Duplicate</button>`:''}${!isO?endorseBtn(b,id):''}</div>
       <div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveLine('${kind}','${id||''}')">Save line</button>`:''}</div>
     </footer>
   </div>`;
@@ -1352,7 +1405,8 @@ async function cxSimilar(){
   const ro = fa.disabled, depts = [...new Set(rows.map(r=>r.department))];
   box.innerHTML = `<div class="ins amber" style="margin:0 0 12px"><b>Similar project proposed by ${esc(depts.join(' and '))}</b>
     <ul style="margin:6px 0">${rows.map(r=>`<li>${esc(r.department)}: ${esc(r.asset)}${r.category?` <span class="hint">(${esc(r.category)}, ${esc(STATUS_LABEL[r.status]||r.status)})</span>`:''}</li>`).join('')}</ul>
-    Talk to ${esc(depts.join(' and '))} to check whether one project can serve both departments, so the plant does not buy twice. ${ro?'':'If yours is still needed, explain how it is different — the reviewers will see this.'}</div>
+    Talk to ${esc(depts.join(' and '))} to check whether one project can serve both departments, so the plant does not buy twice. ${ro?'':'If yours is still needed, explain how it is different — the reviewers will see this.'}
+    ${S._editingId && canEndorse(b) && !cxePendingFor(S._editingId) ? `<div style="margin-top:8px">Or, if it belongs to them: <button type="button" class="btn sm" onclick="endorseLine(S._editingId,'${S.depts.find(d=>d.name===depts[0])?.id||''}')">Endorse this item to ${esc(depts[0])}</button></div>`:''}</div>
     <div class="field"><label for="f_simnote">How this differs from ${esc(depts.join(' / '))}'s proposal${ro?'':' (required to save)'}</label><textarea class="inp" id="f_simnote" rows="3" placeholder="e.g. Ours is a 3-ton forklift for the press line; Warehouse's is for loading bay — different capacity and location. Talked to Warehouse on Oct 8." ${ro?'disabled':''}>${esc(l.similar_note||'')}</textarea></div>`;
 }
 async function saveLine(kind, id){
@@ -1478,6 +1532,7 @@ async function renderOverview(){
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
+    ${cxeBadge()?`<div class="banner blue"><b>${cxeBadge()} CAPEX item${cxeBadge()>1?'s':''} endorsed between departments</b> waiting to be accepted or declined: ${[...new Set(S.cxe.filter(e=>e.status==='pending').map(e=>dName(e.from_dept)+' → '+dName(e.to_dept)))].map(esc).join(', ')}. Open the receiving department's CAPEX tab to answer.</div>`:''}
     ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
@@ -4449,6 +4504,84 @@ async function pennyApply(i, j){
     p.state = 'done'; pennySave(); pennyRender(); toast('Done — Penny\'s change is in the budget');
     if (S.view==='budget' && S.budgetId===b.id) openBudget(b.id);
   } catch(e){ fail(e); }
+}
+
+/* ================= CAPEX ENDORSEMENT =================
+   A department (or a reviewer) hands a CAPEX item over to the department that should own it.
+   The receiving department accepts (the item moves into their budget) or declines with a reason. */
+S.cxe = [];
+async function loadEndorse(){ try { const { data } = await sb.from('bgt_capex_endorsements').select('*').eq('cycle_id', S.cycle.id).order('created_at', { ascending:false }); S.cxe = data||[]; } catch(e){ S.cxe = []; } return S.cxe; }
+const dName = id => deptById(id)?.name || 'another department';
+const canEndorse = b => !!b && S.cycle.status==='open' && (canEdit(b) || isReviewer());
+const canAnswerCxe = e => isReviewer() || (['dept_manager','preparer'].includes(S.me.role) && S.me.department_id===e.to_dept);
+const cxePendingFor = line => S.cxe.find(e => e.line_id===line && e.status==='pending');
+const cxeIncoming = dept => S.cxe.filter(e => e.status==='pending' && e.to_dept===dept);
+// for the nav and overview: what is waiting for me to answer
+const cxeBadge = () => S.cxe.filter(e => e.status==='pending' && (isReviewer() ? true : e.to_dept===S.me.department_id)).length;
+
+function cxeRowNote(l){
+  const p = cxePendingFor(l.id); if (p) return `<div style="font-size:11.5px;color:var(--blue-text,var(--teal))">Endorsed to ${esc(dName(p.to_dept))} — waiting for them to accept</div>`;
+  const d = S.cxe.find(e => e.line_id===l.id && e.status==='declined');
+  if (d) return `<div style="font-size:11.5px;color:var(--red)" title="${esc(d.reply||'')}">${esc(dName(d.to_dept))} declined the endorsement: ${esc(d.reply||'')}</div>`;
+  const a = S.cxe.find(e => e.line_id===l.id && e.status==='accepted');
+  if (a) return `<div style="font-size:11.5px;color:var(--muted)">Endorsed by ${esc(dName(a.from_dept))}, accepted ${fmtDate(a.decided_at)}</div>`;
+  return '';
+}
+// card on the receiving budget: items other departments handed over
+function cxeIncomingHtml(b){
+  const list = b ? cxeIncoming(b.department_id) : []; if (!list.length) return '';
+  return `<div class="card cxe-in"><h3>Endorsed to ${esc(dName(b.department_id))} — ${list.length} waiting for an answer</h3>
+    <p class="hint" style="padding:0 14px;margin:0 0 8px">Another department says these belong to you. Accept to move the item into this budget (you can edit it after), or decline and say why.</p>
+    ${list.map(e => { const s = e.snapshot||{}, can = canAnswerCxe(e); return `<div class="cxe-row">
+      <div class="cxe-main"><div class="item">${esc(s.category||'')}</div><div class="act">${esc(s.asset||'CAPEX item')}</div>
+        <div class="cxe-meta">${s.qty!=null?`${s.qty} × ${peso(s.unit_cost)} · `:''}<b class="num">${peso(s.annual)}</b>${s.priority?` · ${priPill(s.priority)}`:''}</div>
+        ${s.justification?`<div class="cxe-why"><b>Their justification:</b> ${esc(s.justification)}</div>`:''}
+        <div class="cxe-why"><b>From ${esc(dName(e.from_dept))}:</b> ${esc(e.note)} <span class="muted">· ${esc(userName(e.created_by))}, ${fmtDate(e.created_at)}</span></div></div>
+      <div class="cxe-act">${can?`<button class="btn sm primary" onclick="cxeAccept('${e.id}')">Accept into our budget</button><button class="btn sm ghost" onclick="cxeDecline('${e.id}')">Decline</button>`:'<span class="hint">Waiting for the department manager</span>'}</div></div>`; }).join('')}</div>`;
+}
+// page banner for whoever has something to answer, on any tab of the budget
+function cxeBanner(b){
+  if (!b) return ''; const n = cxeIncoming(b.department_id).length; if (!n) return '';
+  return `<div class="banner blue"><b>${n} CAPEX item${n>1?'s':''} endorsed to ${esc(dName(b.department_id))}.</b> <a style="cursor:pointer;font-weight:600" onclick="S.tab='capex';renderBudget()">Review on the CAPEX tab →</a></div>`;
+}
+function endorseBtn(b, id){
+  if (!id || !canEndorse(b)) return '';
+  const p = cxePendingFor(id);
+  return p ? `<button class="btn ghost" onclick="cxeCancel('${p.id}')">Withdraw endorsement</button>` : `<button class="btn ghost" onclick="endorseLine('${id}')">Endorse to another department</button>`;
+}
+function endorseLine(id, preDept){
+  const b = budgetById(S.budgetId), l = S.capex.find(x=>x.id===id); if (!b || !l) return;
+  const sim = preDept || (l.similar_dept && S.depts.find(d=>d.name===l.similar_dept)?.id);
+  const opts = S.depts.filter(d => d.id!==b.department_id && S.budgets.some(x=>x.department_id===d.id));
+  modal2(`<h3>Endorse to another department</h3>
+    <p class="hint">“${esc(l.asset||l.category||'This item')}” (${peso(annual(l))}) will be offered to the department you choose. It stays in ${esc(dName(b.department_id))}'s budget until they accept; if they decline you'll see their reason.</p>
+    <div class="field"><label for="cxeTo">Department that should own it</label><select class="inp" id="cxeTo"><option value="">Choose…</option>${opts.map(d=>`<option value="${d.id}" ${d.id===sim?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="cxeNote">Why it belongs to them (they will see this)</label><textarea class="inp" id="cxeNote" rows="3" placeholder="e.g. Same forklift as Warehouse's proposal; they operate the loading bay and own the unit. Agreed with Warehouse manager on Oct 8."></textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="cxeGo">Endorse</button></div>`);
+  $('#cxeGo').onclick = async () => {
+    const to = $('#cxeTo').value, note = $('#cxeNote').value.trim();
+    if (!to) return toast('Choose the department.', true); if (!note) { toast('Say why it belongs to them.', true); return $('#cxeNote').focus(); }
+    const { error } = await sb.rpc('bgt_capex_endorse', { p_line:id, p_to_dept:to, p_note:note }); if (error) return fail(error);
+    closeModal2(); closeDrawer(); await loadEndorse(); toast(`Endorsed to ${dName(to)} — waiting for them to accept`); renderNav(); renderBudget();
+  };
+}
+async function cxeAccept(id){
+  const e = S.cxe.find(x=>x.id===id); if (!e) return;
+  const { error } = await sb.rpc('bgt_capex_endorse_decide', { p_id:id, p_accept:true, p_reply:null }); if (error) return fail(error);
+  await loadEndorse(); toast(`Accepted — “${e.snapshot?.asset||'item'}” is now in ${dName(e.to_dept)}'s CAPEX`); renderNav(); route();
+}
+function cxeDecline(id){
+  const e = S.cxe.find(x=>x.id===id); if (!e) return;
+  modal2(`<h3>Decline this endorsement?</h3><p class="hint">“${esc(e.snapshot?.asset||'Item')}” stays with ${esc(dName(e.from_dept))}. Tell them why so they can keep it, change it or drop it.</p>
+    <div class="field"><label for="cxeRe">Reason</label><textarea class="inp" id="cxeRe" rows="3" placeholder="e.g. We already have two forklifts for the press line; this unit is for the loading bay."></textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn danger" id="cxeReGo">Decline</button></div>`);
+  $('#cxeReGo').onclick = async () => { const r = $('#cxeRe').value.trim(); if (!r) return toast('Give a reason.', true);
+    const { error } = await sb.rpc('bgt_capex_endorse_decide', { p_id:id, p_accept:false, p_reply:r }); if (error) return fail(error);
+    closeModal2(); await loadEndorse(); toast('Declined — the other department will see your reason'); renderNav(); route(); };
+}
+async function cxeCancel(id){
+  const { error } = await sb.rpc('bgt_capex_endorse_cancel', { p_id:id }); if (error) return fail(error);
+  closeDrawer(); await loadEndorse(); toast('Endorsement withdrawn'); renderNav(); renderBudget();
 }
 
 boot();

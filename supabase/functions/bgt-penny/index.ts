@@ -197,6 +197,8 @@ Deno.serve(async (req) => {
     if (!u || !u.active || u.role === 'pending') return json({ error:'Your account has no budget access yet.' }, 403);
     me = u; db = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, { global:{ headers:{ Authorization:'Bearer ' + jwt } } });
   }
+  // admin previewing a department manager's view: answer exactly as that manager would be answered (RLS already applies it to db)
+  if (me.role === 'admin' && me.view_as?.department_id) me = { ...me, role:'dept_manager', department_id:me.view_as.department_id };
   const { count } = await svc.from('bgt_ai_log').select('id', { count:'exact', head:true }).eq('user_id', me.id).gte('created_at', new Date(Date.now() - 3600e3).toISOString());
   if ((count || 0) >= 80) return json({ error:'Penny needs a break — the hourly limit is reached. Try again later.' }, 429);
   let key = Deno.env.get('ANTHROPIC_API_KEY') || '';

@@ -504,7 +504,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 17:04</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 17:12</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -999,7 +999,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:04</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:12</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2554,7 +2554,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['raw_boards_imported','Raw boards received (imported, for production)','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['raw_boards_imported','Raw boards received (imported, for production)','boards','num'],['volume_local_trade','Trade boards bought locally','boards','num'],['raw_boards_sold','Raw boards sold as-is','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
   ['oee_press1_pct','OEE — Press 1','%','pct'],['oee_press2_pct','OEE — Press 2','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;
@@ -2601,7 +2601,7 @@ async function renderPerf(){
       ${KPI_DEFS.filter(d=>rv||!d[0].startsWith('sales_')).map(kRow).join('')}
       <tr class="calc"><td class="act">${OPX()} OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
-      <tr class="calc"><td class="act">Trade share of boards sold<div class="item" style="text-transform:none">imported, or sold − produced</div></td>${MONTHS.map((_,i)=>{ const s0 = g('volume_sold',i+1), im = g('volume_imported',i+1) ?? (s0!=null && g('production_output',i+1)!=null ? Math.max(0, s0 - g('production_output',i+1)) : null); return `<td class="r num">${s0&&im!=null?(100*im/s0).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>g('volume_sold',m) && (g('volume_imported',m)!=null || g('production_output',m)!=null)); if (!ms.length) return ''; const so = sum(ms.map(m=>g('volume_sold',m))), im = sum(ms.map(m=>g('volume_imported',m) ?? Math.max(0, g('volume_sold',m) - g('production_output',m)))); return so?(100*im/so).toFixed(0)+'%':''; })()}</td></tr>
+      ${perfTradeRows(g)}
       ${pP && pV ? `<tr class="calc"><td class="act">OPEX per board sold<div class="item" style="text-transform:none">produced + traded — for warehouse and logistics</div></td>${opexM.map((v,i)=>{ const p = g('volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${peso(pV.opex/pV.k,2)}</td></tr>` : ''}
       <tr class="calc"><td class="act">Capacity utilization<div class="item" style="text-transform:none">output ÷ capacity</div></td>${MONTHS.map((_,i)=>{ const p = g('production_output',i+1) ?? g('volume_sold',i+1), c = g('capacity_boards',i+1) ?? (g('capacity_boards',0)!=null ? g('capacity_boards',0)/12 : null); return `<td class="r num">${p!=null&&c?(100*p/c).toFixed(0)+'%':''}</td>`; }).join('')}<td class="r num">${(()=>{ const ms = MONTHS.map((_,i)=>i+1).filter(m=>(g('production_output',m)??g('volume_sold',m))!=null && (g('capacity_boards',m)!=null || g('capacity_boards',0)!=null)); if (!ms.length) return ''; const p = sum(ms.map(m=>g('production_output',m)??g('volume_sold',m))), c = sum(ms.map(m=>g('capacity_boards',m) ?? g('capacity_boards',0)/12)); return c?(100*p/c).toFixed(0)+'%':''; })()}</td></tr>
       ${!rv?'':`<tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>`}
@@ -2612,6 +2612,20 @@ async function renderPerf(){
     <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
     fiYearTable(Y);
   } catch(e){ fail(e); }
+}
+/* trade boards: sold − produced is the true trade volume (imports, local purchases and raw boards sold as-is all count).
+   Recorded receipts show how much of it is documented; above 100% means stock was built, below means stock was drawn or receipts are missing. */
+function perfTradeRows(g){
+  const ms = MONTHS.map((_,i)=>i+1);
+  const gap = m => { const s0 = g('volume_sold',m), p = g('production_output',m); return s0!=null && p!=null ? Math.max(0, s0-p) : null; };
+  const rec = m => { const v = ['volume_imported','volume_local_trade','raw_boards_sold'].map(k=>g(k,m)).filter(x=>x!=null); return v.length ? sum(v) : null; };
+  const trade = m => gap(m) ?? rec(m);
+  const pct = (a,b) => a!=null && b ? (100*a/b).toFixed(0)+'%' : '';
+  const tm = ms.filter(m=>g('volume_sold',m) && trade(m)!=null), tS = sum(tm.map(m=>g('volume_sold',m))), tT = sum(tm.map(trade));
+  const rm = ms.filter(m=>gap(m) && rec(m)!=null), rG = sum(rm.map(gap)), rR = sum(rm.map(rec));
+  const r1 = `<tr class="calc"><td class="act">Trade share of boards sold<div class="item" style="text-transform:none">sold − produced (imported, local, raw sold as-is)</div></td>${ms.map(m=>`<td class="r num">${pct(trade(m), g('volume_sold',m))}</td>`).join('')}<td class="r num">${tm.length?pct(tT,tS):''}</td></tr>`;
+  const r2 = rm.length ? `<tr class="calc"><td class="act">Trade covered by recorded receipts<div class="item" style="text-transform:none">imported + local + raw sold ÷ (sold − produced); over 100% = stock built</div></td>${ms.map(m=>`<td class="r num">${gap(m)&&rec(m)!=null?pct(rec(m),gap(m)):''}</td>`).join('')}<td class="r num">${pct(rR,rG)}</td></tr>` : '';
+  return r1 + r2;
 }
 /* yield efficiency and Class B (reject) against target, across years */
 async function fiYearTable(Y){

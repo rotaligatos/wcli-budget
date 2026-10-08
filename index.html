@@ -504,7 +504,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 16:14</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 16:39</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -999,7 +999,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 16:14</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 16:39</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3574,17 +3574,17 @@ document.addEventListener('input', e => { if (!e.target.classList?.contains('ut'
   if (c) c.textContent = q && a ? peso(a/q,2) : ''; });
 
 /* ================= STORES WITHDRAWALS (WRF/WRS issues from the plant's consumption report) ================= */
-const STORE_DEPT = { 'ADMIN':'ADMIN','ADMIN OFFICE':'ADMIN','ENGINEERING AND MAINTENANCE':'ENG','ENGINEERING':'ENG','LOGISTIC':'LOG','LOGISTICS':'LOG','PPIC':'PPIC','PRODUCTION':'PROD','QA/QC':'QA','Q.A.':'QA','QA':'QA','WAREHOUSE':'WH','IT':'IT' };
+const STORE_DEPT = { 'ADMIN':'ADMIN','ADMIN OFFICE':'ADMIN','ENGINEERING AND MAINTENANCE':'ENG','ENGINEERING':'ENG','LOGISTIC':'LOG','LOGISTICS':'LOG','PPIC':'PPIC','PRODUCTION':'PROD','QA/QC':'QA','Q.A.':'QA','QA':'QA','WAREHOUSE':'WH','IT':'IT','FACTORY IMPROVEMENT':'ENG' };
 const STORE_MACH = /PRESS|BOILER|MIP|RAW BOARD|EBT|PAPER LAMINATE/;
 const stU = v => String(v??'').replace(/\s+/g,' ').trim().toUpperCase();
 function storeDept(d, sec){ return stU(sec)==='IT SECTION' ? 'IT' : STORE_DEPT[stU(d)] || null; }
 function storeSection(s){ s = stU(s); return ({ 'EBT SECTION':'EBT', 'WORLD URBAN':'WORLD URBAN (ANNEX)', 'PRODUCTION OFFICE':'OFFICE' })[s] || s || 'UNSPECIFIED'; }
-function storeCat(c){ c = stU(c); return ({ 'ENGINE FUEL':'FUEL & LUBRICANT', 'AUTOMOTIVE LUBRICANT':'FUEL & LUBRICANT', 'CLEANING & SANITATION MATERIAL':'CLEANING MATERIAL' })[c] || c || 'UNCATEGORIZED'; }
+function storeCat(c){ c = stU(c); return ({ 'ENGINE FUEL':'FUEL & LUBRICANT', 'AUTOMOTIVE LUBRICANT':'FUEL & LUBRICANT', 'CLEANING & SANITATION MATERIAL':'CLEANING MATERIAL', 'CLEANING MATERIALS':'CLEANING MATERIAL', 'STATIONERY & SUPPLIES':'STATIONARY & SUPPLIES' })[c] || c || 'UNCATEGORIZED'; }
 /* which budget line a withdrawal belongs to — best fit from store category, section and item */
 function storeLine(cat, sec, item){
   const c = stU(cat), s = stU(sec), i = stU(item);
   if (/FUEL|LUBRICANT/.test(c)) return (/DIESEL|GASOLINE|LPG|KEROSENE|BUNKER|FUEL/.test(i) || c==='ENGINE FUEL') ? 'GAS AND OIL' : STORE_MACH.test(s) ? 'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT' : 'GAS AND OIL';
-  if (['SPARE PARTS','REPAIR & MAINTENANCE'].includes(c) || (c==='MATERIAL & SUPPLIES' && /FACILITY|PROJECT|HLYT/.test(s))) {
+  if (['SPARE PARTS','REPAIR & MAINTENANCE','LABOR & MATERIALS'].includes(c) || (c==='MATERIAL & SUPPLIES' && /FACILITY|PROJECT|HLYT/.test(s))) {
     if (/FORKLIFT/.test(s)) return 'REPAIRS AND MAINTENANCE - FORKLIFT';
     if (/TRUCK/.test(s)) return 'REPAIRS AND MAINTENANCE - DELIVERY VEHICLE';
     if (/STRADA|MOTORCYCLE|AVANZA/.test(s)) return 'REPAIRS AND MAINTENANCE - COMPANY SERVICE VEHICLES';
@@ -3672,10 +3672,10 @@ function parseStoresWorkbook(wb){
   const out = [], skipped = { receipts:0, noDept:{}, noValue:0 };
   wb.worksheets.filter(ws=>/^transaction/i.test(ws.name.trim()) && !/\(RR\)/i.test(ws.name)).forEach(ws => {
     let hr = 0, H = [];
-    for (let r=1; r<=Math.min(10, ws.rowCount); r++) { const v = ws.getRow(r).values.map(x=>stU(cv(x))); if (v.includes('DATE') && v.includes('TOTAL')) { hr = r; H = v; break; } }
+    for (let r=1; r<=Math.min(10, ws.rowCount); r++) { const v = Array.from(ws.getRow(r).values, x=>stU(cv(x))); if ((v.includes('DATE') || v.includes('MONTH/DATE') || v.includes('TRANSACTION DATE')) && v.includes('TOTAL')) { hr = r; H = v; break; } }
     if (!hr) return;
     const ix = (...n) => { const i = H.findIndex(h=>n.includes(h)); return i>0 ? i : null; };
-    const c = { date:ix('DATE'), inv:ix('INVENTORIABLE ITEM'), non:ix('NON-INVENTORIABLE ITEM'), cat:ix('ITEM CATEGORY'), dept:ix('DEPARTMENT'), sec:ix('SECTION'), inQ:ix('IN'), out:ix('OUT','QUANTITY'), ref:ix('WRF NO.','WRF','WRS NO.','WRS'), price:ix('PRICE'), tot:ix('TOTAL') };
+    const c = { date:ix('DATE','MONTH/DATE','TRANSACTION DATE'), inv:ix('INVENTORIABLE ITEM','ITEM DESCRIPTION','ITEM'), non:ix('NON-INVENTORIABLE ITEM'), cat:ix('ITEM CATEGORY'), dept:ix('DEPARTMENT'), sec:ix('SECTION'), inQ:ix('IN'), out:ix('OUT','QUANTITY'), ref:ix('WRF NO.','WRF','WRS NO.','WRS'), price:ix('PRICE'), tot:ix('TOTAL') };
     for (let r=hr+1; r<=ws.rowCount; r++) {
       const row = ws.getRow(r), g = k => c[k] ? cv(row.getCell(c[k]).value) : null;
       let d = g('date'); if (!d) continue;
@@ -3702,7 +3702,7 @@ function importStoresDialog(){
     $('#stMsg').innerHTML = '<p class="hint">Reading…</p>';
     try {
       const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); parsed = parseStoresWorkbook(wb);
-      if (!parsed.rows.length) { $('#stMsg').innerHTML = '<p>No withdrawal transactions found. The file needs a sheet named "transaction…" with DATE, DEPARTMENT, SECTION, ITEM CATEGORY and TOTAL columns.</p>'; return; }
+      if (!parsed.rows.length) { $('#stMsg').innerHTML = '<p>No withdrawal transactions found. The file needs a sheet named "transaction…" with a date column (DATE or MONTH/DATE), DEPARTMENT, SECTION, ITEM CATEGORY and TOTAL.</p>'; return; }
       const ys = {}; parsed.rows.forEach(r => { const y = (ys[r.y] ||= { m:new Set(), n:0, a:0 }); y.m.add(r.m); y.n++; y.a += r.amount; });
       const nd = Object.entries(parsed.skipped.noDept);
       $('#stMsg').innerHTML = `<table class="ledger"><thead><tr><th>Year</th><th>Months</th><th class="r">Withdrawals</th><th class="r">Amount</th></tr></thead><tbody>${Object.entries(ys).map(([y,v])=>{ const m = [...v.m].sort((a,b)=>a-b); return `<tr><td>${y}</td><td>${MONTHS[m[0]-1]}–${MONTHS[m[m.length-1]-1]}</td><td class="r num">${v.n.toLocaleString('en-PH')}</td><td class="r num">${peso(v.a)}</td></tr>`; }).join('')}</tbody></table>

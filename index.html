@@ -504,7 +504,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 16:39</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 17:04</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -999,7 +999,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 16:39</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:04</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2554,7 +2554,7 @@ async function applySuggestion(){
 /* ================= SALES & PLANT PERFORMANCE ================= */
 const KPI_DEFS = [
   ['sales_target','Sales target','₱','money'],['sales_actual','Sales actual','₱','money'],
-  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
+  ['volume_target','Volume target','boards','num'],['volume_sold','Volume sold','boards','num'],['volume_imported','Trade boards received (imported)','boards','num'],['raw_boards_imported','Raw boards received (imported, for production)','boards','num'],['production_required','Boards required by sales (production less Class B)','boards','num'],['production_output','Production output','boards','num'],['yield_target_pct','Production yield efficiency — target','%','pct'],['yield_actual_pct','Production yield efficiency — actual','%','pct'],['capacity_boards','Plant capacity (85% of design, unchanged since 2019)','boards','num'],['production_target','Fixed production plan (only at full capacity)','boards','num'],
   ['oee_press1_pct','OEE — Press 1','%','pct'],['oee_press2_pct','OEE — Press 2','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;

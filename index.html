@@ -408,6 +408,7 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
   .ph .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 .basis-working{background:var(--blue-wash);color:var(--blue)}.basis-submitted{background:var(--amber-wash);color:var(--amber)}.basis-approved{background:var(--green-wash);color:var(--green)}
+.il-list{display:flex;flex-direction:column;gap:6px}.il-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
 .preq-strip ul{margin:6px 0;padding-left:18px}.preq-strip li{margin:2px 0}.preq-strip .muted{opacity:.8;font-size:12.5px}.preq-act{display:flex;gap:12px;align-items:center;margin-top:4px}.preq-act a{cursor:pointer;color:var(--teal);font-weight:600}
 .banner.amber{background:var(--amber-wash);border-color:var(--amber-line);color:var(--amber-text)}.banner.green{background:var(--green-wash);border-color:var(--green-line);color:var(--green-text)}
 .pri-ok{background:var(--green-wash);color:var(--green)}
@@ -502,7 +503,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 09:58</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 10:35</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -892,7 +893,7 @@ async function loadMaster(){
 async function loadBudgets(){
   const { data, error } = await sb.from('bgt_dept_budgets').select('*').eq('cycle_id', S.cycle.id); if (error) throw error;
   S.budgets = data.sort((a,b)=> (deptById(a.department_id)?.sort||0) - (deptById(b.department_id)?.sort||0));
-  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{}), loadEndorse()]);
+  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{}), loadEndorse(), loadPlantSet()]);
   renderNav();
 }
 const deptById = id => S.depts.find(d=>d.id===id);
@@ -997,7 +998,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 09:58</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 10:35</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2020,14 +2021,14 @@ const today = () => new Date().toISOString().slice(0,10);
 function priceMatches(p, q){ q = (q||'').toLowerCase(); return !q || [p.item,p.category,p.supplier,p.quote_ref,p.notes].some(v=>String(v||'').toLowerCase().includes(q)); }
 async function renderPrices(){
   mainLoading('Loading price list…');
-  try { await loadPrices(true); await loadPriceReqs(); } catch(e){ return fail(e); }
+  try { await loadPrices(true); await Promise.all([loadPriceReqs(), loadPlantSet()]); } catch(e){ return fail(e); }
   setTimeout(markPreqsSeen, 1500);
   const cats = [...new Set(S.prices.map(p=>p.category).filter(Boolean))].sort();
   $('#main').innerHTML = `
   <div class="ph"><div><div class="eyebrow">${esc(S.company.name)}</div><h1>Price list</h1>
     <div class="sub">Standard ${S.cycle.year} prices (set by the Head of Plant Operations — every department must use them) plus quotations and reference prices.</div></div>
     <div class="actions"><button class="btn primary" onclick="editPrice()">Add item price</button><button class="btn" onclick="aiPriceDialog()">Look up price online</button><button class="btn" onclick="importPricesDialog()">Import Excel</button><button class="btn ghost" onclick="exportPrices()">Download list / template</button></div></div>
-  ${preqCardHtml()}
+  ${preqCardHtml()}${plantSetCardHtml()}
   <div class="card"><div class="toolbar"><input class="inp" placeholder="Search item, supplier, quote" aria-label="Search prices" value="${esc(S.pr.q)}" oninput="S.pr.q=this.value;$('#prTable').innerHTML=priceTableHtml()">
     <select class="inp" style="max-width:260px" aria-label="Category" onchange="S.pr.cat=this.value;$('#prTable').innerHTML=priceTableHtml()"><option value="">All categories</option>${cats.map(c=>`<option ${c===S.pr.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
     <span class="grow"></span><span class="hint">${S.prices.length} items</span></div>
@@ -4121,8 +4122,41 @@ function itemStdNote(it, i, ed){
   if (sp) return `<div class="it-std warn">A standard ${S.cycle.year} price exists: <b>${esc(sp.item)}</b> ${peso(sp.unit_price,2)}/${esc(sp.unit||'unit')}.${ed?` <a onclick="useStd(${i},'${sp.id}')">Use it</a>`:''}</div>`;
   const rq = it.req && (S.preqs||[]).find(r=>r.id===it.req);
   if (rq) return `<div class="it-std ${rq.status==='open'?'wait':'ok'}">${rq.status==='open'?'Standard price requested — waiting for the Head of Plant Operations.':rq.status==='answered'?`Answered: ${peso(rq.answer_price,2)}/${esc(rq.answer_unit||rq.unit||'unit')}${rq.answer_note?' — '+esc(rq.answer_note):''}.`:`Request declined${rq.answer_note?': '+esc(rq.answer_note):''} — keep your estimate.`}</div>`;
-  return ed && it.name && (it.src||'estimate')==='estimate' ? `<div class="it-std"><a onclick="askStdPrice(${i})">No known price — ask the Head of Plant Operations for a standard price</a></div>` : '';
+  if (!ed || !it.name || (it.src||'estimate')!=='estimate') return '';
+  // only plant-wide cost drivers (fuel, exchange rate, boards, utilities…) are set by the Head of Plant Operations; everything else is found or estimated here
+  if (isPlantSet(it.name)) return `<div class="it-std warn">Plant-wide cost (fuel, exchange rate, boards, utilities) — the Head of Plant Operations sets the price everyone uses. <a onclick="askStdPrice(${i})">Ask for the price to use</a></div>`;
+  return `<div class="it-std">No price on the list yet: <a onclick="itemFind(${i})">search the price list</a> · <a onclick="itemLookup(${i})">look up online</a> · or keep your estimate and say where it came from.</div>`;
 }
+/* which items are plant-wide cost drivers — editable on the Price list page */
+const PLANT_SET_DEFAULT = ['diesel','gasoline','fuel','lpg','bunker','electricity','kwh','meralco','water','exchange rate','usd','dollar','board','mdf','particle board','particleboard','plywood','melamine','decor paper','substrate','resin'];
+async function loadPlantSet(){ try { const { data } = await sb.from('bgt_settings').select('value').eq('key','plant_set_prices').maybeSingle(); S.plantSet = Array.isArray(data?.value) && data.value.length ? data.value : PLANT_SET_DEFAULT; } catch(_){ S.plantSet = PLANT_SET_DEFAULT; } return S.plantSet; }
+function isPlantSet(name){ const n = ' ' + String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' '; return (S.plantSet||PLANT_SET_DEFAULT).some(k => { const w = String(k).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); return w && n.includes(' '+w+' '); }); }
+function plantSetCardHtml(){
+  if (!canManageData()) return '';
+  return `<div class="card" style="margin-bottom:16px"><h3>Prices set by the plant</h3><p class="hint" style="padding:0 14px;margin:0 0 6px">Items matching these words are plant-wide cost drivers: managers are asked to request the price from you instead of estimating. Every other item is found on the price list, looked up online, or estimated by the manager. Mark the price you decide as <b>Standard ${S.cycle.year}</b>.</p>
+    <div style="padding:0 14px 12px"><textarea class="inp" id="psWords" rows="2">${esc((S.plantSet||PLANT_SET_DEFAULT).join(', '))}</textarea>
+    <div class="row-flex" style="margin-top:6px"><button class="btn sm primary" onclick="savePlantSet()">Save</button><button class="btn sm ghost" onclick="$('#psWords').value=PLANT_SET_DEFAULT.join(', ')">Reset to default</button></div></div></div>`;
+}
+async function savePlantSet(){ const v = $('#psWords').value.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean); const r = await sb.from('bgt_settings').upsert({ key:'plant_set_prices', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error); S.plantSet = v; toast('Saved'); }
+// put the cursor in the item name and show the price list matches
+function itemFind(i){ const e = $('#itN'+i); if (!e) return; e.focus(); itemSearch(i); toast('Pick a match from the list under the name, or change the words.'); }
+// online price lookup for one item; picking a result sets the item price as a market estimate
+async function itemLookup(i){
+  const it = S._items[i]; if (!it) return;
+  modal2(`<h3>Look up a price online</h3><p class="hint">Searches Philippine websites for <b>${esc(it.name)}</b> and lists prices it actually finds, with links. Use one as your estimate — it is a market reference, not a quotation.</p>
+    <div class="row-flex"><input class="inp" id="ilQ" value="${esc(it.name)}" style="flex:1" onkeydown="if(event.key==='Enter')itemLookupGo(${i})"><button class="btn primary" id="ilGo" onclick="itemLookupGo(${i})">Search</button></div><div id="ilOut" style="margin-top:10px"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Close</button></div>`);
+  itemLookupGo(i);
+}
+async function itemLookupGo(i){
+  const q = $('#ilQ')?.value.trim(); if (!q) return; $('#ilGo').disabled = true; $('#ilOut').innerHTML = AI_BUSY('Searching and reading pages… about 20–30 seconds.');
+  try { const r = await ai({ mode:'price_lookup', query:q }); S._il = r.prices||[];
+    $('#ilOut').innerHTML = `<p>${esc(r.summary||'')}</p>${r.caveat?`<p class="hint">${esc(r.caveat)}</p>`:''}${S._il.length ? `<div class="il-list">${S._il.map((p,k)=>`<div class="il-row"><div><b>${esc(p.item)}</b><div class="hint">${esc(p.seller||'')}${p.date_text?' · '+esc(p.date_text):''}${p.url?` · <a href="${esc(p.url)}" target="_blank" rel="noopener">source</a>`:''}</div></div><button class="btn sm" onclick="itemUseLookup(${i},${k})">Use ${peso(p.price,2)}${p.unit?'/'+esc(p.unit):''}</button></div>`).join('')}</div>` : '<p class="hint">Nothing found — keep your estimate and note where it came from.</p>'}`;
+  } catch(e){ $('#ilOut').innerHTML = `<div class="banner red">${esc(e.message)}</div>`; }
+  finally { const b = $('#ilGo'); if (b) b.disabled = false; }
+}
+function itemUseLookup(i, k){ const p = S._il[k], it = S._items[i]; if (!p || !it) return;
+  Object.assign(it, { price:Number(p.price)||it.price, unit:it.unit||p.unit||'', src:'estimate', ref:`Online: ${p.seller||'web'}${p.date_text?' '+p.date_text:''}` }); closeModal2(); drawItems(); toast('Price set from the online lookup — save the line to keep it'); }
 function useStd(i, pid){ const sp = (S.prices||[]).find(p=>p.id===pid), it = S._items[i]; if (!sp || !it) return;
   Object.assign(it, { price:Number(sp.unit_price), unit:sp.unit||it.unit, src:'price_list', adj:0, pid:sp.id, std:sp.budget_year, ref:sp.item }); delete it.req; drawItems(); }
 function askStdPrice(i){
@@ -4246,14 +4280,14 @@ async function fillMissingItems(){
 }
 
 /* ---------- standard price requests ---------- */
-async function loadPriceReqs(){ try { const { data } = await sb.from('bgt_price_requests').select('*').eq('year', S.cycle.year).order('created_at', { ascending:false }); S.preqs = data||[]; } catch(e){ S.preqs = []; } return S.preqs; }
+async function loadPriceReqs(){ if (!S.plantSet) loadPlantSet(); try { const { data } = await sb.from('bgt_price_requests').select('*').eq('year', S.cycle.year).order('created_at', { ascending:false }); S.preqs = data||[]; } catch(e){ S.preqs = []; } return S.preqs; }
 const preqBadge = () => isReviewer() ? (S.preqs||[]).filter(r=>r.status==='open').length : (S.preqs||[]).filter(r=>r.status!=='open' && r.requested_by===S.me.id && !r.seen_at).length;
 function preqCardHtml(){
   const R = canManageData(), list = (S.preqs||[]).filter(r => R || r.requested_by===S.me.id || r.department_id===S.me.department_id);
   if (!list.length) return '';
   const open = list.filter(r=>r.status==='open');
   return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)"><h3>Requests for a standard price — ${open.length} waiting</h3>
-    <p class="hint" style="padding:0 14px;margin:0 0 6px">${R?'Managers ask when an item has no standard price. Your answer becomes the price everyone uses, and every budget line that asked is updated.':'Your questions to the Head of Plant Operations about prices to use.'}</p>
+    <p class="hint" style="padding:0 14px;margin:0 0 6px">${R?'Managers ask only for plant-wide costs (fuel, exchange rate, boards, utilities). Your answer becomes the price everyone uses, and every budget line that asked is updated.':'Your questions to the Head of Plant Operations about plant-wide prices.'}</p>
     <div class="tbl-wrap"><table class="ledger" style="min-width:760px"><thead><tr><th>Item</th><th>Department</th><th class="r">Their estimate</th><th>Note</th><th>Answer</th></tr></thead><tbody>
     ${list.map(r=>`<tr><td class="act">${esc(r.item)}${r.unit?`<div class="item" style="text-transform:none">per ${esc(r.unit)}</div>`:''}${r.line_item?`<div class="item">${esc(r.line_item)}</div>`:''}</td><td style="font-size:12.5px">${esc(deptById(r.department_id)?.name||'')}<div class="item" style="text-transform:none">${fmtDate(r.created_at)}</div></td>
       <td class="r num">${r.suggested_price!=null?peso(r.suggested_price,2):'—'}</td><td style="font-size:12.5px;max-width:260px">${esc(r.note||'')}</td>
@@ -4750,6 +4784,7 @@ function ptItemsFor(l){
 async function ptInvoke(fn, body){
   await new Promise(r=>setTimeout(r, 700));
   if (fn==='bgt-ai' && body.mode==='draft_items') return { data:{ result:{ lines:(body.lines||[]).map(l=>({ key:l.key, note:'Practice: sample items from stores usage', items:ptItemsFor(l).map(x=>({ ...x, adj_pct:x.adj, month:x.m })) })) } }, error:null };
+  if (fn==='bgt-ai' && body.mode==='price_lookup') return { data:{ result:{ summary:'Practice: sample prices from 2 shops.', caveat:'Online retail prices — not quotations.', prices:[{ item:'Hydraulic hose assembly 1/2 in x 1 m', price:3200, unit:'pc', seller:'Sample Hardware', date_text:'Oct 2026' }, { item:'Hydraulic hose 1/2 in with fittings', price:3650, unit:'pc', seller:'Sample Industrial Supply', date_text:'Sep 2026' }] } }, error:null };
   if (fn==='bgt-penny') return { data:{ reply:ptPennyReply(body), proposals:[], tools:['get_budget'], model:'practice' }, error:null };
   return { data:{ error:'In practice mode this assistant feature gives no answer — try it for real after practice.' }, error:null };
 }
@@ -4826,19 +4861,19 @@ const PT_SC = [
       { id:'check', el:'.items-box', next:true, say:PT('Check each item: change the quantity or price, remove what you don\'t need (✕), add what is missing. You know your department best.','I-check ang bawat item: palitan ang dami o presyo, tanggalin ang hindi kailangan (✕), idagdag ang kulang. Ikaw ang mas nakakaalam.') },
       { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>SIMDB.bgt_opex_lines.some(l=>l.budget_id===PRT.B && (l.items||[]).length && !l.calc?.ai && l.id!==PRT.L1), say:PT('Tap **Save line** — the draft mark goes away once you have checked it.','I-tap ang **Save line** — mawawala ang draft mark kapag na-check mo na.') },
       { id:'fin', next:true, say:PT('Do the same for the other draft lines. That\'s it! 🎉','Gawin din sa ibang draft line. Tapos na! 🎉') } ] },
-  { id:'price', who:'mgr', mins:2, title:PT('Ask for a standard price','Humingi ng standard price'), desc:PT('When an item has no known price, ask the Head of Plant Operations; the line updates when answered.','Kapag walang presyo ang item, magtanong sa Head of Plant Operations; mag-a-update ang line pag nasagot.'),
+  { id:'price', who:'mgr', mins:3, title:PT('Find a price for an item','Hanapan ng presyo ang item'), desc:PT('Standard prices, the price list, an online lookup or your own estimate — and when to ask the Head of Plant Operations.','Standard prices, price list, online lookup o sariling tantiya — at kailan magtatanong sa Head of Plant Operations.'),
     steps:() => [
       { id:'open', el:()=>[...document.querySelectorAll('#lineTable tr.row, .lcard')].find(r=>r.getClientRects().length && /Forklift diesel/.test(r.textContent)), done:()=>!!$q('.drawer .it-row'), say:PT('Open the line **Forklift diesel (sample)**.','Buksan ang line na **Forklift diesel (sample)**.') },
-      { id:'std', el:'.items-box', next:true, say:PT('Items marked **Standard 2027** use the price the Head of Plant Operations set for everyone — e.g. diesel at ₱80/L. You can\'t change those prices.','Ang may **Standard 2027** ay presyong itinakda ng Head of Plant Operations para sa lahat — hal. diesel ₱80/L. Hindi ito mapapalitan.') },
-      { id:'add', el:()=>btnIn('.items-box','Add item'), done:()=>(S._items||[]).length>=3, say:PT('Tap **Add item** for something without a known price.','I-tap ang **Add item** para sa bagay na walang alam na presyo.') },
-      { id:'est', el:()=>$q(`#itN${(S._items||[]).length-1}`)?.closest('.it-row'), done:()=>{ const it = S._items?.[S._items.length-1]; return (it?.name||'').length>=3 && Number(it?.price)>0; },
-        say:PT('Type **Hydraulic hose assembly**, unit **pc**, qty **2**, and your estimate **₱3,500** as the price.','I-type ang **Hydraulic hose assembly**, unit **pc**, qty **2**, at tantiyang presyo **₱3,500**.'),
-        act:{ label:PT('Fill it in for me','Ako na ang maglalagay'), fn:()=>{ const i = S._items.length-1; S._items[i] = { ...S._items[i], name:'Hydraulic hose assembly', unit:'pc', qty:2, price:3500, src:'estimate', adj:0, freq:'once', m:3 }; drawItems(); } } },
-      { id:'ask', el:()=>[...document.querySelectorAll('.it-std a')].find(a=>/ask the Head/i.test(a.textContent)), done:()=>!!$q('#rqGo'), say:PT('Tap **No known price — ask the Head of Plant Operations…**','I-tap ang **No known price — ask the Head of Plant Operations…**') },
-      { id:'send', el:'#rqGo', done:()=>SIMDB.bgt_price_requests.length>0, say:PT('Add a note (specs, where your estimate came from), then **Send request**.','Maglagay ng note (specs, saan galing ang tantiya), tapos **Send request**.'),
-        why:PT('Your estimate is used until the answer comes. When the standard price is set, every line that asked updates by itself, and you get a badge on **Price list**.','Gagamitin ang tantiya mo hanggang may sagot. Kapag naitakda ang standard price, kusang mag-a-update ang lahat ng line na nagtanong, at may badge sa **Price list**.') },
-      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>{ const l = SIMDB.bgt_opex_lines.find(x=>x.id===PRT.L1); return (l?.items||[]).some(x=>x.req); }, say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
-      { id:'fin', el:'.preq-strip', next:true, say:PT('Your question shows here as **Waiting**. That\'s it! 🎉','Makikita dito ang tanong mo bilang **Waiting**. Tapos na! 🎉') } ] },
+      { id:'std', el:'.items-box', next:true, say:PT('Items marked **Standard 2027** are plant-wide costs — fuel, exchange rate, boards, utilities. The Head of Plant Operations sets one price for everyone (e.g. diesel ₱80/L); you can\'t change it.','Ang may **Standard 2027** ay gastos ng buong planta — fuel, exchange rate, boards, utilities. Isang presyo para sa lahat na itinakda ng Head of Plant Operations (hal. diesel ₱80/L); hindi ito mapapalitan.') },
+      { id:'add', el:()=>btnIn('.items-box','Add item'), done:()=>(S._items||[]).length>=3, say:PT('Now a regular item. Tap **Add item**.','Ngayon, karaniwang item. I-tap ang **Add item**.') },
+      { id:'name', el:()=>$q(`#itN${(S._items||[]).length-1}`), done:()=>(S._items?.[S._items.length-1]?.name||'').length>=5, say:PT('Type **Hydraulic hose assembly**. As you type, matches from the **price list and past purchases** show under the name — pick one if it fits.','I-type ang **Hydraulic hose assembly**. Habang nagta-type, lalabas sa ilalim ang tugma mula sa **price list at dating bili** — piliin kung bagay.'),
+        act:{ label:PT('Type it for me','Ako na ang magta-type'), fn:()=>{ const k = S._items.length-1; S._items[k] = { ...S._items[k], name:'Hydraulic hose assembly', unit:'pc', qty:2, src:'estimate', adj:0, freq:'once', m:3 }; drawItems(); } } },
+      { id:'opts', el:()=>[...document.querySelectorAll('.it-std')].find(x=>/No price on the list yet/.test(x.textContent)), next:true, say:PT('No match on the list. Your options: **search the price list** with other words, **look up online**, or keep **your own estimate** and say where it came from. No need to ask anyone.','Walang tugma sa listahan. Mga puwede: **i-search ang price list** gamit ang ibang salita, **i-look up online**, o gamitin ang **sariling tantiya** at sabihin kung saan galing. Hindi na kailangang magtanong.') },
+      { id:'look', el:()=>[...document.querySelectorAll('.it-std a')].find(a=>/look up online/.test(a.textContent)), done:()=>!!$q('.il-row button'), say:PT('Tap **look up online**.','I-tap ang **look up online**.') },
+      { id:'use', el:'.il-row button', done:()=>/^Online/.test(S._items?.[S._items.length-1]?.ref||''), say:PT('Pick a price that matches your item and tap **Use ₱…**.','Pumili ng presyong tugma sa item mo at i-tap ang **Use ₱…**.'),
+        why:PT('Online prices are market references, not quotations. If you have a supplier quotation, set the source to **Quotation** instead — it is a stronger basis.','Market reference lang ang online prices, hindi quotation. Kung may quotation ka sa supplier, gawing **Quotation** ang source — mas matibay na basehan.') },
+      { id:'save', el:()=>btnIn('.drawer','Save line'), done:()=>{ const l = SIMDB.bgt_opex_lines.find(x=>x.id===PRT.L1); return (l?.items||[]).some(x=>/^Online/.test(x.ref||'')); }, say:PT('Tap **Save line**.','I-tap ang **Save line**.') },
+      { id:'fin', next:true, say:PT('Done! Only plant-wide costs (fuel, exchange rate, boards, utilities) show **Ask for the price to use** — those go to the Head of Plant Operations. Everything else you price yourself. 🎉','Tapos na! Ang gastos lang ng buong planta (fuel, exchange rate, boards, utilities) ang may **Ask for the price to use** — iyon ang itatanong sa Head of Plant Operations. Ang iba, ikaw ang magpe-presyo. 🎉') } ] },
   { id:'capex', who:'mgr', mins:4, title:PT('CAPEX: similar projects and endorsing','CAPEX: magkaparehong proyekto at pag-endorse'), desc:PT('Add an asset, see the similar-project warning, then endorse it to the department that should own it.','Magdagdag ng asset, makita ang babala sa kaparehong proyekto, at i-endorse sa tamang department.'),
     steps:() => [
       { id:'tab', el:()=>[...document.querySelectorAll('.tabs button')].find(b=>/CAPEX/.test(b.textContent)), done:()=>S.tab==='capex', say:PT('Open the **CAPEX** tab.','Buksan ang **CAPEX** tab.') },

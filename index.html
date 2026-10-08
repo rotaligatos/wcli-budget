@@ -246,6 +246,7 @@ main{padding:16px 28px 64px;min-width:0}
   .lc-ply{overflow-x:auto}
   .lc-total{display:flex;justify-content:space-between;padding:10px 12px;font-weight:600;border-top:2px solid var(--line-strong);margin-bottom:70px}
 }
+td.proj{font-style:italic;color:var(--muted)}
 .build-tag{font-size:10.5px;opacity:.55;margin:6px 0 2px}
 .cxe-in{margin-bottom:14px;border-left:4px solid var(--teal)}
 .cxe-row{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
@@ -504,7 +505,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 17:12</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-08 17:41</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -999,7 +1000,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:12</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 17:41</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -2607,11 +2608,78 @@ async function renderPerf(){
       ${!rv?'':`<tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>`}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
+    <div id="pfProj"></div>
     <div class="card" style="margin-top:16px"><h3>Yield, reject rate and OEE — year by year</h3>
       <div id="fiYears" style="padding:4px 14px 12px"><span class="hint">Loading…</span></div></div>
     <p class="hint" style="margin-top:10px">WCLI sells its own boards and imported trade boards (mostly laminated plywood from China, Thailand and Vietnam). Production, engineering and QA costs follow boards <b>produced</b>; warehouse and logistics costs follow boards <b>sold</b> (produced + traded). Peso per board is the first step toward product costing: once production is split by product line, the same view can show cost per product.</p>`;
     fiYearTable(Y);
+    perfProjHtml(Y, K, rv).then(h=>{ const el = document.getElementById('pfProj'); if (el) el.innerHTML = h; }).catch(e=>console.warn('projection', e));
   } catch(e){ fail(e); }
+}
+/* ================= PLANT CALENDAR & YEAR-END PROJECTION (Rommel 2026-10-08) =================
+   Working days: Mon–Sat (26-day basis), closed from the day after the last working day in December
+   until the day before work resumes in January (2026: last day Dec 23, back Jan 4), less other non-working dates.
+   Projection: each measure's rate per working day over its latest months (up to 6) × working days of each month left. */
+const CAL_DEF = { sat:true, last:'12-23', resume:'01-04', off:[] };
+S.cal = null;
+async function loadCal(){ if (S.cal) return S.cal; try { const { data } = await sb.from('bgt_settings').select('value').eq('key','plant_calendar').maybeSingle(); S.cal = { ...CAL_DEF, ...(data?.value||{}) }; } catch(_){ S.cal = { ...CAL_DEF }; } return S.cal; }
+function workDays(y, m, cal = S.cal || CAL_DEF){
+  const n = new Date(y, m, 0).getDate(), off = new Set(cal.off||[]); let d = 0;
+  const [lm, ld] = cal.last.split('-').map(Number), [rm, rd] = cal.resume.split('-').map(Number);
+  for (let i=1; i<=n; i++){ const dt = new Date(y, m-1, i), w = dt.getDay(); if (w===0 || (w===6 && !cal.sat)) continue;
+    const md = m*100+i; if (md > lm*100+ld && m===12) continue; if (m===1 && md < rm*100+rd) continue;
+    if (off.has(`${y}-${String(m).padStart(2,'0')}-${String(i).padStart(2,'0')}`)) continue; d++; }
+  return d;
+}
+const PROJ_KEYS = [['sales_actual','Sales','money'],['volume_sold','Boards sold','num'],['production_output','Boards produced','num'],['volume_imported','Trade boards imported','num'],['volume_local_trade','Trade boards bought locally','num'],['raw_boards_sold','Raw boards sold as-is','num'],['raw_boards_imported','Raw boards imported','num']];
+// rate per working day from the latest (up to 6) months that have the figure; KP = that year's rows
+function projRate(KP, y, metric){
+  const ms = KP.filter(r=>r.metric===metric && r.month>0 && r.value!=null).map(r=>r.month).sort((a,b)=>a-b); if (!ms.length) return null;
+  const use = ms.slice(-6), tot = sum(use.map(m=>Number(KP.find(r=>r.metric===metric && r.month===m).value))), wd = sum(use.map(m=>workDays(y,m)));
+  return wd ? { rate:tot/wd, last:ms[ms.length-1], from:use[0], to:use[use.length-1], y } : null;
+}
+async function perfProjHtml(Y, K, rv){
+  await loadCal(); const cur = new Date().getFullYear();
+  const has = K.some(r=>r.month>0 && ['volume_sold','production_output','sales_actual'].includes(r.metric));
+  let KP = K, base = Y, note;
+  if (!has) { if (Y < cur) return calCardHtml(Y); KP = await loadKpis(Y-1); base = Y-1; }
+  const keys = PROJ_KEYS.filter(([k])=>(rv || !k.startsWith('sales_')) && KP.some(r=>r.metric===k && r.month>0));
+  if (!keys.length) return calCardHtml(Y);
+  const fmt = (t,v) => v==null ? '' : t==='money' ? short(v) : Math.round(v).toLocaleString('en-PH');
+  const wdRow = MONTHS.map((_,i)=>workDays(Y,i+1));
+  const rows = keys.map(([k,l,t]) => { const R = projRate(KP, base, k); if (!R) return '';
+    const cells = MONTHS.map((_,i)=>{ const m = i+1, a = has ? K.find(r=>r.metric===k && r.month===m) : null;
+      if (a) return { v:Number(a.value), p:false }; if (has && m <= R.last) return { v:null, p:false };
+      return { v:R.rate*wdRow[i], p:true }; });
+    const act = sum(cells.filter(c=>!c.p&&c.v!=null).map(c=>c.v)), pr = sum(cells.filter(c=>c.p).map(c=>c.v));
+    return `<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${fmt(t,R.rate)} per working day · ${MONTHS[R.from-1]}–${MONTHS[R.to-1]} ${R.y}</div></td>
+      ${cells.map(c=>`<td class="r num ${c.p?'proj':''}">${fmt(t,c.v)}</td>`).join('')}<td class="r num"><b>${fmt(t,act+pr)}</b>${has&&pr?`<div class="item" style="text-transform:none">${fmt(t,act)} actual + ${fmt(t,pr)}</div>`:''}</td></tr>`; }).join('');
+  const anyProj = !has || rows.includes('proj'), hd = !has ? `${Y} at the ${Y-1} run rate` : anyProj ? `Projection to the end of ${Y}` : `${Y} by working day`;
+  note = has && !anyProj ? `Rate per working day for each measure — the basis for projecting the next year. December is short: the plant closes after ${calTxt(S.cal.last)} and resumes ${calTxt(S.cal.resume)}.` : has ? `Months without figures are projected (in italics): each measure's average per working day over its latest months, times the working days left. December is short — the plant closes after ${calTxt(S.cal.last)} and resumes ${calTxt(S.cal.resume)}.`
+             : `No ${Y} figures yet — this is ${Y} at the ${Y-1} run rate (average per working day of the latest months × ${Y} working days). Use it as the starting point for the ${Y} volume plan, then set targets.`;
+  return `<div class="card" style="margin-top:16px"><h3>${hd}</h3><p class="hint" style="padding:0 14px;margin:0 0 8px">${note}</p>
+    <div class="tbl-wrap"><table class="ledger kpi" style="min-width:1100px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">${has&&anyProj?'Full year (projected)':'Year'}</th></tr></thead><tbody>
+      <tr class="calc"><td class="act">Working days<div class="item" style="text-transform:none">Mon–${S.cal.sat?'Sat':'Fri'} less shutdown${(S.cal.off||[]).length?' and listed holidays':''}</div></td>${wdRow.map(d=>`<td class="r num">${d}</td>`).join('')}<td class="r num">${sum(wdRow)}</td></tr>
+      ${rows}</tbody></table></div>${calEditLink()}</div>`;
+}
+const calTxt = md => { const [m,d] = md.split('-').map(Number); return `${MONTHS[m-1]} ${d}`; };
+const calEditLink = () => canManageData() ? `<div style="padding:8px 14px 12px"><a style="cursor:pointer;color:var(--teal);font-size:13px" onclick="editCal()">Edit plant calendar (workdays, year-end shutdown, holidays)</a></div>` : '';
+function calCardHtml(Y){ const w = MONTHS.map((_,i)=>workDays(Y,i+1));
+  return `<div class="card" style="margin-top:16px"><h3>Working days ${Y}</h3><div class="tbl-wrap"><table class="ledger kpi"><thead><tr><th></th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody><tr class="calc"><td class="act">Working days</td>${w.map(d=>`<td class="r num">${d}</td>`).join('')}<td class="r num">${sum(w)}</td></tr></tbody></table></div>${calEditLink()}</div>`; }
+async function editCal(){
+  const c = await loadCal();
+  modal(`<h3>Plant calendar</h3><p class="hint">Used to project the rest of the year and to spread volume by month. Applies every year.</p>
+    <div class="field"><label><input type="checkbox" id="calSat" ${c.sat?'checked':''}> Saturdays are working days</label></div>
+    <div class="row-flex"><div class="field"><label for="calLast">Last working day in December</label><input class="inp" id="calLast" type="number" min="1" max="31" value="${Number(c.last.split('-')[1])}"></div>
+      <div class="field"><label for="calRes">Work resumes in January on</label><input class="inp" id="calRes" type="number" min="1" max="31" value="${Number(c.resume.split('-')[1])}"></div></div>
+    <div class="field"><label for="calOff">Other non-working dates (holidays, planned shutdowns) — one per line, YYYY-MM-DD</label><textarea class="inp" id="calOff" rows="5" placeholder="2027-04-01\n2027-04-02">${esc((c.off||[]).join('\n'))}</textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="calGo">Save</button></div>`);
+  $('#calGo').onclick = async () => {
+    const p2 = n => String(n).padStart(2,'0'), off = $('#calOff').value.split(/[\s,]+/).map(x=>x.trim()).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x));
+    const v = { sat:$('#calSat').checked, last:'12-'+p2(Math.min(31,Math.max(1,Number($('#calLast').value)||23))), resume:'01-'+p2(Math.min(31,Math.max(1,Number($('#calRes').value)||4))), off };
+    const r = await sb.from('bgt_settings').upsert({ key:'plant_calendar', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
+    S.cal = { ...CAL_DEF, ...v }; closeModal(); toast('Calendar saved'); renderPerf();
+  };
 }
 /* trade boards: sold − produced is the true trade volume (imports, local purchases and raw boards sold as-is all count).
    Recorded receipts show how much of it is documented; above 100% means stock was built, below means stock was drawn or receipts are missing. */

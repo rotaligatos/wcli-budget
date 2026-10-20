@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-08 18:50</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-20 14:34</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-08 18:50</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-20 14:34</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3485,6 +3485,10 @@ const RESOURCES = [['Electricity','kWh','UTILITIES - ELECTRICITY'],['Diesel','li
   ['Water','m³','UTILITIES - WATER'],['Lubricant / oil','liter','REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT'],['Boiler fuel','liter','GAS AND OIL'],['Other','','']];
 const PO_STATUS = ['Ordered','Received','Paid','Cancelled'];
 S.rc = { year:null, dept:null, kind:'utility', month:0, q:'', cache:{} };
+/* electricity and water are kept by the departments in bgt_settings.utility_keepers (Engineering): every bill / meter, read and write */
+S.utilKeepers = null;
+async function loadUtilKeepers(){ if (S.utilKeepers) return S.utilKeepers; try { const { data } = await sb.from('bgt_settings').select('value').eq('key','utility_keepers').maybeSingle(); S.utilKeepers = Array.isArray(data?.value) ? data.value : ['ENG']; } catch(_){ S.utilKeepers = ['ENG']; } return S.utilKeepers; }
+const canUtil = () => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && (S.utilKeepers||['ENG']).includes(deptById(S.me.department_id)?.code));
 const canEditRecords = d => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===d);
 async function loadRecords(Y, dept){
   const k = Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
@@ -3498,6 +3502,7 @@ async function renderRecords(){
     if (!S.rc.year) S.rc.year = new Date().getFullYear();
     if (!isReviewer()) S.rc.dept = S.me.department_id;
     const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
+    await loadUtilKeepers(); const utilN = (canUtil() || isReviewer() ? await loadRecords(Y, null) : R).filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length;
     if (S.rc.kind!=='po') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
     const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
     const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption'), iss = R.filter(r=>r.kind==='issue');
@@ -3507,14 +3512,14 @@ async function renderRecords(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
       <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
-      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(['admin','plant_head'].includes(S.me.role) || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
+      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(canUtil() || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
       <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
-    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',R.filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',utilN],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
     <div id="rcBody">${S.rc.kind==='issue' ? await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}</div>`;
   } catch(e){ fail(e); }
 }
@@ -3670,10 +3675,10 @@ S.rc.uRes = S.rc.uRes || 'Electricity';
 async function utilView(Y, R){
   const res = S.rc.uRes, unit = res==='Electricity' ? 'kWh' : 'm³', li = res==='Electricity' ? 'UTILITIES - ELECTRICITY' : 'UTILITIES - WATER';
   const all = (await loadRecords(Y, null).catch(()=>R)).filter(r=>r.kind==='consumption' && r.resource===res);
-  const canPlant = ['admin','plant_head'].includes(S.me.role);
-  const opts = [...(canPlant||isReviewer() ? [['', 'Whole plant — main bill']] : []), ...S.depts.filter(d=>isReviewer() || d.id===S.me.department_id).map(d=>[d.id, d.name+' — sub-meter / share'])];
-  if (S.rc.uDept===undefined) S.rc.uDept = isReviewer() ? '' : S.me.department_id;
-  const dsel = S.rc.uDept || null, ed = dsel ? canEditRecords(dsel) : canPlant;
+  const canPlant = canUtil(), every = canPlant || isReviewer();
+  const opts = [...(every ? [['', 'Whole plant — main bill']] : []), ...S.depts.filter(d=>every || d.id===S.me.department_id).map(d=>[d.id, d.name+' — sub-meter / share'])];
+  if (S.rc.uDept===undefined) S.rc.uDept = every ? '' : S.me.department_id;
+  const dsel = S.rc.uDept || null, ed = canPlant || (dsel ? canEditRecords(dsel) : false);
   const mine = all.filter(r=>(r.department_id||null)===dsel), cell = m => { const v = mine.filter(r=>r.month===m); return v.length ? { q:sum(v.map(r=>r.qty)), a:sum(v.map(r=>r.amount)), ref:v.map(r=>r.ref_no).filter(Boolean).join(', '), n:v.length } : null; };
   const rows = MONTHS.map((_,i)=>({ m:i+1, c:cell(i+1) }));
   // who used what: department sub-meters against the main bill
@@ -3949,10 +3954,11 @@ const UT_COLS = ['Year','Month','Utility','Bill / meter','Consumption','Billed a
 async function utilTemplate(){
   const Y = S.rc.year, all = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource));
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Utility bills ${Y}`); const h = ws.addRow(UT_COLS); h.font = { bold:true };
-  const meters = [...(['admin','plant_head'].includes(S.me.role) || isReviewer() ? [['PLANT', null]] : []), ...S.depts.filter(d=>canEditRecords(d.id)).map(d=>[d.code, d.id])];
+  await loadUtilKeepers();
+  const meters = [...(canUtil() || isReviewer() ? [['PLANT', null]] : []), ...S.depts.filter(d=>canUtil() || canEditRecords(d.id)).map(d=>[d.code, d.id])];
   for (const res of ['Electricity','Water']) for (const [code, id] of meters) {
     const mine = all.filter(r=>r.resource===res && (r.department_id||null)===id);
-    if (code!=='PLANT' && !mine.length) continue;   // department sub-meters only when they already have data; add rows for others as needed
+    if (code!=='PLANT' && !mine.length && meters.some(x=>x[0]==='PLANT')) continue;   // department sub-meters only when they already have data; add rows for others as needed
     for (let m=1; m<=12; m++) { const v = mine.filter(r=>r.month===m); ws.addRow([Y, MONTHS[m-1], res, code, v.length?sum(v.map(r=>Number(r.qty)||0)):null, v.length&&v.some(r=>r.amount!=null)?sum(v.map(r=>Number(r.amount)||0)):null, v.map(r=>r.ref_no).filter(Boolean).join(', ')||null]); } }
   [8,8,12,14,14,18,22].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(5).numFmt='#,##0.##'; ws.getColumn(6).numFmt='#,##0.00';
   const g = wb.addWorksheet('Guide');
@@ -3981,7 +3987,7 @@ function importUtilDialog(){
       const mv = g('m'), m = typeof mv==='number' ? mv : mv instanceof Date ? mv.getMonth()+1 : (MONTHS.findIndex(x=>String(mv||'').trim().toLowerCase().startsWith(x.toLowerCase()))+1 || Number(mv));
       const y = Number(g('y')) || S.rc.year, res = /water/i.test(String(g('u')||'')) ? 'Water' : /elec|power|meralco/i.test(String(g('u')||'Electricity')) ? 'Electricity' : null;
       const code = String(g('b')||'PLANT').trim(), dep = /^(|plant|whole plant|main)$/i.test(code) ? null : S.depts.find(d=>d.code.toLowerCase()===code.toLowerCase() || d.name.toLowerCase()===code.toLowerCase());
-      const allowed = dep===null ? ['admin','plant_head'].includes(S.me.role) : dep && canEditRecords(dep.id);
+      const allowed = canUtil() || (dep===null ? false : dep && canEditRecords(dep.id));
       if (!(m>=1 && m<=12) || !res || dep===undefined || !allowed || Number.isNaN(q) || Number.isNaN(a) || y<2000) { bad.push(i); continue; }
       rows.push({ y, m, res, dep:dep?dep.id:null, q, a, ref:g('r')?String(g('r')).trim():null }); }
     return { rows, bad };
@@ -3990,6 +3996,7 @@ function importUtilDialog(){
       const by = {}; parsed.rows.forEach(r => { const k = `${r.res} · ${r.dep?deptById(r.dep)?.name:'Whole plant'} · ${r.y}`; (by[k] ||= []).push(r); });
       $('#uiMsg').innerHTML = parsed.rows.length ? `<div class="banner green"><b>${parsed.rows.length} monthly bill${parsed.rows.length>1?'s':''} ready:</b><ul style="margin:4px 0">${Object.entries(by).map(([k,v])=>`<li>${esc(k)}: ${v.length} month${v.length>1?'s':''}, ${Math.round(sum(v.map(x=>x.q||0))).toLocaleString('en-PH')} ${v[0].res==='Electricity'?'kWh':'m³'}, ${peso(sum(v.map(x=>x.a||0)),2)}</li>`).join('')}</ul></div>${parsed.bad.length?`<p class="hint">Skipped rows (bad month or utility, unknown meter, or not yours): ${parsed.bad.slice(0,15).join(', ')}${parsed.bad.length>15?'…':''}</p>`:''}`
         : `<div class="banner red">No bill rows found.${parsed.bad.length?` Skipped rows: ${parsed.bad.slice(0,15).join(', ')}`:''}</div>`;
+      const ys = [...new Set(parsed.rows.map(r=>r.y))]; if (parsed.rows.length && ys.some(y=>y!==S.rc.year)) $('#uiMsg').insertAdjacentHTML('beforeend', `<p class="hint">These bills are for <b>${ys.join(', ')}</b>${ys.length===1?'':' (several years)'} — the page will switch to ${Math.max(...ys)} after the import so you can see them.</p>`);
       $('#uiGo').disabled = !parsed.rows.length; } catch(e){ $('#uiMsg').innerHTML = `<div class="banner red">${esc(e.message)}</div>`; } };
   $('#uiGo').onclick = async () => { if (!parsed?.rows.length) return; $('#uiGo').disabled = true;
     try { const years = [...new Set(parsed.rows.map(r=>r.y))]; let n = 0;
@@ -3999,7 +4006,8 @@ function importUtilDialog(){
           if (old.length) { const d = await sb.from('bgt_plant_records').delete().in('id', old.map(e=>e.id)); if (d.error) throw d.error; }
           const ins = await sb.from('bgt_plant_records').insert({ company_id:S.company.id, department_id:r.dep, kind:'consumption', resource:r.res, unit:r.res==='Electricity'?'kWh':'m³', line_item:r.res==='Electricity'?'UTILITIES - ELECTRICITY':'UTILITIES - WATER', rec_date:`${y}-${String(r.m).padStart(2,'0')}-01`, qty:r.q, amount:r.a, ref_no:r.ref });
           if (ins.error) throw ins.error; n++; } }
-      S.rc.cache = {}; closeModal(); toast(`${n} monthly bill${n>1?'s':''} imported`); renderRecords();
+      const last = parsed.rows.slice().sort((a,b)=>b.y-a.y)[0]; S.rc.cache = {}; S.rc.kind = 'utility'; S.rc.year = last.y; S.rc.uRes = last.res; S.rc.uDept = last.dep || ''; closeModal();
+      toast(`${n} monthly bill${n>1?'s':''} imported — showing ${last.res.toLowerCase()} ${last.y}, ${last.dep?deptById(last.dep)?.name:'whole plant'}`); renderRecords();
     } catch(e){ fail(e); $('#uiGo').disabled = false; } };
 }
 

@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-20 14:47</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-20 14:48</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-20 14:47</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-20 14:48</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3951,22 +3951,31 @@ function rcTab(k, btn){
 
 /* ---------- electricity and water bills: Excel template and import (one row per month per bill / meter) ---------- */
 const UT_COLS = ['Year','Month','Utility','Bill / meter','Consumption','Billed amount (₱)','Bill / account no.'];
-async function utilTemplate(){
-  const Y = S.rc.year, all = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource));
-  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(`Utility bills ${Y}`); const h = ws.addRow(UT_COLS); h.font = { bold:true };
+function utilTemplate(){
+  const Y = S.rc.year, cur = new Date().getFullYear(), ys = Array.from({length:8},(_,i)=>cur-i);
+  const sel = (id, v) => `<select class="inp" id="${id}">${ys.map(y=>`<option ${y===v?'selected':''}>${y}</option>`).join('')}</select>`;
+  modal(`<h3>Download the electricity and water template</h3><p>One file can cover several years — each year gets a row per month for every bill / meter, with the figures already entered filled in.</p>
+    <div class="g2"><div class="field"><label for="utY0">From year</label>${sel('utY0', Math.min(Y, cur)-4)}</div><div class="field"><label for="utY1">To year</label>${sel('utY1', Math.min(Y, cur))}</div></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="utGo">Download</button></div>`);
+  $('#utGo').onclick = () => { const a = Number($('#utY0').value), b = Number($('#utY1').value); closeModal(); utilTemplateGo(Math.min(a,b), Math.max(a,b)); };
+}
+async function utilTemplateGo(Y0, Y1){
+  const Ys = Array.from({length:Y1-Y0+1},(_,i)=>Y0+i), all = [];
+  for (const y of Ys) all.push(...(await loadRecords(y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource)));
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(Y0===Y1 ? `Utility bills ${Y0}` : `Utility bills ${Y0}-${Y1}`); const h = ws.addRow(UT_COLS); h.font = { bold:true };
   await loadUtilKeepers();
   const meters = [...(canUtil() || isReviewer() ? [['PLANT', null]] : []), ...S.depts.filter(d=>canUtil() || canEditRecords(d.id)).map(d=>[d.code, d.id])];
-  for (const res of ['Electricity','Water']) for (const [code, id] of meters) {
-    const mine = all.filter(r=>r.resource===res && (r.department_id||null)===id);
-    if (code!=='PLANT' && !mine.length && meters.some(x=>x[0]==='PLANT')) continue;   // department sub-meters only when they already have data; add rows for others as needed
-    for (let m=1; m<=12; m++) { const v = mine.filter(r=>r.month===m); ws.addRow([Y, MONTHS[m-1], res, code, v.length?sum(v.map(r=>Number(r.qty)||0)):null, v.length&&v.some(r=>r.amount!=null)?sum(v.map(r=>Number(r.amount)||0)):null, v.map(r=>r.ref_no).filter(Boolean).join(', ')||null]); } }
+  for (const y of Ys) for (const res of ['Electricity','Water']) for (const [code, id] of meters) {
+    const mine = all.filter(r=>r.year===y && r.resource===res && (r.department_id||null)===id);
+    if (code!=='PLANT' && !all.some(r=>r.resource===res && (r.department_id||null)===id) && meters.some(x=>x[0]==='PLANT')) continue;   // a sub-meter appears once it has data in any of these years; add rows for others as needed
+    for (let m=1; m<=12; m++) { const v = mine.filter(r=>r.month===m); ws.addRow([y, MONTHS[m-1], res, code, v.length?sum(v.map(r=>Number(r.qty)||0)):null, v.length&&v.some(r=>r.amount!=null)?sum(v.map(r=>Number(r.amount)||0)):null, v.map(r=>r.ref_no).filter(Boolean).join(', ')||null]); } }
   [8,8,12,14,14,18,22].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(5).numFmt='#,##0.##'; ws.getColumn(6).numFmt='#,##0.00';
   const g = wb.addWorksheet('Guide');
   [['How to fill'],['One row per bill per month. Consumption: kWh for Electricity, m³ for Water — as printed on the bill. Billed amount: the total on the bill.'],
    ['Bill / meter: PLANT = the plant\'s main bill. For a department sub-meter or agreed share use its code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')+'.'],
    ['Year: any year — one file can hold several years (e.g. 2022–2026); just add rows. Month: Jan…Dec or 1–12. Rows with no consumption and no amount are ignored. Importing replaces the figures already entered for the same utility, bill / meter and month.']].forEach(r=>g.addRow(r));
   g.getColumn(1).width = 130;
-  download(await wb.xlsx.writeBuffer(), `Utility bills ${Y} - ${S.company.code}.xlsx`); toast('Template downloaded — fill it and use Import Excel');
+  download(await wb.xlsx.writeBuffer(), `Utility bills ${Y0===Y1?Y0:Y0+'-'+Y1} - ${S.company.code}.xlsx`); toast('Template downloaded — fill it and use Import Excel');
 }
 function importUtilDialog(){
   modal(`<h3>Import electricity and water bills</h3><p>Use the file from <b>Download template</b>: one row per bill per month (Year, Month, Utility, Bill / meter, Consumption, Billed amount, Bill no.). Figures for the same month and meter are replaced.</p>

@@ -506,7 +506,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-20 14:48</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-20 17:57</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1001,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-20 14:48</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-20 17:57</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3481,8 +3481,10 @@ function projCard(L, PJ, RG){
 }
 
 /* ================= PLANT RECORDS (PO-based expenses, consumption) ================= */
-const RESOURCES = [['Electricity','kWh','UTILITIES - ELECTRICITY'],['Diesel','liter','GAS AND OIL'],['Gasoline','liter','GAS AND OIL'],['LPG','kg','GAS AND OIL'],
+const RESOURCES = [['Electricity','kWh','UTILITIES - ELECTRICITY'],['Solar','kWh','UTILITIES - ELECTRICITY'],['Diesel','liter','GAS AND OIL'],['Gasoline','liter','GAS AND OIL'],['LPG','kg','GAS AND OIL'],
   ['Water','m³','UTILITIES - WATER'],['Lubricant / oil','liter','REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT'],['Boiler fuel','liter','GAS AND OIL'],['Other','','']];
+const UTILS = ['Electricity','Water','Solar'];   // Solar = the plant's own solar generation (kWh); amount = what is paid for it (PPA / O&M), if any
+const utUnit = r => r==='Water' ? 'm³' : 'kWh', utLi = r => r==='Water' ? 'UTILITIES - WATER' : 'UTILITIES - ELECTRICITY';
 const PO_STATUS = ['Ordered','Received','Paid','Cancelled'];
 S.rc = { year:null, dept:null, kind:'utility', month:0, q:'', cache:{} };
 /* electricity and water are kept by the departments in bgt_settings.utility_keepers (Engineering): every bill / meter, read and write */
@@ -3502,7 +3504,7 @@ async function renderRecords(){
     if (!S.rc.year) S.rc.year = new Date().getFullYear();
     if (!isReviewer()) S.rc.dept = S.me.department_id;
     const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
-    await loadUtilKeepers(); const utilN = (canUtil() || isReviewer() ? await loadRecords(Y, null) : R).filter(r=>r.kind==='consumption'&&['Electricity','Water'].includes(r.resource)).length;
+    await loadUtilKeepers(); const utilN = (canUtil() || isReviewer() ? await loadRecords(Y, null) : R).filter(r=>r.kind==='consumption'&&UTILS.includes(r.resource)).length;
     if (S.rc.kind!=='po') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
     const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
     const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption'), iss = R.filter(r=>r.kind==='issue');
@@ -3584,7 +3586,7 @@ async function editRecord(id){
     <div class="actions" style="justify-content:space-between"><span>${id?`<button class="btn danger" onclick="delRecord('${id}')">Delete</button>`:''}</span><span class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>${id?'':'<button class="btn" id="rMore">Save and add another</button>'}<button class="btn primary" id="rGo">Save</button></span></div>`);
   if (isPO) { const calc = () => { const q = Number($('#rQty').value), p = Number($('#rPrice').value); if (q && p && !$('#rAmt').dataset.typed) $('#rAmt').value = Math.round(q*p*100)/100; };
     $('#rQty').oninput = calc; $('#rPrice').oninput = calc; $('#rAmt').oninput = () => $('#rAmt').dataset.typed = 1; }
-  else { const util = () => { const u = ['Electricity','Water'].includes($('#rRes').value);
+  else { const util = () => { const u = UTILS.includes($('#rRes').value);
       $('#rAmtL').textContent = u ? 'Billed amount (₱) — total on the bill' : 'Amount (₱), if known';
       $('#rUtilHint').textContent = u ? 'Enter one record per bill: consumption from the bill (kWh or m³), the billed amount, and the bill or account number. Use any date in the billing month.' : ''; };
     $('#rRes').onchange = () => { $('#rUnit').value = RESOURCES.find(x=>x[0]===$('#rRes').value)?.[1]||''; util(); }; util(); }
@@ -3669,28 +3671,55 @@ function utilityCard(Y, co){
       ${pub?`<p class="hint" style="padding:8px 14px 12px;margin:0">Published Meralco rate ${Y}: ₱${Number(pub.value).toFixed(2)}/kWh (household benchmark${pub.basis==='ytd'?', '+esc(pub.period||'so far'):''}). Industrial bills differ by demand charges and time of use — the plant's own ₱/kWh above is the figure to budget with.</p>`:''}</div>`; }).join('');
 }
 
+/* solar: what it produced, how much of the plant's electricity it covers, and what it saved at the grid (Meralco) rate of the same month */
+async function solarCard(Y){
+  const A = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && !r.department_id);
+  const m = (res, i) => { const x = A.filter(r=>r.resource===res && r.month===i+1); return x.length ? { q:sum(x.map(r=>Number(r.qty)||0)), a:sum(x.map(r=>Number(r.amount)||0)) } : null; };
+  const R = MONTHS.map((_,i)=>({ g:m('Electricity',i), s:m('Solar',i) })).map((x,i)=>{ const rate = x.g?.q && x.g?.a ? x.g.a/x.g.q : null, tot = (x.g?.q||0)+(x.s?.q||0);
+    return { i, ...x, tot, rate, share: x.s && tot ? 100*x.s.q/tot : null, val: x.s && rate ? x.s.q*rate : null, paid: x.s?.a||0, blend: tot && x.g?.a!=null ? ((x.g?.a||0)+(x.s?.a||0))/tot : null }; });
+  if (!R.some(x=>x.s)) return S.rc.uRes==='Solar' ? '' : `<p class="hint" style="margin-top:12px">No solar generation recorded for ${Y}. Choose Utility → <b>Solar</b> to enter the monthly kWh the solar system produced — grid + solar is the plant's real electricity use.</p>`;
+  const k = v => v==null ? '' : Math.round(v).toLocaleString('en-PH'), on = R.filter(x=>x.s), both = on.filter(x=>x.rate);
+  const sg = sum(on.map(x=>x.s.q)), gg = sum(R.map(x=>x.g?.q||0)), val = sum(both.map(x=>x.val)), paid = sum(on.map(x=>x.paid)), totQ = sum(R.map(x=>x.tot));
+  const gA = sum(R.map(x=>x.g?.a||0)), gQ = sum(R.map(x=>x.g?.a?x.g.q:0));
+  const row = (lbl, f, tot, cls='') => `<tr class="${cls}"><td class="act" style="white-space:nowrap">${lbl}</td>${R.map(x=>`<td class="r num" style="font-size:12.5px">${f(x)}</td>`).join('')}<td class="r num">${tot}</td></tr>`;
+  return `<div class="card" style="margin-top:16px"><h3>Solar and grid electricity ${Y}</h3>
+    <div class="stats" style="padding:0 14px"><div class="stat"><div class="eyebrow">Solar generated</div><div class="v">${k(sg)} kWh</div><div class="s">${on.length} month${on.length>1?'s':''}</div></div>
+      <div class="stat"><div class="eyebrow">Share of plant electricity</div><div class="v">${totQ?(100*sg/totQ).toFixed(1)+'%':'—'}</div><div class="s">solar ÷ (grid + solar)</div></div>
+      <div class="stat"><div class="eyebrow">Grid cost avoided</div><div class="v">${val?short(val):'—'}</div><div class="s">${both.length?`solar kWh × that month's Meralco ₱/kWh${paid?` · less ${short(paid)} paid = ${short(val-paid)} net`:''}`:'needs the Meralco bills for the same months'}</div></div>
+      <div class="stat"><div class="eyebrow">Blended ₱ per kWh</div><div class="v">${gQ?peso((gA+paid)/(gQ+sum(R.filter(x=>x.g?.a).map(x=>x.s?.q||0))),2):'—'}</div><div class="s">grid only ${gQ?peso(gA/gQ,2):'—'}</div></div></div>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:1150px"><thead><tr><th>kWh</th>${MONTHS.map(x=>`<th class="r">${x}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
+      ${row('Grid (Meralco main bill)', x=>k(x.g?.q), k(gg))}${row('Solar generated', x=>k(x.s?.q), k(sg))}${row('Plant use (grid + solar)', x=>x.tot?k(x.tot):'', k(totQ), 'calc')}
+      ${row('Solar share', x=>x.share!=null?x.share.toFixed(0)+'%':'', totQ?(100*sg/totQ).toFixed(0)+'%':'', 'calc')}
+      ${row('Grid ₱ per kWh', x=>x.rate?peso(x.rate,2):'', gQ?peso(gA/gQ,2):'', 'calc')}
+      ${row('Grid cost avoided (₱)', x=>x.val!=null?short(x.val):'', val?short(val):'', 'calc')}
+      ${paid?row('Paid for solar (₱)', x=>x.paid?short(x.paid):'', short(paid), 'calc'):''}
+    </tbody></table></div>
+    <p class="hint" style="padding:8px 14px 12px;margin:0">The Meralco bill only shows what came from the grid. Sub-meters inside the plant read grid + solar together, so departments' readings can add up to more than the main bill — that is the solar share, not an error. Electricity per board uses grid + solar.</p></div>`;
+}
 const recDept = id => id ? (deptById(id)?.name || '?') : 'Whole plant (main bill)';
 S.rc.uRes = S.rc.uRes || 'Electricity';
 /* Electricity and water: one row per month — consumption and billed amount — for the plant's main bill or a department's sub-meter */
 async function utilView(Y, R){
-  const res = S.rc.uRes, unit = res==='Electricity' ? 'kWh' : 'm³', li = res==='Electricity' ? 'UTILITIES - ELECTRICITY' : 'UTILITIES - WATER';
+  const res = S.rc.uRes, unit = utUnit(res), li = utLi(res), sol = res==='Solar';
   const all = (await loadRecords(Y, null).catch(()=>R)).filter(r=>r.kind==='consumption' && r.resource===res);
   const canPlant = canUtil(), every = canPlant || isReviewer();
-  const opts = [...(every ? [['', 'Whole plant — main bill']] : []), ...S.depts.filter(d=>every || d.id===S.me.department_id).map(d=>[d.id, d.name+' — sub-meter / share'])];
+  const opts = sol ? [['', 'Whole plant — solar generation']] : [...(every ? [['', 'Whole plant — main bill']] : []), ...S.depts.filter(d=>every || d.id===S.me.department_id).map(d=>[d.id, d.name+' — sub-meter / share'])];
   if (S.rc.uDept===undefined) S.rc.uDept = every ? '' : S.me.department_id;
-  const dsel = S.rc.uDept || null, ed = canPlant || (dsel ? canEditRecords(dsel) : false);
+  if (sol) S.rc.uDept = '';
+  const dsel = S.rc.uDept || null, ed = canPlant || (!sol && dsel ? canEditRecords(dsel) : false);
   const mine = all.filter(r=>(r.department_id||null)===dsel), cell = m => { const v = mine.filter(r=>r.month===m); return v.length ? { q:sum(v.map(r=>r.qty)), a:sum(v.map(r=>r.amount)), ref:v.map(r=>r.ref_no).filter(Boolean).join(', '), n:v.length } : null; };
   const rows = MONTHS.map((_,i)=>({ m:i+1, c:cell(i+1) }));
   // who used what: department sub-meters against the main bill
   const deptRows = S.depts.map(d=>({ d, v:MONTHS.map((_,i)=>{ const x = all.filter(r=>r.department_id===d.id && r.month===i+1); return x.length ? { q:sum(x.map(r=>r.qty)), a:sum(x.map(r=>r.amount)) } : null; }) })).filter(x=>x.v.some(Boolean));
   const main = MONTHS.map((_,i)=>{ const x = all.filter(r=>!r.department_id && r.month===i+1); return x.length ? { q:sum(x.map(r=>r.qty)), a:sum(x.map(r=>r.amount)) } : null; });
+  const solM = res==='Electricity' ? MONTHS.map((_,i)=>{ const x = (S.rc.cache[Y+'|']||[]).filter(r=>r.kind==='consumption' && r.resource==='Solar' && !r.department_id && r.month===i+1); return x.length ? sum(x.map(r=>Number(r.qty)||0)) : 0; }) : MONTHS.map(()=>0), hasSol = solM.some(Boolean);
   const tq = sum(rows.map(r=>r.c?.q||0)), ta = sum(rows.map(r=>r.c?.a||0));
   return `<div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
-      <div class="field" style="margin:0"><label for="uRes">Utility</label><select class="inp" id="uRes" onchange="S.rc.uRes=this.value;renderRecords()">${['Electricity','Water'].map(x=>`<option ${x===res?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0"><label for="uRes">Utility</label><select class="inp" id="uRes" onchange="S.rc.uRes=this.value;renderRecords()">${UTILS.map(x=>`<option ${x===res?'selected':''}>${x}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;min-width:260px"><label for="uDept">Bill / meter</label><select class="inp" id="uDept" onchange="S.rc.uDept=this.value;renderRecords()">${opts.map(([v,l])=>`<option value="${v}" ${(v||null)===dsel?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
-      <span class="grow"></span><span class="hint" style="max-width:420px">Enter the plant's main ${res==='Electricity'?'Meralco':'water'} bill under <b>Whole plant</b>. If departments have sub-meters or an agreed share, enter each department too — the summary below shows what is left as common use.</span></div>
-    <div class="card"><h3>${res} ${Y} — ${esc(dsel?deptById(dsel)?.name:'Whole plant, main bill')}</h3>
-      <div class="tbl-wrap"><table class="ledger" style="min-width:720px"><thead><tr><th>Month</th><th class="r">Consumption (${unit})</th><th class="r">Billed amount (₱)</th><th class="r">₱ per ${unit}</th><th>Bill / account no.</th></tr></thead><tbody>
+      <span class="grow"></span><span class="hint" style="max-width:420px">${sol ? 'Enter the solar system\'s generation each month (kWh from the inverter or solar meter). Billed amount: what WCLI pays for it that month (PPA or O&amp;M), if any — leave blank if the system is owned. Grid + solar is the plant\'s real electricity use.' : `Enter the plant's main ${res==='Electricity'?'Meralco':'water'} bill under <b>Whole plant</b>. If departments have sub-meters or an agreed share, enter each department too — the summary below shows what is left as common use.`}</span></div>
+    <div class="card"><h3>${sol?'Solar generation':res} ${Y} — ${esc(sol?'Whole plant':dsel?deptById(dsel)?.name:'Whole plant, main bill')}</h3>
+      <div class="tbl-wrap"><table class="ledger" style="min-width:720px"><thead><tr><th>Month</th><th class="r">${sol?'Generated':'Consumption'} (${unit})</th><th class="r">${sol?'Paid for solar (₱, optional)':'Billed amount (₱)'}</th><th class="r">₱ per ${unit}</th><th>${sol?'Reading / reference':'Bill / account no.'}</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td>${MONTHS[r.m-1]}</td>
         <td class="r">${ed?`<input class="inp num ut" data-m="${r.m}" data-k="q" type="number" step="any" min="0" value="${r.c?.q??''}" style="max-width:150px;margin-left:auto">`:`<span class="num">${r.c?Math.round(r.c.q).toLocaleString('en-PH'):''}</span>`}</td>
         <td class="r">${ed?`<input class="inp num ut" data-m="${r.m}" data-k="a" type="number" step="any" min="0" value="${r.c?.a??''}" style="max-width:160px;margin-left:auto">`:`<span class="num">${r.c?.a?peso(r.c.a,2):''}</span>`}</td>
@@ -3701,12 +3730,14 @@ async function utilView(Y, R){
     ${deptRows.length ? `<div class="card" style="margin-top:16px"><h3>${res} by department ${Y} (${unit})</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1100px"><thead><tr><th>Bill / meter</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th><th class="r">₱ year</th></tr></thead><tbody>
       ${main.some(Boolean)?`<tr><td class="act">Whole plant — main bill</td>${main.map(c=>`<td class="r num" style="font-size:12.5px">${c?Math.round(c.q).toLocaleString('en-PH'):''}</td>`).join('')}<td class="r num">${Math.round(sum(main.map(c=>c?.q||0))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(main.map(c=>c?.a||0)))}</td></tr>`:''}
       ${deptRows.map(x=>`<tr><td style="font-size:13px">${esc(x.d.name)}</td>${x.v.map(c=>`<td class="r num" style="font-size:12.5px">${c?Math.round(c.q).toLocaleString('en-PH'):''}</td>`).join('')}<td class="r num">${Math.round(sum(x.v.map(c=>c?.q||0))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(x.v.map(c=>c?.a||0)))}</td></tr>`).join('')}
-      ${main.some(Boolean)?`<tr class="calc"><td class="act">Common use (main bill − departments)</td>${main.map((c,i)=>{ const d = sum(deptRows.map(x=>x.v[i]?.q||0)); return `<td class="r num" style="font-size:12.5px">${c?Math.round(c.q-d).toLocaleString('en-PH'):''}</td>`; }).join('')}<td class="r num">${Math.round(sum(main.map(c=>c?.q||0)) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.q||0))))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(main.map(c=>c?.a||0)) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.a||0)))))}</td></tr>`:''}
+      ${hasSol?`<tr><td class="act">Solar generation</td>${solM.map(v=>`<td class="r num" style="font-size:12.5px">${v?Math.round(v).toLocaleString('en-PH'):''}</td>`).join('')}<td class="r num">${Math.round(sum(solM)).toLocaleString('en-PH')}</td><td></td></tr>`:''}
+      ${main.some(Boolean)?`<tr class="calc"><td class="act">Common use (${hasSol?'main bill + solar':'main bill'} − departments)</td>${main.map((c,i)=>{ const d = sum(deptRows.map(x=>x.v[i]?.q||0)); return `<td class="r num" style="font-size:12.5px">${c?Math.round(c.q+solM[i]-d).toLocaleString('en-PH'):''}</td>`; }).join('')}<td class="r num">${Math.round(sum(main.map(c=>c?.q||0)) + sum(solM) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.q||0))))).toLocaleString('en-PH')}</td><td class="r num">${short(sum(main.map(c=>c?.a||0)) - sum(deptRows.map(x=>sum(x.v.map(c=>c?.a||0)))))}</td></tr>`:''}
     </tbody></table></div></div>` : ''}
-    ${dsel ? '' : utilityCard(Y, all.filter(r=>!r.department_id))}`;
+    ${dsel ? '' : sol ? '' : utilityCard(Y, all.filter(r=>!r.department_id))}
+    ${!dsel && (res==='Electricity' || sol) ? await solarCard(Y) : ''}`;
 }
 async function saveUtil(Y){
-  const res = S.rc.uRes, unit = res==='Electricity' ? 'kWh' : 'm³', dsel = S.rc.uDept || null, li = res==='Electricity' ? 'UTILITIES - ELECTRICITY' : 'UTILITIES - WATER';
+  const res = S.rc.uRes, unit = utUnit(res), dsel = S.rc.uDept || null, li = utLi(res);
   const all = (await loadRecords(Y, null)).filter(r=>r.kind==='consumption' && r.resource===res && (r.department_id||null)===dsel);
   const v = {}; document.querySelectorAll('.ut').forEach(e => { (v[e.dataset.m] ||= {})[e.dataset.k] = e.value.trim(); });
   let n = 0;
@@ -3961,17 +3992,17 @@ function utilTemplate(){
 }
 async function utilTemplateGo(Y0, Y1){
   const Ys = Array.from({length:Y1-Y0+1},(_,i)=>Y0+i), all = [];
-  for (const y of Ys) all.push(...(await loadRecords(y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource)));
+  for (const y of Ys) all.push(...(await loadRecords(y, null)).filter(r=>r.kind==='consumption' && UTILS.includes(r.resource)));
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet(Y0===Y1 ? `Utility bills ${Y0}` : `Utility bills ${Y0}-${Y1}`); const h = ws.addRow(UT_COLS); h.font = { bold:true };
   await loadUtilKeepers();
   const meters = [...(canUtil() || isReviewer() ? [['PLANT', null]] : []), ...S.depts.filter(d=>canUtil() || canEditRecords(d.id)).map(d=>[d.code, d.id])];
-  for (const y of Ys) for (const res of ['Electricity','Water']) for (const [code, id] of meters) {
+  for (const y of Ys) for (const res of UTILS) for (const [code, id] of meters) {
     const mine = all.filter(r=>r.year===y && r.resource===res && (r.department_id||null)===id);
     if (code!=='PLANT' && !all.some(r=>r.resource===res && (r.department_id||null)===id) && meters.some(x=>x[0]==='PLANT')) continue;   // a sub-meter appears once it has data in any of these years; add rows for others as needed
     for (let m=1; m<=12; m++) { const v = mine.filter(r=>r.month===m); ws.addRow([y, MONTHS[m-1], res, code, v.length?sum(v.map(r=>Number(r.qty)||0)):null, v.length&&v.some(r=>r.amount!=null)?sum(v.map(r=>Number(r.amount)||0)):null, v.map(r=>r.ref_no).filter(Boolean).join(', ')||null]); } }
   [8,8,12,14,14,18,22].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(5).numFmt='#,##0.##'; ws.getColumn(6).numFmt='#,##0.00';
   const g = wb.addWorksheet('Guide');
-  [['How to fill'],['One row per bill per month. Consumption: kWh for Electricity, m³ for Water — as printed on the bill. Billed amount: the total on the bill.'],
+  [['How to fill'],['One row per bill per month. Consumption: kWh for Electricity, m³ for Water — as printed on the bill. Billed amount: the total on the bill.'],['Utility: Electricity, Water or Solar. Solar = kWh the solar system generated that month (Bill / meter PLANT); Billed amount = what is paid for it (PPA / O&M), blank if owned.'],
    ['Bill / meter: PLANT = the plant\'s main bill. For a department sub-meter or agreed share use its code: '+S.depts.map(d=>d.code+' = '+d.name).join(', ')+'.'],
    ['Year: any year — one file can hold several years (e.g. 2022–2026); just add rows. Month: Jan…Dec or 1–12. Rows with no consumption and no amount are ignored. Importing replaces the figures already entered for the same utility, bill / meter and month.']].forEach(r=>g.addRow(r));
   g.getColumn(1).width = 130;
@@ -3994,7 +4025,7 @@ function importUtilDialog(){
       const num = k => { const x = g(k); if (x==null || x==='') return null; const n = Number(String(x).replace(/[₱,\s]/g,'')); return isNaN(n) ? NaN : n; };
       const q = num('q'), a = num('a'); if (q==null && a==null) continue;
       const mv = g('m'), m = typeof mv==='number' ? mv : mv instanceof Date ? mv.getMonth()+1 : (MONTHS.findIndex(x=>String(mv||'').trim().toLowerCase().startsWith(x.toLowerCase()))+1 || Number(mv));
-      const y = Number(g('y')) || S.rc.year, res = /water/i.test(String(g('u')||'')) ? 'Water' : /elec|power|meralco/i.test(String(g('u')||'Electricity')) ? 'Electricity' : null;
+      const y = Number(g('y')) || S.rc.year, res = /solar|pv\b|photovolt/i.test(String(g('u')||'')) ? 'Solar' : /water/i.test(String(g('u')||'')) ? 'Water' : /elec|power|meralco/i.test(String(g('u')||'Electricity')) ? 'Electricity' : null;
       const code = String(g('b')||'PLANT').trim(), dep = /^(|plant|whole plant|main)$/i.test(code) ? null : S.depts.find(d=>d.code.toLowerCase()===code.toLowerCase() || d.name.toLowerCase()===code.toLowerCase());
       const allowed = canUtil() || (dep===null ? false : dep && canEditRecords(dep.id));
       if (!(m>=1 && m<=12) || !res || dep===undefined || !allowed || Number.isNaN(q) || Number.isNaN(a) || y<2000) { bad.push(i); continue; }
@@ -4003,17 +4034,17 @@ function importUtilDialog(){
   };
   $('#uiChk').onclick = async () => { try { parsed = await read(); if (!parsed) return;
       const by = {}; parsed.rows.forEach(r => { const k = `${r.res} · ${r.dep?deptById(r.dep)?.name:'Whole plant'} · ${r.y}`; (by[k] ||= []).push(r); });
-      $('#uiMsg').innerHTML = parsed.rows.length ? `<div class="banner green"><b>${parsed.rows.length} monthly bill${parsed.rows.length>1?'s':''} ready:</b><ul style="margin:4px 0">${Object.entries(by).map(([k,v])=>`<li>${esc(k)}: ${v.length} month${v.length>1?'s':''}, ${Math.round(sum(v.map(x=>x.q||0))).toLocaleString('en-PH')} ${v[0].res==='Electricity'?'kWh':'m³'}, ${peso(sum(v.map(x=>x.a||0)),2)}</li>`).join('')}</ul></div>${parsed.bad.length?`<p class="hint">Skipped rows (bad month or utility, unknown meter, or not yours): ${parsed.bad.slice(0,15).join(', ')}${parsed.bad.length>15?'…':''}</p>`:''}`
+      $('#uiMsg').innerHTML = parsed.rows.length ? `<div class="banner green"><b>${parsed.rows.length} monthly bill${parsed.rows.length>1?'s':''} ready:</b><ul style="margin:4px 0">${Object.entries(by).map(([k,v])=>`<li>${esc(k)}: ${v.length} month${v.length>1?'s':''}, ${Math.round(sum(v.map(x=>x.q||0))).toLocaleString('en-PH')} ${utUnit(v[0].res)}, ${peso(sum(v.map(x=>x.a||0)),2)}</li>`).join('')}</ul></div>${parsed.bad.length?`<p class="hint">Skipped rows (bad month or utility, unknown meter, or not yours): ${parsed.bad.slice(0,15).join(', ')}${parsed.bad.length>15?'…':''}</p>`:''}`
         : `<div class="banner red">No bill rows found.${parsed.bad.length?` Skipped rows: ${parsed.bad.slice(0,15).join(', ')}`:''}</div>`;
       const ys = [...new Set(parsed.rows.map(r=>r.y))]; if (parsed.rows.length && ys.some(y=>y!==S.rc.year)) $('#uiMsg').insertAdjacentHTML('beforeend', `<p class="hint">These bills are for <b>${ys.join(', ')}</b>${ys.length===1?'':' (several years)'} — the page will switch to ${Math.max(...ys)} after the import so you can see them.</p>`);
       $('#uiGo').disabled = !parsed.rows.length; } catch(e){ $('#uiMsg').innerHTML = `<div class="banner red">${esc(e.message)}</div>`; } };
   $('#uiGo').onclick = async () => { if (!parsed?.rows.length) return; $('#uiGo').disabled = true;
     try { const years = [...new Set(parsed.rows.map(r=>r.y))]; let n = 0;
-      for (const y of years) { const ex = (await loadRecords(y, null)).filter(r=>r.kind==='consumption' && ['Electricity','Water'].includes(r.resource));
+      for (const y of years) { const ex = (await loadRecords(y, null)).filter(r=>r.kind==='consumption' && UTILS.includes(r.resource));
         for (const r of parsed.rows.filter(x=>x.y===y)) {
           const old = ex.filter(e=>e.resource===r.res && (e.department_id||null)===r.dep && e.month===r.m);
           if (old.length) { const d = await sb.from('bgt_plant_records').delete().in('id', old.map(e=>e.id)); if (d.error) throw d.error; }
-          const ins = await sb.from('bgt_plant_records').insert({ company_id:S.company.id, department_id:r.dep, kind:'consumption', resource:r.res, unit:r.res==='Electricity'?'kWh':'m³', line_item:r.res==='Electricity'?'UTILITIES - ELECTRICITY':'UTILITIES - WATER', rec_date:`${y}-${String(r.m).padStart(2,'0')}-01`, qty:r.q, amount:r.a, ref_no:r.ref });
+          const ins = await sb.from('bgt_plant_records').insert({ company_id:S.company.id, department_id:r.dep, kind:'consumption', resource:r.res, unit:utUnit(r.res), line_item:utLi(r.res), rec_date:`${y}-${String(r.m).padStart(2,'0')}-01`, qty:r.q, amount:r.a, ref_no:r.ref });
           if (ins.error) throw ins.error; n++; } }
       const last = parsed.rows.slice().sort((a,b)=>b.y-a.y)[0]; S.rc.cache = {}; S.rc.kind = 'utility'; S.rc.year = last.y; S.rc.uRes = last.res; S.rc.uDept = last.dep || ''; closeModal();
       toast(`${n} monthly bill${n>1?'s':''} imported — showing ${last.res.toLowerCase()} ${last.y}, ${last.dep?deptById(last.dep)?.name:'whole plant'}`); renderRecords();

@@ -320,7 +320,7 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .ps-tbl th{background:var(--ink);color:#fff;text-align:left;padding:10px 12px;font:600 11.5px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
 .ps-tbl td{padding:8px 12px;border-bottom:1px solid #eef1ef;vertical-align:top}.ps-tbl tbody tr:nth-child(even) td{background:#f7f9f8}.ps-tbl tbody tr:last-child td{border-bottom:0}
-.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:var(--mute)}
+.ps-tbl td:nth-child(2){white-space:nowrap}.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:var(--mute)}
 .ps-tbl tr[style*="background"] td{background:#e6f1ee!important;border-top:2px solid var(--t)}
 .ps-just{font-size:13px;color:#475467;max-width:520px}.ps-pri{color:#fff;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .ps ul{margin:0 0 16px;padding:0;list-style:none;font-size:16px;line-height:1.45}
@@ -546,6 +546,16 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
 .ol-strip>span{flex:none}.ol-strip .eyebrow{font-size:10px}
 .ol-strip b{font-weight:600;color:var(--muted)} .ol-strip a{color:var(--teal);font-weight:600;cursor:pointer;margin-left:auto}
 h3.sec{font-size:18px;font-stretch:85%;margin:18px 0 8px}
+.ev{margin-bottom:12px;border-left:4px solid var(--amber)}.ev.ev-active{border-left-color:var(--red)}.ev.ev-closed{opacity:.7;border-left-color:var(--line-strong)}
+.ev-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 14px 0}.ev-h h3{margin:2px 0 0}
+.ev-s{padding:6px 14px 0;margin:0;font-size:13.5px;line-height:1.5}
+.ev-a{margin:12px 14px 6px;font-size:13px}.ev-act{margin:0;padding:0 14px 0 32px;font-size:13px;line-height:1.5}.ev-act li{margin-bottom:4px}
+.ev-sum{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin-bottom:12px}.ev-sum>div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-width:170px}
+.ev-sum span{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.ev-sum b{font-size:20px;font-variant-numeric:tabular-nums}.ev-sum small{display:block;font-size:11.5px;color:var(--muted)}
+.ev-sum .ev-btns{display:flex;gap:8px;align-items:center;margin-left:auto;background:none;border:0;padding:0}
+.ev-ms{display:flex;flex-wrap:wrap;gap:10px}.ev-ms label{display:flex;gap:4px;align-items:center;font-size:13px}
+.ev-tbl{width:100%;margin-bottom:6px}.ev-tbl td{padding:3px 4px}.ev-tbl .inp{font-size:12.5px}.ev-tbl .num{max-width:80px}
+.ev-ci{border-left:3px solid var(--amber);padding-left:8px}
 .ol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .ol-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 .ol-card .v{font-family:var(--mono);font-size:22px;font-weight:600}.ol-card .s{font-size:12.5px;color:var(--muted)}
@@ -607,7 +617,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 23:18</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-21 23:37</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1102,7 +1112,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:18</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:37</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1208,7 +1218,8 @@ async function openBudget(id){
       sb.from('bgt_comments').select('*').eq('budget_id', id).order('created_at'),
       sb.from('bgt_events').select('*').eq('budget_id', id).order('created_at'),
       loadOpenItems(id),
-      loadLyRef(id)
+      loadLyRef(id),
+      loadOutlook(S.cycle.year).catch(()=>null)
     ]);
     for (const r of [o,c,cm,ev]) if (r.error) throw r.error;
     S.opex = o.data; S.capex = c.data; S.comments = cm.data; S.events = ev.data;
@@ -1322,6 +1333,10 @@ function runChecks(){
   const add = (kind,id,sev,msg,name) => out.push({kind,id,sev,msg,name});
   const seen = {};
   { const n = (S.oi||[]).filter(x=>x.status==='open' && x.budget_id===S.budgetId).length; if (n) add('budget',null,'warn',`${n} question${n>1?'s':''} or data gap${n>1?'s':''} from the assistant draft still open — answer them in “To confirm” at the top of the budget.`,'To confirm'); }
+  { const o = S.ol?.cache?.[S.cycle.year]; if (o?.E?.length) { const EL = evLines(o), done = new Set();
+    S.opex.forEach(l => { const x = EL[l.line_item]; if (!x || done.has(l.line_item) || !annual(l)) return; done.add(l.line_item);
+      const act = x.ev.flatMap(v=>(v.e.actions||[]).filter(a=>!a.lines?.length||a.lines.includes(l.line_item))).slice(0,2).map(a=>a.action);
+      add('opex', l.id, 'info', `Exposed to ${x.ev.map(v=>`${v.e.title} (${evMonthsText(v.ms)})`).join(', ')}.${x.likely?` The likely +${x.likely}% for the year is in the standard prices and the suggested change;`:''} the worst case is covered by the plant reserve held by the MD.${act.length?' Consider: '+act.join('; ')+'.':''}`, l.line_item); }); } }
   S.opex.forEach(l => {
     const n = l.activity || l.line_item || 'Untitled line', m = months(l), t = sum(m);
     if (l.calc?.ai) add('opex',l.id,'warn','Drafted by the assistant and not yet confirmed — open the line, check it and save.',n);
@@ -1685,7 +1700,7 @@ async function renderOverview(){
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn primary" onclick="presentPlant()">Present plant budget</button><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
     ${cxeBadge()?`<div class="banner blue"><b>${cxeBadge()} CAPEX item${cxeBadge()>1?'s':''} endorsed between departments</b> waiting to be accepted or declined: ${[...new Set(S.cxe.filter(e=>e.status==='pending').map(e=>dName(e.from_dept)+' → '+dName(e.to_dept)))].map(esc).join(', ')}. Open the receiving department's CAPEX tab to answer.</div>`:''}
-    ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
+    ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div><div id="evStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
       <div class="stat capex"><div class="eyebrow">Plant CAPEX</div><div class="v">${short(T.capex)}</div><div class="s">${peso(T.capex)}</div></div>
@@ -1709,6 +1724,7 @@ async function renderOverview(){
     <div id="ovDup"></div>
     <div class="card" style="margin-top:16px"><h3>Top OPEX line items</h3><div class="bars">${topItems(o).map(([k,v])=>`<div class="bar" style="grid-template-columns:minmax(160px,320px) 1fr 120px"><span style="font-size:12px">${esc(k)}</span><div class="track2"><i style="width:${100*v/(topItems(o)[0]?.[1]||1)}%;background:var(--teal)"></i></div><span class="num" style="text-align:right">${short(v)}</span></div>`).join('') || '<div class="empty">No OPEX lines yet.</div>'}</div></div>`;
     if ($('#olStrip')) outlookStrip().then(h=>{ const e=$('#olStrip'); if (e) e.innerHTML = h; });
+    if ($('#evStrip')) evStripHtml(o).then(h=>{ const e=$('#evStrip'); if (e) e.innerHTML = h; }).catch(console.error);
     ovDeprCard(T.opex).then(h=>{ const e=$('#ovDepr'); if (e) e.innerHTML = h; });
     { const e = $('#ovDup'); if (e) e.innerHTML = ovDupCard(c); }
   } catch(e){ fail(e); }
@@ -2361,12 +2377,14 @@ const METHOD_TXT = { budget:'the budget', runrate:'the run-rate (average monthly
 S.ol = { cache:{} };
 async function loadOutlook(year){
   if (S.ol.cache[year]) return S.ol.cache[year];
-  const [a, d] = await Promise.all([
+  const [a, d, E] = await Promise.all([
     sb.from('bgt_assumptions').select('*').eq('year', year).order('sort'),
-    sb.from('bgt_cost_drivers').select('*').eq('year', year).order('line_item')
+    sb.from('bgt_cost_drivers').select('*').eq('year', year).order('line_item'),
+    loadEvents(year).catch(e=>{ console.error(e); return []; })
   ]);
   if (a.error) throw a.error; if (d.error) throw d.error;
-  return (S.ol.cache[year] = { year, A:a.data||[], D:d.data||[] });
+  if (year===S.cycle?.year) S._evAll = E;
+  return (S.ol.cache[year] = { year, A:a.data||[], D:d.data||[], E });
 }
 async function loadDrivers(year){ try { const o = await loadOutlook(year); return o; } catch(e){ console.error(e); return { A:[], D:[] }; } }
 const assumpByKey = (o, k) => (o?.A||[]).find(a=>a.key===k);
@@ -2374,7 +2392,8 @@ function generalPct(o){ const i = assumpByKey(o,'inflation_2027') || (o?.A||[]).
 function drvPct(o, item, which){
   const d = (o?.D||[]).find(x=>x.line_item===item);
   if (which==='rest') return d ? Number(d.rest_of_year_pct)||0 : 0;
-  return d ? Number(d.next_year_pct)||0 : generalPct(o);
+  const base = d ? Number(d.next_year_pct)||0 : generalPct(o);
+  return Math.round((base + evLikely(o, item))*10)/10;   // + the likely effect of events in the budget (El Niño, wage order…)
 }
 const fmtVal = a => a.value==null ? '' : (a.unit && a.unit.startsWith('₱') ? '₱'+Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + ' ' + a.unit.replace(/^₱\s*/,'') : Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + (a.unit==='%'?'%':a.unit?' '+a.unit:''));
 async function outlookYear(){ // budget year whose outlook applies: the open cycle, else the latest with data
@@ -2406,7 +2425,7 @@ async function renderOutlook(){
       <div class="sub">What is happening outside the company that will move our costs — and the change we assume for each expense line.${latest?` Figures as of <b>${latest}</b>.`:''}</div></div>
       <div class="actions">${ed?'<button class="btn primary" onclick="editAssump()">Add an indicator</button>':''}</div></div>
     ${!o.A.length ? `<div class="banner blue">No outlook recorded for ${y} yet.</div>` : ''}
-    <div id="olpBox"></div>
+    <div id="olpBox"></div><div id="evBox"></div>
     ${cats.map(([c,l])=>{ const list = o.A.filter(a=>(a.category||'custom')===c); if (!list.length) return '';
       return `<h3 class="sec">${l}</h3><div class="ol-grid">${list.map(a=>`<div class="ol-card">
         <div class="eyebrow">${esc(a.label)}</div>
@@ -2436,7 +2455,7 @@ async function renderOutlook(){
           <td style="font-size:12.5px;max-width:380px">${ed?`<input class="inp drv" data-item="${esc(it)}" data-k="rationale" value="${esc(d?.rationale||'')}" placeholder="Reason">`:esc(d?.rationale||'')}</td></tr>`; }).join('')}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveDrivers(${y})">Save changes</button></div>`:''}</div>`;
-    renderTrend(y, o); olpCardHtml(y).then(h=>{ const e=$("#olpBox"); if (e) e.innerHTML = h; }).catch(console.error);
+    renderTrend(y, o); evSectionHtml(y, o).then(h=>{ const e=$('#evBox'); if (e) e.innerHTML = h; }).catch(console.error); olpCardHtml(y).then(h=>{ const e=$("#olpBox"); if (e) e.innerHTML = h; }).catch(console.error);
   } catch(e){ fail(e); }
 }
 async function saveDrivers(y){
@@ -2684,6 +2703,7 @@ async function renderConsider(item, prev, dept){
         ${drivers.length ? drivers.map(a=>`<div class="ci"><b>${esc(a.label)}: ${fmtVal(a)}</b> — ${esc(a.outlook||a.value_text||'')} ${a.source_url?`<a href="${esc(a.source_url)}" target="_blank" rel="noopener">Source</a>`:''}</div>`).join('')
           : `<div class="ci"><b>General inflation ${generalPct(o)}% in ${Y}</b> (BSP baseline). No specific cost driver recorded for this line.</div>`}
         ${d?.rationale ? `<div class="ci">${esc(d.rationale)}</div>` : ''}
+        ${(()=>{ const x = evLines(o)[item]; if (!x) return ''; return x.ev.map(v=>`<div class="ci ev-ci"><b>${esc(v.e.title)} — ${evMonthsText(v.ms)}:</b> ${v.e.status==='active'?`likely +${v.im.likely}% in those months (+${Math.round(v.im.likely*v.sh*10)/10}% for the year, included in the suggestion below); worst case +${v.im.worst}% is covered by the plant reserve held by the MD.`:`being watched (${v.e.probability}% likely, up to +${v.im.worst}%) — not in your budget; covered by the plant reserve.`}${(v.e.actions||[]).filter(a=>!a.lines?.length||a.lines.includes(item)).slice(0,2).map(a=>`<br>Consider: ${esc(a.action)}`).join('')}</div>`).join(''); })()}
         ${volItem && pT!=null && pA ? `<div class="ci"><b>Production plan ${Y}: ${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}% vs ${Y-1}.</b> This cost moves with volume — scale it accordingly.</div>` : ''}
         ${prices.length ? `<div class="ci"><b>Price list:</b> ${prices.map(p=>`${esc(p.item)} ${peso(p.unit_price,2)}/${esc(p.unit||'unit')}${p.source_type==='market'?' (market)':''}`).join(' · ')}</div>` : ''}
         ${base ? `<div class="sug"><div><b>Suggested ${Y} for ${esc(deptById(dept)?.name)} · ${esc(item)}: ${peso(sug)}</b><br><small>${Y-1} ${prev.hasAct?'full-year view':'budget'} ${peso(base)} × ${pct>=0?'+':''}${pct}%. Other ${Y} lines on this item: ${peso(others)}.</small></div>
@@ -2981,6 +3001,9 @@ function olpCompute(d){
     how:`${P.elec_wcli ? `WCLI's rate entered in settings ₱${eBase}` : eb ? `WCLI's own bills: ₱${eb.rate.toFixed(2)}/kWh over ${eb.n} month${eb.n>1?'s':''} (${eb.from}–${eb.to}, Plant records)` : `Meralco overall rate ₱${eBase} (published benchmark — import WCLI's bills in Plant records → Electricity and water for a closer figure)`} + ${P.elec_adj}% for ${S.cycle.year}`, approx:!P.elec_wcli && !eb });
   const wBase = Number(P.water_rate) || (wb ? wb.rate : null);
   if (wBase) rows.push({ key:'water', item:'Water', unit:'m³', category:'UTILITIES - WATER', price:r2(wBase*(1+P.water_adj/100)), how:`${P.water_rate ? `WCLI's water rate entered in settings ₱${wBase}` : `WCLI's own bills: ₱${wb.rate.toFixed(2)}/m³ over ${wb.n} month${wb.n>1?'s':''} (${wb.from}–${wb.to})`} + ${P.water_adj}% inflation` });
+  const EL = evLines(d.o);
+  rows.forEach(r => { const x = r.category && EL[r.category]; if (!x?.likely) return; const p0 = r.price; r.price = r2(r.price*(1+x.likely/100));
+    r.how += `; + ${x.likely}% for ${x.ev.filter(v=>v.e.status==='active').map(v=>`${v.e.title} (+${v.im.likely}% in ${evMonthsText(v.ms)})`).join(', ')} = ₱${r.price} (was ₱${p0} without events)`; r.ev = x.likely; });
   return rows;
 }
 async function olpCardHtml(y){
@@ -3023,6 +3046,153 @@ async function olpSaveSettings(){
   ['share','crude_now','fuel_buffer','gas_ratio','fx_buffer','elec_adj','water_adj'].forEach(k => { if (v[k]==null) v[k] = OLP_DEF[k]; });
   const r = await sb.from('bgt_settings').upsert({ key:'outlook_prices', value:v }, { onConflict:'key' }); if (r.error) return fail(r.error);
   closeModal(); toast('Saved — check the prices, then publish'); renderOutlook();
+}
+
+/* ================= EVENTS AND RISKS (cost outlook) =================
+   Things that will distort the normal trend in the budget year: a climate event (El Niño), a planned wage order,
+   a power-rate hike. Each event names the expense lines it moves, by how much in the months it hits (likely and
+   worst case), and what we can do about it.
+   How it reaches the budget (option C, agreed with the Head of Plant Operations):
+     • an event IN THE BUDGET (status "active"): the likely increase goes into the standard prices and the suggested
+       change per line; the gap to the worst case becomes the plant contingency reserve, held by the MD;
+     • an event we are WATCHING: nothing in the prices; worst case × probability goes into the reserve. */
+const EV_STATUS = { active:'In the budget', watch:'Watching', closed:'Closed' };
+const evMonthsText = ms => { ms = (ms||[]).slice().sort((a,b)=>a-b); if (!ms.length) return '—'; if (ms.length===12) return 'All year';
+  const runs = []; ms.forEach(m => { const r = runs[runs.length-1]; if (r && m===r[1]+1) r[1] = m; else runs.push([m,m]); });
+  return runs.map(([a,b]) => a===b ? MONTHS[a-1] : `${MONTHS[a-1]}–${MONTHS[b-1]}`).join(', '); };
+// per expense line: likely % (goes into prices) and reserve % (worst-case gap), both for the whole year
+function evLines(o){
+  const L = {};
+  (o?.E||[]).filter(e=>e.status!=='closed').forEach(e => (e.impacts||[]).forEach(im => {
+    if (!im.line) return; const ms = im.months?.length ? im.months : e.months, sh = (ms||[]).length/12;
+    const lk = Number(im.likely)||0, wc = Math.max(Number(im.worst)||0, lk), x = (L[im.line] ||= { likely:0, reserve:0, worst:0, ev:[] });
+    if (e.status==='active') { x.likely += lk*sh; x.reserve += (wc-lk)*sh; x.worst += wc*sh; }
+    else { x.reserve += wc*sh*(Number(e.probability)||0)/100; x.worst += wc*sh; }
+    x.ev.push({ e, im, sh, ms });
+  }));
+  Object.values(L).forEach(x => { x.likely = Math.round(x.likely*10)/10; x.reserve = Math.round(x.reserve*10)/10; x.worst = Math.round(x.worst*10)/10; });
+  return L;
+}
+const evLikely = (o, item) => evLines(o)[item]?.likely || 0;
+// reserve in pesos from the budget lines that are exposed: per event and in total
+function evReserve(o, opexLines){
+  const byLine = {}; (opexLines||[]).forEach(l => { const k = l.line_item; if (k) byLine[k] = (byLine[k]||0) + annual(l); });
+  const per = [];
+  (o?.E||[]).filter(e=>e.status!=='closed').forEach(e => { let likely = 0, reserve = 0; const rows = [];
+    (e.impacts||[]).forEach(im => { const amt = byLine[im.line]||0; if (!im.line) return; const ms = im.months?.length ? im.months : e.months, sh = (ms||[]).length/12;
+      const lk = Number(im.likely)||0, wc = Math.max(Number(im.worst)||0, lk);
+      // budget lines already carry the likely increase: back it out to get the base
+      const base = e.status==='active' ? amt/(1+lk*sh/100) : amt;
+      const l = e.status==='active' ? base*lk*sh/100 : 0, r = e.status==='active' ? base*(wc-lk)*sh/100 : base*wc*sh/100*(Number(e.probability)||0)/100;
+      likely += l; reserve += r; rows.push({ im, amt, likely:l, reserve:r, sh }); });
+    per.push({ e, likely, reserve, rows }); });
+  return { per, likely:sum(per.map(p=>p.likely)), reserve:sum(per.map(p=>p.reserve)) };
+}
+async function loadEvents(y){ const { data, error } = await sb.from('bgt_risk_events').select('*').eq('year', y).order('created_at'); if (error) throw error; return data||[]; }
+
+/* ---------- the "Events and risks" section of the Cost outlook page ---------- */
+async function evSectionHtml(y, o){
+  const ed = canManageData(), E = (o.E||[]);
+  let R = { per:[], likely:0, reserve:0 };
+  try { const cur = await loadYearData(y, null); R = evReserve(o, cur.bud); S._evR = R; } catch(e){ console.error(e); }
+  const pr = id => R.per.find(p=>p.e.id===id);
+  const card = e => { const p = pr(e.id);
+    return `<div class="card ev ev-${e.status}"><div class="ev-h"><div><div class="eyebrow">${e.kind==='planned'?'Planned change':'Event'} · ${evMonthsText(e.months)} ${y}${e.status==='watch'?` · ${e.probability}% likely`:''}</div><h3>${esc(e.title)}</h3></div>
+        <span class="chip ${e.status==='active'?'pri-crit':e.status==='watch'?'pri-med':'pri-ok'}">${EV_STATUS[e.status]}</span></div>
+      ${e.summary?`<p class="ev-s">${esc(e.summary)}</p>`:''}
+      ${(e.impacts||[]).length?`<div class="tbl-wrap"><table class="ledger" style="min-width:620px"><thead><tr><th>Expense line it moves</th><th>Months</th><th class="r">Likely</th><th class="r">Worst case</th><th class="r">In the ${y} budget</th><th class="r">Reserve</th></tr></thead><tbody>
+        ${(e.impacts||[]).map((im,i)=>{ const rw = p?.rows.find(r=>r.im===im) || p?.rows[i]; return `<tr><td class="act" style="font-size:13px">${esc(im.line)}${im.note?`<div class="hint">${esc(im.note)}</div>`:''}</td><td style="font-size:12.5px">${evMonthsText(im.months?.length?im.months:e.months)}</td>
+          <td class="r num">${e.status==='active'?`+${Number(im.likely)||0}%`:'<span class="hint">not in prices</span>'}</td><td class="r num">+${Number(im.worst)||0}%</td>
+          <td class="r num">${rw?.likely?short(rw.likely):'—'}</td><td class="r num">${rw?.reserve?short(rw.reserve):'—'}</td></tr>`; }).join('')}</tbody></table></div>
+        <p class="hint" style="padding:4px 14px 0;margin:0">Increases apply in the months shown. "In the budget" and "Reserve" use the ${y} lines entered so far${p&&!sum(p.rows.map(r=>r.amt))?' — none of the exposed lines has an amount yet':''}.</p>`:''}
+      ${(e.actions||[]).length?`<h4 class="ev-a">What we can do</h4><ul class="ev-act">${(e.actions||[]).map(a=>`<li><b>${esc(a.action)}</b>${a.lines?.length?` <span class="hint">· ${esc(a.lines.join(', '))}</span>`:''}${a.owner?` <span class="chip basis-working" style="font-size:10.5px">${esc(a.owner)}</span>`:''}${a.cost||a.saving?`<div class="hint">${a.cost?`Cost ${short(a.cost)}`:''}${a.cost&&a.saving?' · ':''}${a.saving?`saves about ${short(a.saving)} a year`:''}</div>`:''}${a.note?`<div class="hint">${esc(a.note)}</div>`:''}</li>`).join('')}</ul>`:''}
+      <div class="src" style="padding:6px 14px 12px">${(e.sources||[]).map(s=>s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title||'Source')}</a>`:esc(s.title||'')).join(' · ')}${e.as_of?` · as of ${e.as_of}`:''}${ed?` · <a onclick="evEdit('${e.id}')">Edit</a>`:''}</div></div>`; };
+  return `<h3 class="sec">Events and risks for ${y}</h3>
+    <p class="hint" style="margin:-4px 0 10px">Things that break the normal trend — a climate event, a wage order, a power-rate hike. For events <b>in the budget</b>, the likely increase goes into the standard prices and the suggested change per line; the gap to the worst case becomes a <b>contingency reserve held by the MD</b>, released only if it happens. Events we are <b>watching</b> add worst case × probability to the reserve.</p>
+    <div class="ev-sum"><div><span>Likely cost already in the ${y} prices</span><b>${short(R.likely)}</b></div><div><span>Contingency reserve (MD)</span><b>${short(R.reserve)}</b></div><div><span>Events</span><b>${E.filter(e=>e.status!=='closed').length}</b><small>${E.filter(e=>e.status==='active').length} in the budget · ${E.filter(e=>e.status==='watch').length} watching</small></div>
+      ${ed?`<div class="ev-btns"><button class="btn primary" onclick="evDraft()">Draft an event with the assistant</button><button class="btn" onclick="evEdit()">Add an event</button></div>`:''}</div>
+    ${E.filter(e=>e.status!=='closed').map(card).join('') || `<div class="card"><div class="empty"><b>No events recorded for ${y}</b>Add one — for example El Niño, a coming wage order or a Meralco rate increase.</div></div>`}
+    ${E.some(e=>e.status==='closed')?`<details style="margin:6px 0 14px"><summary class="hint" style="cursor:pointer">${E.filter(e=>e.status==='closed').length} closed</summary>${E.filter(e=>e.status==='closed').map(card).join('')}</details>`:''}`;
+}
+
+/* ---------- add / edit ---------- */
+function evEdit(id, draft){
+  const e = id ? (S._evAll||[]).find(x=>x.id===id) : (draft || { title:'', kind:'event', status:'active', probability:100, months:[1,2,3,4,5,6,7,8,9,10,11,12], impacts:[], actions:[], sources:[] });
+  S._evE = JSON.parse(JSON.stringify(e)); S._evE.impacts ||= []; S._evE.actions ||= []; S._evE.sources ||= [];
+  modal(`<h3>${id?'Edit event':'New event'}</h3><div id="evForm"></div>
+    <div class="actions" style="justify-content:space-between">${id?`<button class="btn ghost danger" onclick="evClose('${id}')">Mark closed</button>`:'<span></span>'}<div class="row-flex"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="evSave('${id||''}')">Save</button></div></div>`, 'wide');
+  evForm();
+}
+function evForm(){
+  const e = S._evE, li = (S.items.opex||[]).slice().sort();
+  const opt = (v) => `<option value="">— choose —</option>${li.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}`;
+  $('#evForm').innerHTML = `<div class="g2"><div class="field"><label for="ev_t">Event</label><input class="inp" id="ev_t" value="${esc(e.title||'')}" placeholder="e.g. Very strong El Niño 2026–27"></div>
+      <div class="field"><label for="ev_k">Type</label><select class="inp" id="ev_k"><option value="event" ${e.kind!=='planned'?'selected':''}>Event (climate, market, supply)</option><option value="planned" ${e.kind==='planned'?'selected':''}>Planned change (wage order, rate hike, tax)</option></select></div>
+      <div class="field"><label for="ev_st">How to budget it</label><select class="inp" id="ev_st"><option value="active" ${e.status==='active'?'selected':''}>In the budget — likely increase in prices, worst-case gap in the reserve</option><option value="watch" ${e.status==='watch'?'selected':''}>Watching — only in the reserve (worst case × probability)</option><option value="closed" ${e.status==='closed'?'selected':''}>Closed — no longer applies</option></select></div>
+      <div class="field"><label for="ev_p">Probability (%)</label><input class="inp num" id="ev_p" type="number" min="0" max="100" value="${e.probability??100}"></div></div>
+    <div class="field"><label>Months of ${S.cycle.year} it affects</label><div class="ev-ms">${MONTHS.map((m,i)=>`<label><input type="checkbox" class="ev_m" value="${i+1}" ${(e.months||[]).includes(i+1)?'checked':''}> ${m}</label>`).join('')}</div></div>
+    <div class="field"><label for="ev_s">What is happening and why it matters</label><textarea class="inp" id="ev_s" rows="3">${esc(e.summary||'')}</textarea></div>
+    <h4 class="ev-a">Expense lines it moves <span class="hint">— % increase in the months it hits</span></h4>
+    <table class="ledger ev-tbl"><thead><tr><th>Expense line</th><th class="r">Likely %</th><th class="r">Worst %</th><th>Why</th><th></th></tr></thead><tbody>
+      ${e.impacts.map((im,i)=>`<tr><td><select class="inp evi" data-i="${i}" data-k="line">${opt(im.line)}</select></td><td><input class="inp num evi" data-i="${i}" data-k="likely" type="number" step="any" value="${im.likely??''}"></td><td><input class="inp num evi" data-i="${i}" data-k="worst" type="number" step="any" value="${im.worst??''}"></td><td><input class="inp evi" data-i="${i}" data-k="note" value="${esc(im.note||'')}"></td><td><button class="btn sm ghost" onclick="evRow('impacts',${i})">✕</button></td></tr>`).join('')}
+    </tbody></table><button class="btn sm" onclick="evRow('impacts')">+ Add a line</button>
+    <h4 class="ev-a">What we can do <span class="hint">— recommendations to avoid or soften it</span></h4>
+    <table class="ledger ev-tbl"><thead><tr><th>Action</th><th>Lines it protects</th><th>Owner</th><th class="r">Cost ₱</th><th class="r">Saves ₱/yr</th><th></th></tr></thead><tbody>
+      ${e.actions.map((a,i)=>`<tr><td><input class="inp eva" data-i="${i}" data-k="action" value="${esc(a.action||'')}"></td><td><select class="inp eva" data-i="${i}" data-k="lines">${opt((a.lines||[])[0])}</select></td><td><input class="inp eva" data-i="${i}" data-k="owner" value="${esc(a.owner||'')}" placeholder="e.g. Engineering" style="max-width:130px"></td>
+        <td><input class="inp num eva" data-i="${i}" data-k="cost" type="number" value="${a.cost??''}"></td><td><input class="inp num eva" data-i="${i}" data-k="saving" type="number" value="${a.saving??''}"></td><td><button class="btn sm ghost" onclick="evRow('actions',${i})">✕</button></td></tr>`).join('')}
+    </tbody></table><button class="btn sm" onclick="evRow('actions')">+ Add an action</button>
+    <div class="field" style="margin-top:12px"><label for="ev_src">Sources — one per line: title | link</label><textarea class="inp" id="ev_src" rows="3">${esc(e.sources.map(s=>`${s.title||''} | ${s.url||''}`).join('\n'))}</textarea></div>`;
+}
+function evRead(){ const e = S._evE;
+  e.title = $('#ev_t').value.trim(); e.kind = $('#ev_k').value; e.status = $('#ev_st').value; e.probability = Math.max(0, Math.min(100, Number($('#ev_p').value)||0));
+  e.months = [...document.querySelectorAll('.ev_m:checked')].map(x=>Number(x.value)); e.summary = $('#ev_s').value.trim();
+  document.querySelectorAll('.evi').forEach(x => { const im = e.impacts[x.dataset.i]; im[x.dataset.k] = x.type==='number' ? (x.value===''?null:Number(x.value)) : x.value; });
+  document.querySelectorAll('.eva').forEach(x => { const a = e.actions[x.dataset.i], k = x.dataset.k; a[k] = k==='lines' ? (x.value?[x.value]:[]) : x.type==='number' ? (x.value===''?null:Number(x.value)) : x.value; });
+  e.sources = $('#ev_src').value.split('\n').map(t=>t.trim()).filter(Boolean).map(t=>{ const [a,b] = t.split('|').map(s=>s.trim()); return b ? { title:a, url:b } : /^https?:/.test(a) ? { title:'Source', url:a } : { title:a }; });
+}
+function evRow(k, i){ evRead(); if (i==null) S._evE[k].push(k==='impacts'?{ line:'', likely:null, worst:null }:{ action:'', lines:[] }); else S._evE[k].splice(i,1); evForm(); }
+async function evSave(id){
+  evRead(); const e = S._evE;
+  if (!e.title) return toast('Name the event.', true); if (!e.months.length) return toast('Tick the months it affects.', true);
+  const imp = e.impacts.filter(x=>x.line); if (imp.some(x=>(Number(x.worst)||0) < (Number(x.likely)||0))) return toast('Worst case should be at least the likely increase.', true);
+  const row = { company_id:S.company.id, year:S.cycle.year, title:e.title, summary:e.summary||null, kind:e.kind, status:e.status, probability:e.probability, months:e.months,
+    impacts:imp.map(x=>({ line:x.line, likely:Number(x.likely)||0, worst:Number(x.worst)||0, note:x.note||'' , ...(x.months?.length?{ months:x.months }:{}) })),
+    actions:e.actions.filter(a=>a.action), sources:e.sources, as_of:new Date().toISOString().slice(0,10), updated_by:S.me.id, updated_at:new Date().toISOString() };
+  const q = id ? await sb.from('bgt_risk_events').update(row).eq('id', id) : await sb.from('bgt_risk_events').insert({ ...row, created_by:S.me.id });
+  if (q.error) return fail(q.error);
+  S.ol.cache = {}; closeModal(); toast('Event saved — republish the standard prices so the likely increase reaches the budgets'); renderOutlook();
+}
+async function evClose(id){ const q = await sb.from('bgt_risk_events').update({ status:'closed', updated_by:S.me.id, updated_at:new Date().toISOString() }).eq('id', id); if (q.error) return fail(q.error); S.ol.cache = {}; closeModal(); toast('Event closed'); renderOutlook(); }
+
+/* ---------- the assistant drafts an event from the news ---------- */
+function evDraft(){
+  modal(`<h3>Draft an event with the assistant</h3><p class="hint">It searches the news, then proposes the months, the expense lines it moves (likely and worst case) and what WCLI can do. You check and edit before saving.</p>
+    <div class="field"><label for="evq">Event</label><input class="inp" id="evq" placeholder="e.g. El Niño 2026–27, second NCR wage order 2027, Meralco rate increase"></div>
+    <div class="field"><label for="evn">Anything we already know (optional)</label><textarea class="inp" id="evn" rows="3" placeholder="e.g. our plant is in Pasig; we have solar; water comes from Manila Water"></textarea></div>
+    <div id="evMsg" class="hint"></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn primary" id="evGo" onclick="evDraftGo()">Draft it</button></div>`);
+  setTimeout(()=>$('#evq')?.focus(), 50);
+}
+async function evDraftGo(){
+  const q = $('#evq').value.trim(); if (!q) return toast('Type the event first.', true);
+  $('#evGo').disabled = true; $('#evMsg').textContent = 'Searching the news and drafting… about a minute.';
+  try { const { data, error } = await sb.functions.invoke('bgt-ai', { body:{ mode:'draft_event', year:S.cycle.year, query:q, notes:$('#evn').value.trim(), lines:S.items.opex||[] } });
+    if (error || data?.error) throw new Error(data?.error || error.message);
+    const d = data.result || data.out || data; const li = new Set(S.items.opex||[]);
+    evEdit(null, { title:d.title||q, kind:d.kind==='planned'?'planned':'event', status:d.status==='watch'?'watch':'active', probability:Number(d.probability)||100,
+      months:(d.months||[]).map(Number).filter(m=>m>=1&&m<=12), summary:d.summary||'',
+      impacts:(d.impacts||[]).filter(x=>li.has(x.line)).map(x=>({ line:x.line, likely:Number(x.likely)||0, worst:Number(x.worst)||0, note:x.why||x.note||'' })),
+      actions:(d.actions||[]).map(a=>({ action:a.action, lines:(a.lines||[]).filter(l=>li.has(l)).slice(0,1), owner:a.owner||'', cost:a.cost||null, saving:a.saving||null, note:a.note||'' })),
+      sources:(d.sources||[]).map(s=>({ title:s.title, url:s.url })) });
+    toast('Draft ready — check every figure before saving');
+  } catch(e){ $('#evMsg').textContent = 'Could not draft: ' + e.message; $('#evGo').disabled = false; }
+}
+// Plant overview banner
+async function evStripHtml(opexAll){
+  const o = await loadOutlook(S.cycle.year), E = (o.E||[]).filter(e=>e.status!=='closed'); if (!E.length) return '';
+  const R = evReserve(o, opexAll);
+  return `<div class="banner amber ev-strip"><b>Events and risks:</b> ${E.map(e=>`${esc(e.title)} <span class="hint">(${EV_STATUS[e.status].toLowerCase()}, ${evMonthsText(e.months)})</span>`).join(' · ')}
+    — likely <b>${short(R.likely)}</b> already in the prices · contingency reserve <b>${short(R.reserve)}</b> held by the MD. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('outlook')">Details →</a></div>`;
 }
 
 /* ================= BUDGET ASSISTANT ================= */
@@ -5961,9 +6131,10 @@ async function prsGatherPlant(){
     const g = q('Electricity'), so = q('Solar'), sh = (S.utilShared||['MSSI']).map(c=>({ c, r:q('Electricity', c) })).filter(x=>x.r.length);
     if (g.length) elec = { gridQ:tq(g), gridA:ta(g), months:new Set(g.map(r=>r.month)).size, solarQ:tq(so), shared:sh.map(x=>({ c:x.c, q:tq(x.r), a:ta(x.r) })), y:Y-1 };
     if (elec) { elec.rate = elec.gridQ ? elec.gridA/elec.gridQ : null; elec.avoided = elec.solarQ && elec.rate ? elec.solarQ*elec.rate : 0; elec.own = elec.gridA - sum(elec.shared.map(x=>x.a)); } } catch(e){}
+  let ev = null; try { const o = await loadOutlook(Y); if ((o.E||[]).some(e=>e.status!=='closed')) ev = evReserve(o, opex); } catch(e){}
   const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
-    depts, lines, over, unb, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    depts, lines, over, unb, ev, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
 }
 
@@ -6054,6 +6225,15 @@ function prsDeckPlant(D){
     pptx:(s, H) => { H.base(s, 'What the analysis says'); if (lead) s.addText(lead, { x:0.5, y:1.45, w:12.2, h:0.8, fontFace:H.F, fontSize:13, italic:true, color:H.INK, valign:'top', fit:'shrink' });
       const col = (blocks, x) => s.addText(blocks.flatMap(([t, arr]) => [{ text:t, options:{ bold:true, fontSize:12, color:H.MUTE, breakLine:true } }, ...arr.map(v=>({ text:v, options:{ bullet:true, breakLine:true } }))]), { x, y:2.25, w:6.0, h:4.6, fontFace:H.F, fontSize:12, color:H.INK, valign:'top', paraSpaceAfter:4, fit:'shrink' });
       col([['Strengths / opportunities', good], ['Weaknesses / threats', bad]], 0.5); col([['Top risks', risks], ['Recommendations', recs]], 6.8); } });
+  if (D.ev?.per.length) { const EV = D.ev, acts = EV.per.flatMap(p=>(p.e.actions||[]).map(a=>({ ...a, ev:p.e.title }))).slice(0,6);
+    S_.push({ id:'prisk', title:'Events and risks', live:()=>go('outlook'), html:() => `<h2>Events and risks for ${Y} <small>and what we will do about them</small></h2>
+      ${kp([['Likely cost in the prices', short(EV.likely), 'added to the standard prices and suggested changes'], ['Contingency reserve', short(EV.reserve), 'held by the MD — released only if it happens'], ['Events', String(EV.per.length), EV.per.map(p=>EV_STATUS[p.e.status].toLowerCase()).join(', ')], ['Budget + reserve', short(tot+EV.reserve), 'the plant\'s worst-case exposure']])}
+      <div class="ps-2col" style="grid-template-columns:1.15fr 1fr"><div><table class="ps-tbl"><thead><tr><th>Event</th><th>Months</th><th class="r">In prices</th><th class="r">Reserve</th></tr></thead><tbody>
+        ${EV.per.map(p=>`<tr><td><b>${esc(p.e.title)}</b><br><small>${esc((p.e.impacts||[]).map(i=>`${prsLi(i.line)} ${p.e.status==='active'?'+'+i.likely+'%':''}${i.worst?' (worst +'+i.worst+'%)':''}`).join(' · '))}</small></td><td>${evMonthsText(p.e.months)}</td><td class="r">${short(p.likely)}</td><td class="r"><b>${short(p.reserve)}</b></td></tr>`).join('')}</tbody></table></div>
+      <div><h3>What we will do</h3><ul>${acts.map(a=>`<li><b>${esc(a.action)}</b>${a.owner?` <small>— ${esc(a.owner)}</small>`:''}${a.saving?` <small>· saves ~${short(a.saving)}/yr</small>`:''}</li>`).join('')||'<li>No actions recorded yet.</li>'}</ul></div></div>`,
+      notes:() => EV.per.map(p=>`${p.e.title} (${evMonthsText(p.e.months)}): ${short(p.likely)} in prices, reserve ${short(p.reserve)}. ${p.e.summary||''}`).join('\n'),
+      pptx:(s, H) => { H.base(s, `Events and risks for ${Y}`, 'and what we will do'); H.kpis(s, [['Likely cost in prices', short(EV.likely)], ['Contingency reserve', short(EV.reserve), 'held by the MD'], ['Events', String(EV.per.length)], ['Budget + reserve', short(tot+EV.reserve)]]);
+        H.tbl(s, ['Event','Months','In prices','Reserve','What we will do'], EV.per.map(p=>[{ text:p.e.title, options:{ bold:true } }, evMonthsText(p.e.months), short(p.likely), { text:short(p.reserve), options:{ bold:true } }, (p.e.actions||[]).slice(0,3).map(a=>'• '+a.action).join('\n')]), 3.2, [3.0,1.4,1.4,1.4,4.93]); } }); }
   S_.push({ id:'popts', title:'Options', live:()=>go('analysis'), html:() => `<h2>If the plant must spend less</h2>${kp([['Low / Discretionary OPEX', short(lowOT), `${lowO.length} lines — first to cut`], ['Medium / Low CAPEX', short(medCT), `${medC.length} items — can be deferred`], ['Budget without both', short(tot-lowOT-medCT), tot?`${Math.round(100*(lowOT+medCT)/tot)}% less`:'']].concat([['Critical / Mandatory', short(D.pri['Critical / Mandatory']||0), 'never cut — only re-price']]))}
       <div class="ps-2col"><div><h3>CAPEX that could wait</h3><ul>${medC.slice(0,6).map(l=>`<li>${esc(l.asset)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Medium or Low.</li>'}</ul></div>
         <div><h3>Largest discretionary OPEX</h3><ul>${lowO.sort((a,b)=>annual(b)-annual(a)).slice(0,6).map(l=>`<li>${esc(l.activity||l.line_item)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Low / Discretionary.</li>'}</ul></div></div>`,
@@ -6064,10 +6244,11 @@ function prsDeckPlant(D){
       <li>Approve the ${Y} plant OPEX of <b>${short(D.opexT)}</b> (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).</li>
       <li>Approve <b>${D.capex.length}</b> CAPEX items totalling <b>${short(D.capexT)}</b>${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.</li>
       <li>Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.</li>
+      ${D.ev?.reserve?`<li>Approve a contingency reserve of <b>${short(D.ev.reserve)}</b>, held by the MD, for ${esc(D.ev.per.map(p=>p.e.title).join(', '))} — released only if it happens.</li>`:''}
       ${waiting?`<li>Note: ${waiting} department budget${waiting>1?'s are':' is'} still being finalised.</li>`:''}</ol>
       <div class="ps-sum">${Y} plant budget: <b>${short(D.opexT)}</b> OPEX + <b>${short(D.capexT)}</b> CAPEX = <b>${short(tot)}</b></div>`,
     notes:() => `Ask for approval of ${short(tot)}.`,
-    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
+    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`, ...(D.ev?.reserve?[`Approve a contingency reserve of ${short(D.ev.reserve)}, held by the MD, for ${D.ev.per.map(p=>p.e.title).join(', ')}.`]:[])].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
       s.addText(`${Y} plant budget: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:H.F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:H.T }, align:'center' }); } });
   return S_;
 }
@@ -6086,6 +6267,11 @@ async function prsDataPack(){
     const s2 = wb.addWorksheet('By expense line'); s2.addRow(['Expense line',`${Y}`,`${Y-1} full-year view`,`${Y-1} budget`]); hd(s2); D.lines.forEach(x=>s2.addRow([x.item, x.amt, x.lyView, x.lyBud])); s2.columns.forEach((c,i)=>c.width = i?18:48);
     const s3 = wb.addWorksheet('Per board'); s3.addRow(['Year','OPEX per board produced','OPEX per board sold','Note']); hd(s3); D.per.forEach(p=>s3.addRow([p.y, p.prod, p.sold, p.budget?'budget ÷ planned boards':'Accounting actuals ÷ boards'])); s3.columns.forEach(c=>c.width = 26);
     const s4 = wb.addWorksheet('Standard prices'); s4.addRow(['Item','Unit','Price','Source']); hd(s4); D.std.forEach(p=>s4.addRow([p.item, p.unit, Number(p.unit_price), p.source_type||''])); s4.columns.forEach(c=>c.width = 28);
+    if (D.ev?.per.length) { const s5 = wb.addWorksheet('Events and risks'); s5.addRow(['Event','Status','Months','Expense line','Likely %','Worst %','Budget on the line','In prices','Reserve']); hd(s5);
+      D.ev.per.forEach(p=>p.rows.forEach(r=>s5.addRow([p.e.title, EV_STATUS[p.e.status], evMonthsText(r.im.months?.length?r.im.months:p.e.months), r.im.line, p.e.status==='active'?Number(r.im.likely)||0:0, Number(r.im.worst)||0, r.amt, r.likely, r.reserve])));
+      s5.addRow(['Total','','','','','','',D.ev.likely,D.ev.reserve]).font = { bold:true };
+      const s6 = wb.addWorksheet('Recommendations'); s6.addRow(['Event','Action','Lines it protects','Owner','Cost','Saves per year']); hd(s6);
+      D.ev.per.forEach(p=>(p.e.actions||[]).forEach(a=>s6.addRow([p.e.title, a.action, (a.lines||[]).join(', '), a.owner||'', a.cost||null, a.saving||null]))); [s5,s6].forEach(w=>w.columns.forEach(c=>c.width = 24)); }
     lineSheet('OPEX lines', D.opex, true); capSheet(D.capex, true);
   } else {
     const s1 = wb.addWorksheet('By expense line'); s1.addRow(['Expense line',`${Y}`,`${Y-1} full-year view`,`${Y-1} budget`,'Why']); hd(s1); D.lines.forEach(x=>s1.addRow([x.item, x.amt, x.lyView, x.lyBud, x.why])); s1.columns.forEach((c,i)=>c.width = i?18:44);

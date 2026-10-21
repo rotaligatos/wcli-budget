@@ -622,7 +622,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-22 00:36</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-22 01:05</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -857,6 +857,10 @@ const annual = l => months(l).reduce((s,x)=>s+x,0);
 const sum = a => a.reduce((s,x)=>s+(Number(x)||0),0);
 const fmtDate = d => d ? new Date(d).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
 const isReviewer = () => REVIEWERS.includes(S.me?.role);
+/* extra record-keeping grants on top of a user's department and role (bgt_users.access) */
+const ACCESS_LABEL = { stores:'Stores withdrawals' };
+const hasAccess = k => !S.preview && (S.me?.access||[]).includes(k);
+const canStores = () => canManageData() || hasAccess('stores');
 function toast(msg, err=false){ const t=$('#toast'); t.textContent=msg; t.className=err?'err':''; clearTimeout(t._h); t._h=setTimeout(()=>t.className='hidden', err?6000:2600); }
 function fail(e){ console.error(e); toast((e && (e.message||e.error_description)) || String(e), true); }
 function show(id){ ['login','pending','app'].forEach(x=>$('#'+x).classList.toggle('hidden', x!==id)); }
@@ -1117,7 +1121,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 00:36</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 01:05</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1785,10 +1789,11 @@ async function renderAdmin(){
     <div class="field" style="flex:1;min-width:150px"><label for="nuDept">Department</label><select class="inp" id="nuDept">${deptOpts('')}</select></div>
     <div class="field" style="flex:1;min-width:150px"><label for="nuRole">Role</label><select class="inp" id="nuRole">${roles.filter(r=>r!=='pending').map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join('')}</select></div>
     <button class="btn primary" onclick="addUser()">Add user</button></div></div>
-  <div class="card" style="margin-bottom:16px"><h3>People</h3><div class="tbl-wrap"><table class="ledger" style="min-width:760px"><thead><tr><th>Name / email</th><th>Department</th><th>Role</th><th>Active</th><th>Last sign-in</th></tr></thead><tbody>
+  <div class="card" style="margin-bottom:16px"><h3>People</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Name / email</th><th>Department</th><th>Role</th><th title="Records this person keeps for the whole plant, on top of their department and role">Also keeps</th><th>Active</th><th>Last sign-in</th></tr></thead><tbody>
     ${S.users.map(u=>`<tr><td><input class="inp" style="max-width:220px;padding:4px 7px" value="${esc(u.full_name||'')}" onchange="updUser('${u.id}',{full_name:this.value})" aria-label="Name"><div class="item" style="text-transform:none">${esc(u.email)}</div></td>
       <td><select class="inp" onchange="updUser('${u.id}',{department_id:this.value||null})">${deptOpts(u.department_id)}</select></td>
       <td><select class="inp" onchange="updUser('${u.id}',{role:this.value})">${roles.map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
+      <td style="white-space:nowrap;font-size:12.5px">${Object.entries(ACCESS_LABEL).map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${(u.access||[]).includes(k)?'checked':''} onchange="updAccess('${u.id}','${k}',this.checked)">${l}</label>`).join('')}</td>
       <td><input type="checkbox" ${u.active?'checked':''} onchange="updUser('${u.id}',{active:this.checked})" aria-label="Active"></td>
       <td class="num" style="font-size:12px">${u.last_login?fmtDate(u.last_login):(u.auth_uid?'':'Not yet')}</td></tr>`).join('')}
   </tbody></table></div></div>
@@ -1848,6 +1853,10 @@ async function addUser(){
   const { error } = await sb.from('bgt_users').insert({ email, full_name:$('#nuName').value.trim()||null, department_id:$('#nuDept').value||null, role:$('#nuRole').value, company_id:S.company.id });
   if (error) return fail(error.code==='23505' ? new Error('That email is already in the list.') : error);
   toast('User added'); renderAdmin();
+}
+async function updAccess(id, k, on){
+  const u = S.users.find(x=>x.id===id), a = new Set(u?.access||[]); on ? a.add(k) : a.delete(k);
+  await updUser(id, { access:[...a] });
 }
 async function updUser(id, patch){
   const { error } = await sb.from('bgt_users').update(patch).eq('id', id); if (error) return fail(error);
@@ -3896,7 +3905,7 @@ async function renderRecords(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${Y} · ${dept?esc(deptById(dept)?.name):'Whole plant'}</div><h1>Plant records</h1>
       <div class="sub">The plant's own record of spending (from purchase orders) and consumption (power, fuel, water…). It may not capture everything Accounting books, but it is available right away — and it shows usage, not just pesos.</div></div>
-      <div class="actions">${S.rc.kind==='issue' ? (canManageData()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(canUtil() || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
+      <div class="actions">${S.rc.kind==='issue' ? (canStores()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(canUtil() || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
       ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
@@ -3904,7 +3913,7 @@ async function renderRecords(){
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
     <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',utilN],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
-    <div id="rcBody">${S.rc.kind==='issue' ? await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}</div>`;
+    <div id="rcBody">${S.rc.kind==='issue' ? (hasAccess('stores') && !isReviewer() ? await storesLoadsCard(Y) : '') + await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}</div>`;
   } catch(e){ fail(e); }
 }
 async function poView(Y, dept, po, list, poMonths, ed){
@@ -4185,6 +4194,14 @@ async function loadIssues(Y, dept){
   const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('department_id,month,line_item,section,category,item,qty,amount,ref_no,rec_date,id,unit_price,one_off,one_off_note').eq('year', Y).eq('kind','issue'); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
   return (S.rc.cache[k] = rows);
 }
+/* for the stores records keeper: which months of the stores report are loaded for the whole plant (no analysis) */
+async function storesLoadsCard(Y){
+  const [a, b] = await Promise.all([Y, Y-1].map(y => sb.rpc('bgt_stores_loads', { p_year:y }).then(r => r.data||[], () => [])));
+  const row = (y, L) => { const m = Object.fromEntries(L.map(x=>[x.month, x]));
+    return `<tr><td><b>${y}</b></td>${MONTHS.map((n,i)=>{ const x = m[i+1]; return `<td class="r num" title="${x?`${n} ${y}: ${Number(x.rows).toLocaleString('en-PH')} withdrawals, ${peso(x.total)}, last entry ${x.last_date}, ${x.depts} departments`:`${n} ${y}: not loaded`}">${x?Number(x.rows).toLocaleString('en-PH'):'<span style="color:var(--faint)">—</span>'}</td>`; }).join('')}<td class="r num">${short(sum(L.map(x=>x.total)))}</td></tr>`; };
+  return `<div class="card" style="margin-bottom:16px"><h3>Stores report loaded — whole plant</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Year</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>${row(Y, a)}${row(Y-1, b)}</tbody></table></div>
+    <p class="hint" style="padding:8px 14px 12px;margin:0">Withdrawals stored per month for all departments. Import the latest consumption report to fill or refresh a month; importing replaces only the months in the file. Hover a month for its peso total and last entry date. The analysis below is for your own department.</p></div>`;
+}
 async function issueView(Y, dept, issAll){
   const [p1a, p2a, D] = await Promise.all([loadIssues(Y-1, dept), loadIssues(Y-2, dept), loadYearData(Y, dept).catch(()=>null)]);
   // one-time items (e.g. a powerline rehabilitation) stay visible but are left out of comparisons and the pace
@@ -4200,7 +4217,7 @@ async function issueView(Y, dept, issAll){
   const tY = tot(iss), tYc = tot(iss.filter(isC)), tP = tot(p1), tPsame = tot(p1.filter(isC)), tP2 = tot(p2), rr = cl ? tYc/cl*12 : 0;
   const pct = (a,b) => b ? `${a>=b?'+':''}${Math.round(100*(a-b)/b)}%` : '—';
   const span = n ? `${MONTHS[ms[0]-1]}–${MONTHS[last-1]}` : '', cspan = cl ? `Jan–${MONTHS[cl-1]}` : '';
-  if (!iss.length && !p1.length) return `<div class="card"><div class="empty"><b>No stores withdrawals for ${Y}</b>${canManageData()?'Use <b>Import stores report</b> with the plant\'s consumption report (WRF transactions). The app maps each withdrawal to a department and budget line.':'The Head of Plant Operations loads these from the plant\'s consumption report.'}</div></div>`;
+  if (!iss.length && !p1.length) return `<div class="card"><div class="empty"><b>No stores withdrawals for ${Y}</b>${canStores()?'Use <b>Import stores report</b> with the plant\'s consumption report (WRF transactions). The app maps each withdrawal to a department and budget line.':'The Head of Plant Operations loads these from the plant\'s consumption report.'}</div></div>`;
   // by expense line: two years back, last year, this year to date, run-rate, Accounting same months
   const L0 = by(iss, r=>r.line_item), L1 = by(p1, r=>r.line_item), L2 = by(p2, r=>r.line_item), L1s = by(p1.filter(isC), r=>r.line_item), L0c = by(iss.filter(isC), r=>r.line_item);
   const acc = {}; (D?.act||[]).filter(a=>a.kind!=='capex' && ms.includes(a.month)).forEach(a => acc[a.line_item] = (acc[a.line_item]||0) + Number(a.amount));
@@ -4224,7 +4241,7 @@ async function issueView(Y, dept, issAll){
       <div class="stat"><div class="eyebrow">Full year ${Y-1}</div><div class="v">${tP?short(tP):'—'}</div><div class="s">${tP2?`${Y-2}: ${short(tP2)} (${pct(tP,tP2)})`:''}</div></div>
       <div class="stat"><div class="eyebrow">${Y} full-year pace</div><div class="v">${n?short(rr):'—'}</div><div class="s">${cl?`Average of ${cspan} × 12`:''}</div></div>
     </div>
-    ${summaryOnly?`<div class="banner blue">Loaded as monthly totals per department and budget line. ${canManageData()?'Import the report file (<b>Import stores report</b>) to see sections, equipment and items — it replaces these totals for the months in the file.':''}</div>`:''}
+    ${summaryOnly?`<div class="banner blue">Loaded as monthly totals per department and budget line. ${canStores()?'Import the report file (<b>Import stores report</b>) to see sections, equipment and items — it replaces these totals for the months in the file.':''}</div>`:''}
     <div class="card"><h3>By budget line</h3><div class="tbl-wrap"><table class="ledger" style="min-width:1000px"><thead><tr><th>Budget line</th>${th}<th class="r">Accounting ${Y} ${span}</th></tr></thead><tbody>
       ${lines.map(li=>`<tr><td style="font-size:13px">${esc(li)}</td><td class="r num">${z(L2[li])}</td><td class="r num">${z(L1[li])}</td><td class="r num">${z(L0[li])}</td><td class="r num">${z(L1s[li])}</td><td class="r num">${z(L0c[li])}</td><td class="r num">${cl&&L1s[li]?pct(L0c[li]||0,L1s[li]):''}</td><td class="r num">${cl&&L0c[li]?short(L0c[li]/cl*12):''}</td><td class="r num">${acc[li]?short(acc[li]):'—'}</td></tr>`).join('')}
     </tbody><tfoot><tr><td>Total</td><td class="r num">${z(tP2)}</td><td class="r num">${z(tP)}</td><td class="r num">${z(tY)}</td><td class="r num">${z(tPsame)}</td><td class="r num">${z(tYc)}</td><td class="r num">${cl?pct(tYc,tPsame):''}</td><td class="r num">${cl?short(rr):''}</td><td class="r num">${short(sum(lines.map(li=>acc[li]||0)))}</td></tr></tfoot></table></div>

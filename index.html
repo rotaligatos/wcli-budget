@@ -287,6 +287,7 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps-tbl{width:100%;border-collapse:collapse;font-size:14px}.ps-tbl th{background:#0f5a52;color:#fff;text-align:left;padding:8px 10px;font-weight:600}.ps-tbl td{padding:7px 10px;border-bottom:1px solid #eaecf0;vertical-align:top}.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:#667085}
 .ps-just{font-size:13px;color:#475467;max-width:520px}.ps-pri{color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;white-space:nowrap}
 .ps ul{margin:0 0 16px;padding-left:22px;font-size:16px;line-height:1.5}.ps-chk{font-size:14px;color:#475467;margin:6px 0}
+.ps-an ul{font-size:15px;line-height:1.4;margin-bottom:10px}.ps-an h3{margin-top:4px}
 .ps-dec{font-size:24px;line-height:1.5;padding-left:34px}.ps-dec li{margin-bottom:10px}
 .ps-sum{position:absolute;left:60px;right:60px;bottom:64px;background:#0f5a52;color:#fff;font-size:24px;text-align:center;padding:16px;border-radius:12px}
 .pm{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end}.pm-c{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}.pm-b{width:70%;background:#0f5a52;border-radius:4px 4px 0 0}.pm-v{font-size:11px;color:#667085;margin-bottom:3px;white-space:nowrap}.pm-l{font-size:12px;color:#667085;margin-top:4px;border-top:1px solid #d0d5dd;width:100%;text-align:center;padding-top:3px}
@@ -562,7 +563,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 22:48</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-21 23:10</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1057,7 +1058,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 22:48</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:10</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -5710,9 +5711,9 @@ function prsOpen(D, deck, meta){
 const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));
 function prsShow(){
   const V = prsVisible(); PRS.i = Math.max(0, Math.min(PRS.i, V.length-1)); const s = V[PRS.i]; if (!s) return;
-  $('#prsSlide').innerHTML = `<div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.meta.label)}</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
+  $('#prsSlide').innerHTML = `<div class="ps"><div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${esc(PRS.meta.label)}</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
   $('#prsNo').textContent = `${PRS.i+1} / ${V.length}`; $('#prsProg').style.width = `${100*(PRS.i+1)/V.length}%`;
-  $('#prsLive').style.visibility = s.live ? 'visible' : 'hidden'; prsNotesSync();
+  $('#prsLive').style.visibility = s.live ? 'visible' : 'hidden'; prsShrink($('#prsSlide')); prsNotesSync();
 }
 function prsGo(d){ const n = prsVisible().length; PRS.i = Math.max(0, Math.min(n-1, PRS.i + d)); prsShow(); }
 function prsFit(){ const st = document.querySelector('#prs .prs-stage'), sl = $('#prsSlide'); if (!st || !sl) return; const k = Math.min(st.clientWidth/1280, st.clientHeight/720); sl.style.transform = `scale(${k})`; }
@@ -5725,9 +5726,10 @@ document.addEventListener('keydown', e => { if (!PRS.on || e.target.closest?.('i
 function prsFull(){ const el = document.getElementById('prs'); if (!document.fullscreenElement) el?.requestFullscreen?.().catch(()=>{}); else document.exitFullscreen?.(); setTimeout(prsFit, 200); }
 function prsExit(){ PRS.on = false; document.body.classList.remove('prs-on'); document.getElementById('prs')?.remove(); if (document.fullscreenElement) document.exitFullscreen?.(); try { PRS.win?.close(); } catch(_){} }
 // drill down: leave the deck open in the background, show the real page, come back with "Back to slides"
-function prsLive(){ const s = prsVisible()[PRS.i]; if (!s?.live) return; document.getElementById('prs').style.display = 'none'; document.body.classList.remove('prs-on'); s.live();
+function prsLive(){ const s = prsVisible()[PRS.i]; if (!s?.live) return; PRS.wasFull = !!document.fullscreenElement; if (PRS.wasFull) document.exitFullscreen?.().catch(()=>{}); document.getElementById('prs').style.display = 'none'; document.body.classList.remove('prs-on'); s.live();
   let b = document.getElementById('prsBack'); if (!b) { b = document.createElement('button'); b.id = 'prsBack'; b.className = 'btn primary'; b.textContent = '◂ Back to slides'; b.onclick = prsBack; document.body.appendChild(b); } }
-function prsBack(){ document.getElementById('prsBack')?.remove(); closeDrawer?.(); const el = document.getElementById('prs'); if (!el) return; el.style.display = ''; document.body.classList.add('prs-on'); prsShow(); prsFit(); }
+function prsBack(){ document.getElementById('prsBack')?.remove(); closeDrawer?.(); const el = document.getElementById('prs'); if (!el) return; el.style.display = ''; document.body.classList.add('prs-on'); prsShow(); prsFit();
+  if (PRS.wasFull) { PRS.wasFull = false; el.requestFullscreen?.().catch(()=>{}); setTimeout(prsFit, 200); } }
 function prsList(){
   modal2(`<h3>Slides for this meeting</h3><p class="hint">Untick a slide to skip it — remembered on this device for this budget.</p>
     <div class="prs-ls">${PRS.deck.map(s=>`<label><input type="checkbox" data-id="${s.id}" ${PRS.hidden.has(s.id)?'':'checked'}> ${esc(s.title)}</label>`).join('')}</div>
@@ -5769,12 +5771,15 @@ function prsPrint(mode){ prsPrintPrep(mode); setTimeout(() => { window.print(); 
 function prsPrintDone(){ document.body.classList.remove('prs-printing'); const h = document.getElementById('prsPrint'); if (h) h.innerHTML = ''; const pg = document.getElementById('prsPage'); if (pg) pg.textContent = ''; }
 function prsPrintPrep(mode){
   const V = prsVisible(); let host = document.getElementById('prsPrint'); if (!host) { host = document.createElement('div'); host.id = 'prsPrint'; document.body.appendChild(host); }
-  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.meta.label)} · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
+  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps"><div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${esc(PRS.meta.label)} · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
     ${mode==='handout'?`<div class="pp-n"><b>${esc(s.title)}</b><p>${esc(s.notes?s.notes():'')}</p>${prsMyNote(s.id)?`<p><b>My notes:</b> ${esc(prsMyNote(s.id))}</p>`:''}<div class="pp-lines"></div></div>`:''}</section>`).join('');
   let pg = document.getElementById('prsPage'); if (!pg) { pg = document.createElement('style'); pg.id = 'prsPage'; document.head.appendChild(pg); }
   pg.textContent = mode==='handout' ? '@page{size:A4 portrait;margin:12mm}' : '@page{size:1280px 720px;margin:0}';
-  document.body.classList.add('prs-printing');
+  document.body.classList.add('prs-printing'); prsShrink(host);
 }
+// long text (e.g. an analysis report) never runs past the footer: scale the slide body down until it fits
+function prsShrink(root){ (root||document).querySelectorAll('.ps-in').forEach(el => { el.style.zoom = ''; const max = 720-46-60-8; let k = 1;
+  while (el.scrollHeight*k > max && k > 0.55) { k -= 0.04; el.style.zoom = k; } }); }
 let PPTX_LIB = null;
 function prsLoadPptx(){ if (window.PptxGenJS) return Promise.resolve(); if (PPTX_LIB) return PPTX_LIB;
   return PPTX_LIB = new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'; s.onload = ok; s.onerror = () => { PPTX_LIB = null; no(new Error('Could not load the PowerPoint maker — check the internet connection.')); }; document.head.appendChild(s); }); }
@@ -5971,16 +5976,19 @@ function prsDeckPlant(D){
       <div><h3>By category</h3>${prsBars(Object.entries(capCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({ label:k, v })), Math.max(...Object.values(capCat),1))}<h3 style="margin-top:18px">Payment timing</h3>${prsMonths(prsMonthVals(D.capex), 120)}</div></div>`,
     notes:() => capS.slice(0,5).map(l=>`${l.asset} (${deptById(l.department_id)?.name}) ${short(annual(l))}, ${l.priority||'no priority'}`).join('; '),
     pptx:(s, H) => { H.base(s, `CAPEX — ${short(D.capexT)}`, `${D.capex.length} items`); H.tbl(s, ['Asset / project','Department','Priority','Amount','Why'], capS.slice(0,9).map(l=>[{ text:l.asset||'', options:{ bold:true } }, deptById(l.department_id)?.name||'', l.priority||'—', short(annual(l)), (l.justification||'').slice(0,140)]), 1.35, [3.0,1.7,1.6,1.3,4.7]); } });
-  const R = D.rep;
-  if (R) S_.push({ id:'panal', title:'Analysis', live:()=>go('analysis'), html:() => `<h2>What the analysis says <small>report of ${fmtDate(D.repAt)}</small></h2>
-      ${R.headline?`<p class="ps-why" style="font-size:18px">${esc(R.headline)}</p>`:''}<div class="ps-2col"><div><h3>Strengths / opportunities</h3><ul>${[...(R.swot?.strengths||[]), ...(R.swot?.opportunities||[])].slice(0,5).map(x=>`<li>${esc(x.point||x)}</li>`).join('')}</ul>
-        <h3>Weaknesses / threats</h3><ul>${[...(R.swot?.weaknesses||[]), ...(R.swot?.threats||[])].slice(0,4).map(x=>`<li>${esc(x.point||x)}</li>`).join('')}</ul></div>
-      <div><h3>Top risks</h3><ul>${(R.risks||[]).slice(0,4).map(x=>`<li>${esc(x.risk||x)}${x.response?` — <small>${esc(x.response)}</small>`:''}</li>`).join('')}</ul><h3>Recommendations</h3><ul>${(R.recommendations||[]).slice(0,4).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`,
-    notes:() => R.headline || '',
-    pptx:(s, H) => { H.base(s, 'What the analysis says'); if (R.headline) s.addText(R.headline, { x:0.5, y:1.25, w:12.3, h:0.9, fontFace:H.F, fontSize:14, italic:true, color:H.INK });
-      const col = (t, arr, x) => s.addText([{ text:t+'\n', options:{ bold:true, fontSize:13, color:H.MUTE } }, ...arr.map(v=>({ text:v+'\n', options:{ bullet:true } }))], { x, y:2.2, w:6.0, h:4.7, fontFace:H.F, fontSize:12, color:H.INK, valign:'top' });
-      col('Strengths, opportunities, weaknesses and threats', [...(R.swot?.strengths||[]).slice(0,2), ...(R.swot?.opportunities||[]).slice(0,2), ...(R.swot?.weaknesses||[]).slice(0,2), ...(R.swot?.threats||[]).slice(0,2)].map(x=>x.point||x), 0.5);
-      col('Risks and recommendations', [...(R.risks||[]).slice(0,3).map(x=>x.risk||x), ...(R.recommendations||[]).slice(0,4)], 6.8); } });
+  const R = D.rep, cut = (t, n) => { t = String(t||'').trim(); return t.length>n ? t.slice(0, n).replace(/\s+\S*$/,'')+'…' : t; };
+  const lead = R?.headline ? cut(String(R.headline).split(/(?<=[.!?])\s+/).reduce((a,t)=>a.length>=150?a:(a?a+' ':'')+t, ''), 320) : '';
+  const pts = a => (a||[]).map(x=>cut(x.point||x, 90));
+  const good = R ? [...pts(R.swot?.strengths).slice(0,3), ...pts(R.swot?.opportunities).slice(0,1)] : [], bad = R ? [...pts(R.swot?.weaknesses).slice(0,2), ...pts(R.swot?.threats).slice(0,2)] : [];
+  const risks = R ? (R.risks||[]).slice(0,3).map(x=>cut(x.risk||x, 110)) : [], recs = R ? (R.recommendations||[]).slice(0,3).map(x=>cut(x.action||x.recommendation||x, 120)) : [];
+  if (R) S_.push({ id:'panal', title:'Analysis', live:()=>{ S.an.tab='report'; go('analysis'); }, html:() => `<h2>What the analysis says <small>report of ${fmtDate(D.repAt)} — full text on the live page</small></h2>
+      ${lead?`<p class="ps-why" style="font-size:17px;line-height:1.45">${esc(lead)}</p>`:''}<div class="ps-2col ps-an"><div><h3>Strengths / opportunities</h3><ul>${good.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+        <h3>Weaknesses / threats</h3><ul>${bad.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div><h3>Top risks</h3><ul>${risks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h3>Recommendations</h3><ul>${recs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`,
+    notes:() => [R.headline||'', ...(R.risks||[]).slice(0,3).map(x=>x.response?`${x.risk}: ${x.response}`:'')].filter(Boolean).join('\n'),
+    pptx:(s, H) => { H.base(s, 'What the analysis says'); if (lead) s.addText(lead, { x:0.5, y:1.2, w:12.3, h:0.95, fontFace:H.F, fontSize:13, italic:true, color:H.INK, valign:'top', fit:'shrink' });
+      const col = (blocks, x) => s.addText(blocks.flatMap(([t, arr]) => [{ text:t, options:{ bold:true, fontSize:12, color:H.MUTE, breakLine:true } }, ...arr.map(v=>({ text:v, options:{ bullet:true, breakLine:true } }))]), { x, y:2.25, w:6.0, h:4.6, fontFace:H.F, fontSize:12, color:H.INK, valign:'top', paraSpaceAfter:4, fit:'shrink' });
+      col([['Strengths / opportunities', good], ['Weaknesses / threats', bad]], 0.5); col([['Top risks', risks], ['Recommendations', recs]], 6.8); } });
   S_.push({ id:'popts', title:'Options', live:()=>go('analysis'), html:() => `<h2>If the plant must spend less</h2>${kp([['Low / Discretionary OPEX', short(lowOT), `${lowO.length} lines — first to cut`], ['Medium / Low CAPEX', short(medCT), `${medC.length} items — can be deferred`], ['Budget without both', short(tot-lowOT-medCT), tot?`${Math.round(100*(lowOT+medCT)/tot)}% less`:'']].concat([['Critical / Mandatory', short(D.pri['Critical / Mandatory']||0), 'never cut — only re-price']]))}
       <div class="ps-2col"><div><h3>CAPEX that could wait</h3><ul>${medC.slice(0,6).map(l=>`<li>${esc(l.asset)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Medium or Low.</li>'}</ul></div>
         <div><h3>Largest discretionary OPEX</h3><ul>${lowO.sort((a,b)=>annual(b)-annual(a)).slice(0,6).map(l=>`<li>${esc(l.activity||l.line_item)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Low / Discretionary.</li>'}</ul></div></div>`,

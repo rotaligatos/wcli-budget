@@ -622,7 +622,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-22 01:05</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-22 01:30</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -858,9 +858,18 @@ const sum = a => a.reduce((s,x)=>s+(Number(x)||0),0);
 const fmtDate = d => d ? new Date(d).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
 const isReviewer = () => REVIEWERS.includes(S.me?.role);
 /* extra record-keeping grants on top of a user's department and role (bgt_users.access) */
-const ACCESS_LABEL = { stores:'Stores withdrawals' };
+const ACCESS_LABEL = { stores:'Stores withdrawals', po:'PO expenses', consumption:'Other consumption (fuel, LPG…)', utility:'Electricity and water' };
 const hasAccess = k => !S.preview && (S.me?.access||[]).includes(k);
 const canStores = () => canManageData() || hasAccess('stores');
+/* per-user view set by an admin (bgt_users.layout): pages hidden from the menu, plant-record tabs hidden, start page */
+const PAGES = [['overview','Plant overview',true],['budget','Budget',false],['actuals','Actuals and projection',false],['records','Plant records',false],['capex','CAPEX tracker',false],['perf','Sales and plant performance',false],['analysis','Analysis and scenarios',false],['outlook','Cost outlook',false],['prices','Price list',false]];
+const RC_TABS = [['utility','Electricity and water'],['po','PO expenses'],['consumption','Other consumption'],['issue','Stores withdrawals']];
+const LAYOUT = () => (S.preview ? null : S.me?.layout) || {};
+const pageOn = v => v==='admin' || !(LAYOUT().hide||[]).includes(v);
+const rcTabOn = k => !(LAYOUT().rcHide||[]).includes(k) || hasAccess(k==='issue'?'stores':k);
+const keepsKind = k => ['po','consumption'].includes(k) && hasAccess(k);
+function homeView(){ const R = isReviewer(), h = LAYOUT().home; if (h && pageOn(h) && (h!=='overview'||R)) return h;
+  const f = PAGES.find(([v,,rev]) => pageOn(v) && (!rev || R)); return f ? f[0] : 'budget'; }
 function toast(msg, err=false){ const t=$('#toast'); t.textContent=msg; t.className=err?'err':''; clearTimeout(t._h); t._h=setTimeout(()=>t.className='hidden', err?6000:2600); }
 function fail(e){ console.error(e); toast((e && (e.message||e.error_description)) || String(e), true); }
 function show(id){ ['login','pending','app'].forEach(x=>$('#'+x).classList.toggle('hidden', x!==id)); }
@@ -1044,6 +1053,8 @@ function actionsFor(b){
 
 /* ================= ROUTING / NAV ================= */
 function route(){
+  if (!S._homed) { S._homed = true; if (S.view==='budget' && !S.budgetId) S.view = homeView(); }
+  if (!pageOn(S.view)) S.view = homeView();
   if (!S.budgetId && S.view==='budget') {
     const own = S.budgets.find(b=>b.department_id===S.me.department_id);
     if (own && !isReviewer()) S.budgetId = own.id; else S.view = isReviewer() ? 'overview' : 'budget';
@@ -1076,11 +1087,12 @@ function navModel(){
   const R = isReviewer(), mine = S.budgets.find(b=>b.department_id===S.me.department_id);
   const list = R ? S.budgets : S.budgets.filter(b=>b.department_id===S.me.department_id);
   const groups = [];
-  if (R) groups.push({ t:'Plan', items:[['overview','Plant overview']] });
-  groups.push({ t:R?'Budgets':'My budget', depts:list });
-  groups.push({ t:'Track', items:[['actuals','Actuals and projection'],['records','Plant records'],['capex','CAPEX tracker']] });
-  groups.push({ t:'Analyse', items:[['perf','Sales and plant performance'],['analysis','Analysis and scenarios'],['outlook','Cost outlook']] });
-  groups.push({ t:'Setup', items:[['prices','Price list'+(preqBadge()?` <span class="nbadge">${preqBadge()}</span>`:'')], ...(S.me.role==='admin'?[['admin','Users and settings']]:[])] });
+  const f = a => a.filter(([v]) => pageOn(v)), add = (t, items) => { items = f(items); if (items.length) groups.push({ t, items }); };
+  if (R) add('Plan', [['overview','Plant overview']]);
+  if (pageOn('budget')) groups.push({ t:R?'Budgets':'My budget', depts:list });
+  add('Track', [['actuals','Actuals and projection'],['records','Plant records'],['capex','CAPEX tracker']]);
+  add('Analyse', [['perf','Sales and plant performance'],['analysis','Analysis and scenarios'],['outlook','Cost outlook']]);
+  add('Setup', [['prices','Price list'+(preqBadge()?` <span class="nbadge">${preqBadge()}</span>`:'')], ...(S.me.role==='admin'?[['admin','Users and settings']]:[])]);
   return { R, mine, list, groups };
 }
 const NAV_ICON = {
@@ -1103,7 +1115,7 @@ function renderNav(){
   // phone
   const ysel = $('#cycleSelM'); if (ysel) { ysel.innerHTML = $('#cycleSel').innerHTML; ysel.value = S.cycle?.id; }
   const first = N.R ? ['overview','Overview'] : ['budget','Budget'];
-  const tabs = [first, ['actuals','Actuals'], ['capex','CAPEX'], ['analysis','Analysis'], ['more','More']];
+  const tabs = [first, ['actuals','Actuals'], ['capex','CAPEX'], ['analysis','Analysis'], ['more','More']].filter(([v]) => v==='more' || pageOn(v));
   const curTab = ['overview','budget','actuals','capex','analysis'].includes(S.view) ? (S.view==='budget' && N.R ? 'more' : S.view) : 'more';
   const bb = $('#botbar'); if (bb) bb.innerHTML = tabs.map(([v,l]) => `<button class="${curTab===v||(v==='budget'&&curTab==='budget')?'on':''}" onclick="${v==='more'?'openNavSheet()':v==='budget'?(N.mine?`go('budget','${N.mine.id}')`:"openNavSheet()"):`go('${v}')`}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${NAV_ICON[v]}</svg>${l}</button>`).join('');
 }
@@ -1121,7 +1133,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 01:05</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 01:30</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1789,11 +1801,11 @@ async function renderAdmin(){
     <div class="field" style="flex:1;min-width:150px"><label for="nuDept">Department</label><select class="inp" id="nuDept">${deptOpts('')}</select></div>
     <div class="field" style="flex:1;min-width:150px"><label for="nuRole">Role</label><select class="inp" id="nuRole">${roles.filter(r=>r!=='pending').map(r=>`<option value="${r}">${ROLE_LABEL[r]}</option>`).join('')}</select></div>
     <button class="btn primary" onclick="addUser()">Add user</button></div></div>
-  <div class="card" style="margin-bottom:16px"><h3>People</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Name / email</th><th>Department</th><th>Role</th><th title="Records this person keeps for the whole plant, on top of their department and role">Also keeps</th><th>Active</th><th>Last sign-in</th></tr></thead><tbody>
+  <div class="card" style="margin-bottom:16px"><h3>People</h3><div class="tbl-wrap"><table class="ledger" style="min-width:900px"><thead><tr><th>Name / email</th><th>Department</th><th>Role</th><th title="Pages, plant-record tabs and records this person keeps — on top of their department and role">View</th><th>Active</th><th>Last sign-in</th></tr></thead><tbody>
     ${S.users.map(u=>`<tr><td><input class="inp" style="max-width:220px;padding:4px 7px" value="${esc(u.full_name||'')}" onchange="updUser('${u.id}',{full_name:this.value})" aria-label="Name"><div class="item" style="text-transform:none">${esc(u.email)}</div></td>
       <td><select class="inp" onchange="updUser('${u.id}',{department_id:this.value||null})">${deptOpts(u.department_id)}</select></td>
       <td><select class="inp" onchange="updUser('${u.id}',{role:this.value})">${roles.map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${ROLE_LABEL[r]}</option>`).join('')}</select></td>
-      <td style="white-space:nowrap;font-size:12.5px">${Object.entries(ACCESS_LABEL).map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${(u.access||[]).includes(k)?'checked':''} onchange="updAccess('${u.id}','${k}',this.checked)">${l}</label>`).join('')}</td>
+      <td style="font-size:12.5px"><button class="btn ghost" style="padding:4px 10px" onclick="customizeUser('${u.id}')">${viewSummary(u)}</button></td>
       <td><input type="checkbox" ${u.active?'checked':''} onchange="updUser('${u.id}',{active:this.checked})" aria-label="Active"></td>
       <td class="num" style="font-size:12px">${u.last_login?fmtDate(u.last_login):(u.auth_uid?'':'Not yet')}</td></tr>`).join('')}
   </tbody></table></div></div>
@@ -1854,9 +1866,32 @@ async function addUser(){
   if (error) return fail(error.code==='23505' ? new Error('That email is already in the list.') : error);
   toast('User added'); renderAdmin();
 }
-async function updAccess(id, k, on){
-  const u = S.users.find(x=>x.id===id), a = new Set(u?.access||[]); on ? a.add(k) : a.delete(k);
-  await updUser(id, { access:[...a] });
+function viewSummary(u){
+  const L = u.layout||{}, h = (L.hide||[]).length, t = (L.rcHide||[]).length, k = (u.access||[]).length;
+  if (!h && !t && !k && !L.home) return 'Default';
+  return [h?`${h} page${h>1?'s':''} hidden`:'', t?`${t} record tab${t>1?'s':''} hidden`:'', k?`keeps ${(u.access||[]).map(x=>ACCESS_LABEL[x]?.split(' (')[0]).join(', ')}`:'', L.home?`starts on ${PAGES.find(p=>p[0]===L.home)?.[1]||L.home}`:''].filter(Boolean).join(' · ');
+}
+function customizeUser(id){
+  const u = S.users.find(x=>x.id===id); if (!u) return;
+  const L = u.layout||{}, rev = REVIEWERS.includes(u.role), pages = PAGES.filter(p=>!p[2]||rev);
+  const ck = (name, v, on, label, hint='') => `<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0"><input type="checkbox" name="${name}" value="${v}" ${on?'checked':''} style="margin-top:3px"><span>${label}${hint?`<span class="hint" style="display:block;font-size:12px">${hint}</span>`:''}</span></label>`;
+  modal(`<h3>Customize view — ${esc(u.full_name||u.email)}</h3>
+    <p class="hint">On top of ${esc(deptById(u.department_id)?.name||'no department')} · ${ROLE_LABEL[u.role]||u.role}. Hiding a page only tidies the menu; what a person may read or change is still set by their department, role and the records they keep below.</p>
+    <div class="g2"><div><div class="eyebrow" style="margin:6px 0">Pages in the menu</div>${pages.map(([v,l])=>ck('cuPage', v, !(L.hide||[]).includes(v), l)).join('')}</div>
+    <div><div class="eyebrow" style="margin:6px 0">Plant records tabs</div>${RC_TABS.map(([k,l])=>ck('cuTab', k, !(L.rcHide||[]).includes(k), l)).join('')}
+      <div class="field" style="margin-top:12px"><label for="cuHome">Start page</label><select class="inp" id="cuHome"><option value="">Default for the role</option>${pages.map(([v,l])=>`<option value="${v}" ${L.home===v?'selected':''}>${l}</option>`).join('')}</select></div></div></div>
+    <div class="eyebrow" style="margin:14px 0 6px">Keeps these records for every department</div>
+    ${Object.entries(ACCESS_LABEL).map(([k,l])=>ck('cuKeep', k, (u.access||[]).includes(k), l, {stores:'Imports the stores consumption report for the whole plant. Sees which months are loaded, not the plant-wide analysis.', po:'Adds and imports POs for any department.', consumption:'Adds and imports fuel, LPG and other readings for any department.', utility:'Enters electricity and water readings for every meter.'}[k])).join('')}
+    <div class="actions" style="justify-content:space-between;margin-top:14px"><button class="btn ghost" id="cuReset">Reset to default</button><span><button class="btn ghost" onclick="closeModal()">Cancel</button> <button class="btn primary" id="cuGo">Save</button></span></div>`);
+  const vals = (n, on) => [...document.querySelectorAll(`input[name=${n}]`)].filter(i=>i.checked===on).map(i=>i.value);
+  $('#cuReset').onclick = async () => { await updUser(id, { layout:{}, access:[] }); closeModal(); renderAdmin(); };
+  $('#cuGo').onclick = async () => {
+    const hide = vals('cuPage', false), rcHide = vals('cuTab', false), access = vals('cuKeep', true), home = $('#cuHome').value;
+    if (hide.length === pages.length) { toast('Leave at least one page in the menu.', true); return; }
+    if (home && hide.includes(home)) { toast('The start page is hidden — show it or pick another.', true); return; }
+    const layout = {}; if (hide.length) layout.hide = hide; if (rcHide.length) layout.rcHide = rcHide; if (home) layout.home = home;
+    await updUser(id, { layout, access }); closeModal(); renderAdmin();
+  };
 }
 async function updUser(id, patch){
   const { error } = await sb.from('bgt_users').update(patch).eq('id', id); if (error) return fail(error);
@@ -3881,8 +3916,8 @@ function addUtilMeter(){
   $('#amGo').onclick = () => { const d = $('#amD').value, n = $('#amN').value.trim(); if (!n) { toast('Name the meter.', true); return; }
     S.utilMetersNew.push({ dept:d, name:n }); S.rc.uDept = d; S.rc.uSec = n; closeModal(); renderRecords(); toast('Meter added — enter its readings and Save'); };
 }
-const canUtil = () => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && (S.utilKeepers||['ENG']).includes(deptById(S.me.department_id)?.code));
-const canEditRecords = d => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===d);
+const canUtil = () => ['admin','plant_head'].includes(S.me?.role) || hasAccess('utility') || (['preparer','dept_manager'].includes(S.me?.role) && (S.utilKeepers||['ENG']).includes(deptById(S.me.department_id)?.code));
+const canEditRecords = (d, kind=S.rc?.kind) => ['admin','plant_head'].includes(S.me?.role) || (['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===d) || (!!d && keepsKind(kind));
 async function loadRecords(Y, dept){
   const k = Y+'|'+(dept||''); if (S.rc.cache[k]) return S.rc.cache[k];
   const rows = await fetchAll(()=>{ let q = sb.from('bgt_plant_records').select('*').eq('year', Y); if (dept) q = q.eq('department_id', dept); return q.order('rec_date', { ascending:false }); });
@@ -3893,11 +3928,13 @@ async function renderRecords(){
   mainLoading('Loading plant records…');
   try {
     if (!S.rc.year) S.rc.year = new Date().getFullYear();
-    if (!isReviewer()) S.rc.dept = S.me.department_id;
+    if (!rcTabOn(S.rc.kind)) S.rc.kind = (RC_TABS.find(([k])=>rcTabOn(k))||RC_TABS[0])[0];
+    const keeper = !isReviewer() && keepsKind(S.rc.kind);
+    if (!isReviewer() && !keeper) S.rc.dept = S.me.department_id;
     const Y = S.rc.year, dept = S.rc.dept, R = await loadRecords(Y, dept), K = await loadKpis(Y).catch(()=>[]);
     await loadUtilKeepers(); const utilN = (canUtil() || isReviewer() ? await loadRecords(Y, null) : R).filter(r=>r.kind==='consumption'&&UTILS.includes(r.resource)).length;
     if (S.rc.kind!=='po') await Promise.all([loadYearData(Y, dept).catch(()=>null), loadHist().catch(()=>[])]);
-    const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id;
+    const ed = dept ? canEditRecords(dept) : ['admin','plant_head'].includes(S.me.role) || !!S.me.department_id || keeper;
     const po = R.filter(r=>r.kind==='po'), co = R.filter(r=>r.kind==='consumption'), iss = R.filter(r=>r.kind==='issue');
     const list = (S.rc.kind==='po'?po:co).filter(r=>(!S.rc.month || r.month===S.rc.month) && (!S.rc.q || JSON.stringify([r.ref_no,r.item,r.supplier,r.line_item,r.resource,r.notes]).toLowerCase().includes(S.rc.q.toLowerCase())));
     const years = [...new Set([...Array.from({length:7},(_,i)=>new Date().getFullYear()-i), ...S.cycles.map(c=>c.year), Y])].sort((a,b)=>b-a);
@@ -3908,16 +3945,16 @@ async function renderRecords(){
       <div class="actions">${S.rc.kind==='issue' ? (canStores()?`<button class="btn primary" onclick="importStoresDialog()">Import stores report</button>`:'') : ''}${S.rc.kind==='utility' ? `<button class="btn" onclick="utilTemplate()">Download template</button>${(canUtil() || S.me.department_id) ? '<button class="btn primary" onclick="importUtilDialog()">Import Excel</button>' : ''}` : ''}${ed&&S.rc.kind!=='utility'&&S.rc.kind!=='issue'?`<button class="btn primary" onclick="editRecord()">Add ${S.rc.kind==='po'?'PO':'reading'}</button><button class="btn" onclick="importRecordsDialog()">Import Excel</button>`:''}${S.rc.kind!=='utility'?`<button class="btn ghost" onclick="exportRecords()">Download ${ed?'template / ':''}data</button>`:''}</div></div>
     <div class="toolbar card" style="margin-bottom:12px;border-radius:var(--r)">
       <div class="field" style="margin:0"><label for="rcYear">Year</label><select class="inp" id="rcYear" onchange="S.rc.year=Number(this.value);renderRecords()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
-      ${isReviewer()?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">Whole plant</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+      ${isReviewer()||keeper?`<div class="field" style="margin:0"><label for="rcDept">Department</label><select class="inp" id="rcDept" onchange="S.rc.dept=this.value||null;renderRecords()"><option value="">${keeper?'All departments':'Whole plant'}</option>${S.depts.map(d=>`<option value="${d.id}" ${d.id===dept?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
       <div class="field" style="margin:0"><label for="rcMonth">Month</label><select class="inp" id="rcMonth" onchange="S.rc.month=Number(this.value);renderRecords()"><option value="0">All months</option>${MONTHS.map((m,i)=>`<option value="${i+1}" ${S.rc.month===i+1?'selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;flex:1;min-width:180px"><label for="rcQ">Search</label><input class="inp" id="rcQ" value="${esc(S.rc.q)}" placeholder="PO no., item, supplier…" onkeydown="if(event.key==='Enter'){S.rc.q=this.value;renderRecords()}"></div>
     </div>
-    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',utilN],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
+    <div class="tabs" role="tablist" style="margin-bottom:12px">${[['utility','Electricity and water',utilN],['po','PO expenses',po.length],['consumption','Other consumption',co.length],['issue','Stores withdrawals',R.filter(r=>r.kind==='issue').length]].filter(([k])=>rcTabOn(k)).map(([k,l,n])=>`<button role="tab" class="${S.rc.kind===k?'on':''}" onclick="rcTab('${k}', this)">${l}<span class="cnt">${n}</span></button>`).join('')}</div>
     <div id="rcBody">${S.rc.kind==='issue' ? (hasAccess('stores') && !isReviewer() ? await storesLoadsCard(Y) : '') + await issueView(Y, dept, iss) : S.rc.kind==='utility' ? await utilView(Y, R) : S.rc.kind==='po' ? await poView(Y, dept, po, list, poMonths, ed) : consView(Y, co, list, K, ed)}</div>`;
   } catch(e){ fail(e); }
 }
 async function poView(Y, dept, po, list, poMonths, ed){
-  const D = await loadYearData(Y, dept).catch(()=>null), acc = {};
+  const D = (isReviewer() || (dept && dept===S.me.department_id)) ? await loadYearData(Y, dept).catch(()=>null) : null, acc = {};
   (D?.act||[]).filter(a=>a.kind!=='capex' && poMonths.includes(a.month)).forEach(a => acc[a.line_item] = (acc[a.line_item]||0) + Number(a.amount));
   const byLine = {}; po.forEach(r => byLine[r.line_item||'(no line item)'] = (byLine[r.line_item||'(no line item)']||0) + recAmt(r));
   (S.rc.cache[Y+'|'+(dept||'')]||[]).filter(r=>r.kind==='consumption' && Number(r.amount) && r.line_item && poMonths.includes(r.month)).forEach(r => byLine[r.line_item] = (byLine[r.line_item]||0) + Number(r.amount));

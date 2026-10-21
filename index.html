@@ -18,8 +18,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --bg:#EEF0ED; --surface:#FFFFFF; --surface-2:#F7F8F6; --ink:#16201D; --muted:#5D6B66; --faint:#8A9691;
@@ -622,7 +622,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-22 00:21</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-22 00:36</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1117,7 +1117,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 00:21</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 00:36</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -6205,10 +6205,12 @@ async function prsGatherPlant(){
   vol.trade = vol.volume_sold && vol.production_output ? Math.max(0, 1 - vol.production_output.fy0/vol.volume_sold.fy0) : null;
   // unit cost: OPEX per board, three years of actuals + the budget year at the run rate
   const per = [];
-  for (const y of [Y-3, Y-2, Y-1]) { try { const ac = await fetchAll(()=>sb.from('bgt_actuals').select('month,amount').eq('year', y).eq('kind','opex').eq('excluded', false)); if (!ac.length) continue;
-      const K = await loadKpis(y).catch(()=>[]), g = (m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
+  const perY = await Promise.all([Y-3, Y-2, Y-1].map(async y => { try {
+      const [ac, K] = await Promise.all([fetchAll(()=>sb.from('bgt_actuals').select('month,amount').eq('year', y).eq('kind','opex').eq('excluded', false)), loadKpis(y).catch(()=>[])]); if (!ac.length) return null;
+      const g = (m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
       const f = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)>0 && ac.some(a=>a.month===mo)); return ms.length ? sum(ac.filter(a=>ms.includes(a.month)).map(a=>Number(a.amount)))/sum(ms.map(mo=>g(m,mo))) : null; };
-      per.push({ y, prod:f('production_output'), sold:f('volume_sold') }); } catch(e){} }
+      return { y, prod:f('production_output'), sold:f('volume_sold') }; } catch(e){ return null; } }));
+  per.push(...perY.filter(Boolean));
   per.push({ y:Y, prod:vol.production_output?.run ? opexT/(vol.production_output.target || vol.production_output.run) : null, sold:vol.volume_sold?.run ? opexT/(vol.volume_sold.target || vol.volume_sold.run) : null, budget:true });
   // the cost outlook: standard prices and indicators
   const [{ data:std }, { data:asm }, { data:rep }] = await Promise.all([

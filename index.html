@@ -546,6 +546,11 @@ table.ledger{width:100%;border-collapse:collapse;min-width:860px}
 .ol-strip>span{flex:none}.ol-strip .eyebrow{font-size:10px}
 .ol-strip b{font-weight:600;color:var(--muted)} .ol-strip a{color:var(--teal);font-weight:600;cursor:pointer;margin-left:auto}
 h3.sec{font-size:18px;font-stretch:85%;margin:18px 0 8px}
+.cxa-chip{display:inline-block;font-size:11px;font-weight:600;color:#fff;background:var(--c);border-radius:999px;padding:1px 8px;white-space:nowrap;cursor:help}
+.cxa-tr{display:inline-block;font-size:11.5px;color:var(--teal);cursor:pointer;margin-top:2px}
+.cxa-box{border-left:4px solid var(--c)!important;font-size:12.5px;margin-top:0}
+.cxa{margin-bottom:16px}.cxa-sum{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px}.cxa-sum>div{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;padding:6px 12px;min-width:150px}
+.cxa-sum span{display:block;font-size:11.5px;color:var(--muted)}.cxa-sum b{font-size:18px;font-variant-numeric:tabular-nums}.cxa-sum small{display:block;font-size:11px;color:var(--muted)}
 .ev{margin-bottom:12px;border-left:4px solid var(--amber)}.ev.ev-active{border-left-color:var(--red)}.ev.ev-closed{opacity:.7;border-left-color:var(--line-strong)}
 .ev-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 14px 0}.ev-h h3{margin:2px 0 0}
 .ev-s{padding:6px 14px 0;margin:0;font-size:13.5px;line-height:1.5}
@@ -617,7 +622,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 23:37</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-22 00:21</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1112,7 +1117,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:37</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 00:21</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1317,10 +1322,11 @@ function renderCapexTable(ed, checks){
   const AC = S.cx.cache.ac; if (!AC) { loadAssetClasses().then(()=>{ if (S.tab==='capex') renderBudget(); }).catch(console.error); }
   const dp = l => AC ? lineDepr({ ...l, year:S.cycle.year }, AC) : null, dT = AC ? sum(list.map(l=>dp(l).inYear)) : 0, dY = AC ? sum(list.map(l=>dp(l).yr)) : 0;
   const locked = S.cycle.status==='locked', b = budgetById(S.budgetId), canSt = b && canSetCapexStatus(b.department_id);
+  if (!S._cxaC && !S._cxaLoading) { S._cxaLoading = true; cxaContext().then(c=>{ S._cxaC = c; S._cxaLoading = false; if (S.tab==='capex') renderBudget(); }).catch(()=>{ S._cxaLoading = false; }); }
   return tb + `<div id="capexCarry"></div><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th class="r" title="Straight-line depreciation, from the month after purchase">Depreciation<br>${S.cycle.year} / full year</th>${locked?'<th>Status</th>':''}<th></th></tr></thead><tbody>
   ${list.map(l=>{ const d = dp(l); return `<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
-    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}${cxeRowNote(l)}</td>
-    <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}</td>
+    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${canEndorse(b) && !cxePendingFor(l.id) && !locked ? `<a class="cxa-tr" onclick="event.stopPropagation();endorseLine('${l.id}')">Transfer to another department…</a>` : ''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}${cxeRowNote(l)}</td>
+    <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}${S._cxaC?`<div style="margin-top:4px">${cxaChip(cxaAdvise(l, S._cxaC))}</div>`:''}</td>
     <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${d?(d.life?`${short(d.inYear)} / ${short(d.yr)}`:'<span class="hint">not depreciated</span>'):''}</td>
     ${locked?`<td onclick="event.stopPropagation()">${capexChip(l.impl_status)}${canSt?` <a class="hint" style="cursor:pointer;color:var(--teal)" onclick="S.cx.cache={};capexStatusDialog('${l.id}')">Update</a>`:''}</td>`:''}<td>${flagFor(checks,'capex',l.id)}</td></tr>`; }).join('')}
   </tbody><tfoot><tr><td colspan="5">Total CAPEX</td><td class="r num">${peso(sum(list.map(annual)))}</td><td class="r num" style="font-size:12.5px">${AC?`${short(dT)} / ${short(dY)}`:''}</td>${locked?'<td></td>':''}<td></td></tr></tfoot></table></div>
@@ -1337,6 +1343,7 @@ function runChecks(){
     S.opex.forEach(l => { const x = EL[l.line_item]; if (!x || done.has(l.line_item) || !annual(l)) return; done.add(l.line_item);
       const act = x.ev.flatMap(v=>(v.e.actions||[]).filter(a=>!a.lines?.length||a.lines.includes(l.line_item))).slice(0,2).map(a=>a.action);
       add('opex', l.id, 'info', `Exposed to ${x.ev.map(v=>`${v.e.title} (${evMonthsText(v.ms)})`).join(', ')}.${x.likely?` The likely +${x.likely}% for the year is in the standard prices and the suggested change;`:''} the worst case is covered by the plant reserve held by the MD.${act.length?' Consider: '+act.join('; ')+'.':''}`, l.line_item); }); } }
+  if (S._cxaC) S.capex.forEach(l => { const a = cxaAdvise(l, S._cxaC); if (['push','defer','hold'].includes(a.rec)) add('capex', l.id, 'info', `Timing advice — ${CXA[a.rec].l}: ${a.why}`, l.asset || l.category || 'CAPEX item'); });
   S.opex.forEach(l => {
     const n = l.activity || l.line_item || 'Untitled line', m = months(l), t = sum(m);
     if (l.calc?.ai) add('opex',l.id,'warn','Drafted by the assistant and not yet confirmed — open the line, check it and save.',n);
@@ -1477,7 +1484,7 @@ function editLine(kind, id){
     <div class="field"><label for="f_asset">Asset / project</label><input class="inp" id="f_asset" value="${esc(l.asset||'')}" placeholder="e.g. Warehouse forklift replacement" ${ro}></div>
     <div class="field"><label for="f_description">Detailed description</label><textarea class="inp" id="f_description" placeholder="What will be purchased or built, with key specifications" ${ro}>${esc(l.description||'')}</textarea></div>
     <div id="simBox"></div>
-    <div id="capexConsider"></div>
+    <div id="capexAdvice"></div><div id="capexConsider"></div>
     <div class="field"><label for="f_justification">Business justification</label><textarea class="inp" id="f_justification" placeholder="WHY it is needed, and WHAT happens if it is not done" ${ro}>${esc(l.justification||'')}</textarea></div>
     <div class="g3">
       <div class="field"><label for="f_qty">Quantity</label><input class="inp num" id="f_qty" type="number" step="any" value="${l.qty??''}" ${ro}></div>
@@ -1524,6 +1531,8 @@ function editLine(kind, id){
   S._editingId = id || null;
   if (isO) { refreshRef(); $('#f_line_item').addEventListener('change', refreshRef); loadPrices().catch(()=>{}).then(()=>{ itemSyncAnswers(); drawItems(); }); drawItems(); }
   else { S._sim = null; S._simLine = l; const fa = $('#f_asset'); if (fa && !fa.disabled) { fa.addEventListener('change', ()=>cxSimilar()); } cxSimilar(); }
+  if (!isO && id) cxaContext().then(C => { const l = S.capex.find(x=>x.id===id), e = $('#capexAdvice'); if (!l || !e) return; const a = cxaAdvise(l, C);
+    e.innerHTML = `<div class="box cxa-box" style="--c:${CXA[a.rec].c}"><b>Timing advice: ${CXA[a.rec].l}</b><br>${esc(a.why)}${a.notes.map(n=>`<br><span class="hint">${esc(n)}</span>`).join('')}</div>`; }).catch(console.error);
   if (!isO) loadOutlook(S.cycle.year).then(o => { const a = assumpByKey(o,'usdphp'), e = $('#capexConsider'); if (a && e) e.innerHTML = `<div class="box" style="margin-top:0;font-size:12.5px"><b>Imported equipment:</b> peso at ${fmtVal(a)} (${esc(a.value_text||'')}). Price dollar quotes at ₱62–63/$ and add freight, duties and installation. Inflation ${generalPct(o)}% for local works.${(()=>{ const c = $('#f_category')?.value, d = c && o.D.find(x=>x.line_item===c); return d && d.next_year_pct!=null ? `<br><b>${esc(c)}:</b> assume ${Number(d.next_year_pct)>=0?'+':''}${Number(d.next_year_pct)}% vs ${S.cycle.year-1} prices — ${esc(d.rationale||'')}` : ''; })()}</div>`; }).catch(()=>{});
   setTimeout(()=>{ const f = $('.drawer .body .inp:not([disabled])'); if (f && !id) f.focus(); }, 50);
 }
@@ -1573,7 +1582,7 @@ async function cxSimilar(){
   box.innerHTML = `<div class="ins amber" style="margin:0 0 12px"><b>Similar project proposed by ${esc(depts.join(' and '))}</b>
     <ul style="margin:6px 0">${rows.map(r=>`<li>${esc(r.department)}: ${esc(r.asset)}${r.category?` <span class="hint">(${esc(r.category)}, ${esc(STATUS_LABEL[r.status]||r.status)})</span>`:''}</li>`).join('')}</ul>
     Talk to ${esc(depts.join(' and '))} to check whether one project can serve both departments, so the plant does not buy twice. ${ro?'':'If yours is still needed, explain how it is different — the reviewers will see this.'}
-    ${S._editingId && canEndorse(b) && !cxePendingFor(S._editingId) ? `<div style="margin-top:8px">Or, if it belongs to them: <button type="button" class="btn sm" onclick="endorseLine(S._editingId,'${S.depts.find(d=>d.name===depts[0])?.id||''}')">Endorse this item to ${esc(depts[0])}</button></div>`:''}</div>
+    ${S._editingId && canEndorse(b) && !cxePendingFor(S._editingId) ? `<div style="margin-top:8px">Or, if it belongs to them: <button type="button" class="btn sm" onclick="endorseLine(S._editingId,'${S.depts.find(d=>d.name===depts[0])?.id||''}')">Transfer this item to ${esc(depts[0])}</button></div>`:''}</div>
     <div class="field"><label for="f_simnote">How this differs from ${esc(depts.join(' / '))}'s proposal${ro?'':' (required to save)'}</label><textarea class="inp" id="f_simnote" rows="3" placeholder="e.g. Ours is a 3-ton forklift for the press line; Warehouse's is for loading bay — different capacity and location. Talked to Warehouse on Oct 8." ${ro?'disabled':''}>${esc(l.similar_note||'')}</textarea></div>`;
 }
 async function saveLine(kind, id){
@@ -1699,7 +1708,7 @@ async function renderOverview(){
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
       <div class="actions"><button class="btn primary" onclick="presentPlant()">Present plant budget</button><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
-    ${cxeBadge()?`<div class="banner blue"><b>${cxeBadge()} CAPEX item${cxeBadge()>1?'s':''} endorsed between departments</b> waiting to be accepted or declined: ${[...new Set(S.cxe.filter(e=>e.status==='pending').map(e=>dName(e.from_dept)+' → '+dName(e.to_dept)))].map(esc).join(', ')}. Open the receiving department's CAPEX tab to answer.</div>`:''}
+    ${cxeBadge()?`<div class="banner blue"><b>${cxeBadge()} CAPEX item${cxeBadge()>1?'s':''} being transferred between departments</b> waiting to be accepted or declined: ${[...new Set(S.cxe.filter(e=>e.status==='pending').map(e=>dName(e.from_dept)+' → '+dName(e.to_dept)))].map(esc).join(', ')}. Open the receiving department's CAPEX tab to answer.</div>`:''}
     ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div><div id="evStrip"></div>':''}
     <div class="stats">
       <div class="stat opex"><div class="eyebrow">Plant OPEX</div><div class="v">${short(T.opex)}</div><div class="s">${peso(T.opex)}</div></div>
@@ -3524,6 +3533,7 @@ async function renderCapexTracker(){
     const budT = sum(yl.map(annual)), doneT = by('done');
     const waiting = open ? L.filter(l=>l.impl_status==='deferred' && l.target_year===open.year && !L.some(x=>x.carried_from===l.id) && (!S.cx.dept || l.department_id===S.cx.dept)) : [];
     const D = open ? await deprModel(open.year, S.cx.dept) : null;
+    setTimeout(() => cxaPanelHtml().then(h=>{ const e=$('#cxaBox'); if (e) e.innerHTML = h; }).catch(console.error), 0);
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${esc(S.site?.name||'Pasig Plant')} · ${S.cx.dept?esc(deptById(S.cx.dept)?.name):'Whole plant'}</div><h1>CAPEX tracker</h1>
       <div class="sub">What happened to each approved CAPEX item — done, in progress, rescheduled, deferred to a later year or cancelled — and the depreciation it adds to operating cost.</div></div>
@@ -3539,6 +3549,7 @@ async function renderCapexTracker(){
       <div class="stat"><div class="eyebrow">Deferred / rescheduled</div><div class="v">${short(by('deferred')+by('rescheduled'))}</div><div class="s">${yl.filter(l=>l.impl_status==='deferred').length} deferred · ${yl.filter(l=>l.impl_status==='rescheduled').length} rescheduled</div></div>
       <div class="stat"><div class="eyebrow">Cancelled</div><div class="v">${short(by('cancelled'))}</div><div class="s">${short(by('planned'))} still marked planned</div></div>
     </div>
+    <div id="cxaBox"></div>
     ${waiting.length ? `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)"><h3>Deferred to ${open.year} — not yet in the ${open.year} budget</h3><div class="tbl-wrap"><table class="ledger"><thead><tr><th>From</th><th>Department</th><th>Asset</th><th class="r">Amount</th><th>Month</th><th>Reason</th><th></th></tr></thead><tbody>
       ${waiting.map(l=>`<tr><td class="num">${l.year}</td><td>${esc(deptById(l.department_id)?.name)}</td><td><div class="item">${esc(l.category||'')}</div><div class="act">${esc(l.asset||'')}</div></td><td class="r num">${peso(l.quote_amount??l.impl_amount??annual(l))}</td><td>${l.target_month?MONTHS[l.target_month-1]:'—'}</td><td style="font-size:12.5px;max-width:280px">${esc(l.impl_note||'')}</td>
         <td>${canCarry(l, open)?`<button class="btn" onclick="carryCapex('${l.id}')">Add to ${open.year} budget</button>`:'<span class="hint">Department adds it</span>'}</td></tr>`).join('')}
@@ -3750,6 +3761,85 @@ function projCard(L, PJ, RG){
     ${rows.map(r=>`<tr><td><div class="act">${esc(r.p.name)}</div>${r.p.note?`<div class="hint" style="font-size:12px">${esc(r.p.note)}</div>`:''}</td><td style="font-size:12.5px">${esc(r.dept||'')}</td><td class="num" style="font-size:12.5px">${r.ys.join(', ')}</td><td class="r num">${peso(r.amt)}</td>
       <td style="font-size:12.5px">${r.p.status==='implemented'?`<span class="chip pri-ok">Implemented${r.p.implemented_on?' '+fmtDay(r.p.implemented_on).replace(/ \d+,/,''):''}</span>${r.a?`<div class="hint" style="font-size:11.5px">${esc(r.a.name)} — see project register</div>`:''}`:r.ys.length>2?`<span class="chip pri-high">Requested ${r.ys.length} times</span>`:'<span class="chip pri-med">Re-proposed</span>'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
+}
+
+/* ================= CAPEX TIMING ADVICE =================
+   One recommendation per CAPEX item of the open budget year, from rules that can be checked:
+     push     — do it early: it protects against an event in the outlook, or its price is rising fast
+     proceed  — keep as planned (Critical / Mandatory, High)
+     hold     — wait for a condition (volume, a priority, a quotation)
+     defer    — can move to next year (Medium / Low with no event exposure)
+     opex     — not CAPEX: unit cost below the threshold or life of a year or less
+     incomplete — no amount yet
+   Inputs: priority, unit cost vs threshold, useful life, quotation, payment month, the outlook price change for the
+   CAPEX category, active events (El Niño…) and how full the plant is (boards produced vs capacity). */
+const CXA = {
+  push:{ l:'Push — do it early', s:'Push', c:'#c4320a', o:1 }, proceed:{ l:'Proceed as planned', s:'Proceed', c:'#2e7d6b', o:2 },
+  hold:{ l:'Hold until…', s:'Hold', c:'#b88a00', o:3 }, defer:{ l:'Defer to next year', s:'Defer', c:'#667085', o:4 },
+  opex:{ l:'Move to OPEX', s:'OPEX', c:'#3b6fb6', o:5 }, incomplete:{ l:'No amount yet', s:'No amount', c:'#98a2b3', o:6 } };
+// words in an asset that tie it to an expense line an event raises
+const CXA_EV = [
+  { line:'UTILITIES - ELECTRICITY', re:/solar|inverter|\bled\b|vfd|variable.?speed|capacitor|power.?factor|energy.?(sav|eff)|genset|generator|aircon|air.?con|cooling|chiller|ventilat|exhaust fan|insulat/i, why:'cuts electricity use or keeps the plant running' },
+  { line:'UTILITIES - WATER', re:/water|tank|cistern|rain.?water|deep.?well|pump/i, why:'secures water supply' },
+  { line:'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT', re:/cooling|chiller|ventilat|exhaust|overhaul|replace(ment)? .*motor|compressor/i, why:'reduces heat-related breakdowns' } ];
+const CXA_VOL = /truck|forklift|side.?loader|press\b|line \d|new line|additional line|capacity|expansion|second shift|conveyor/i;
+async function cxaContext(){
+  const Y = S.cycle.year, o = await loadOutlook(Y), th = Number(S.cycle.capex_threshold)||20000;
+  let util = null;
+  try { await loadCal(); const K = await loadKpis(Y-1), cap = Number(assumpByKey(o,'capacity_basis')?.value) || null, R = projRate(K, Y-1, 'production_output');
+    if (cap && R) { const act = sum(K.filter(k=>k.metric==='production_output' && k.month>0).map(k=>Number(k.value))), fy = act + R.rate*sum(MONTHS.slice(R.last).map((_,i)=>workDays(Y-1, R.last+i+1)));
+      util = fy/(cap*12); } } catch(e){}
+  const ev = (o.E||[]).filter(e=>e.status==='active'), fx = assumpByKey(o,'usdphp');
+  return { Y, o, th, util, ev, fx };
+}
+function cxaAdvise(l, C){
+  const amt = annual(l), qty = Number(l.qty)||0, uc = Number(l.unit_cost) || (qty ? amt/qty : amt), txt = `${l.asset||''} ${l.description||''} ${l.justification||''}`;
+  const m1 = MONTHS.findIndex((_,i)=>Number(l['m'+(i+1)])) + 1, pri = l.priority || '', notes = [];
+  const d = (C.o.D||[]).find(x=>x.line_item===l.category), pct = d ? Number(d.next_year_pct)||0 : 0;
+  if (/import|usd|\$|china|japan|taiwan|germany|korea|italy/i.test(txt) && C.fx) notes.push(`Priced in dollars — peso at ${fmtVal(C.fx)}; quote at ₱62–63/$ plus freight and duties.`);
+  if (!l.quote_amount && amt >= 500000) notes.push('No quotation on file yet — get one before approval.');
+  const r = (rec, why) => ({ rec, why, notes, amt, m1 });
+  if (!amt) return r('incomplete', 'No amount yet — add the quantity and unit cost, or a quotation.');
+  if (uc && uc < C.th) return r('opex', `Unit cost ${peso(uc)} is below the ₱${C.th.toLocaleString()} CAPEX threshold — budget it as OPEX (supplies, tools or IT under OPEX).`);
+  if (l.useful_life_months && Number(l.useful_life_months) <= 12) return r('opex', 'Useful life of a year or less — it is an expense, not an asset.');
+  // events: does this asset protect against one?
+  for (const e of C.ev) for (const g of CXA_EV) {
+    const im = (e.impacts||[]).find(i=>i.line===g.line); if (!im || !g.re.test(txt)) continue;
+    const first = Math.min(...(e.months||[1])), late = m1 && m1 >= first;
+    return r('push', `${e.title} raises ${prsLiPlain(g.line)} +${im.likely}–${im.worst}% in ${evMonthsText(e.months)}; this ${g.why}.${late ? (first<=1 ? ` Schedule it as early as possible (Jan–Feb) instead of ${MONTHS[m1-1]}.` : ` Pay/install before ${MONTHS[first-1]} instead of ${MONTHS[m1-1]}.`) : ' Keep it early in the year.'}`);
+  }
+  if (pct >= 10 && /^(Critical|High)/.test(pri) && m1 > 3) return r('push', `${l.category} prices are expected +${pct}% in ${C.Y} — buy in Q1 rather than ${MONTHS[m1-1]}.`);
+  if (/^Critical/.test(pri)) return r('proceed', 'Critical / Mandatory — keep it; only re-price or re-time it.' + (pct ? ` Allow +${pct}% for ${l.category}.` : ''));
+  if (CXA_VOL.test(txt) && C.util != null && C.util < 0.5) return r('hold', `Capacity-related while the plant runs at about ${Math.round(C.util*100)}% of capacity — hold until sales orders show the volume needs it${l.carried_from?' (already deferred once)':''}.`);
+  if (!pri) return r('hold', 'No priority set — the department must say how critical it is before it can be approved.');
+  if (/^(Medium|Low)/.test(pri)) return r('defer', `${pri} priority with no event exposure — can move to ${C.Y+1} to save ${short(amt)} of ${C.Y} cash${l.carried_from?'; note it was already deferred once':''}.`);
+  return r('proceed', 'High priority — keep as planned.' + (pct >= 10 ? ` Prices +${pct}% expected — buy early.` : ''));
+}
+const prsLiPlain = s => String(s||'').replace(/^UTILITIES - /,'').replace(/^REPAIRS AND MAINTENANCE - /,'repairs — ').toLowerCase();
+const cxaChip = a => a ? `<span class="cxa-chip" style="--c:${CXA[a.rec].c}" title="${esc(a.why)}">${CXA[a.rec].s}</span>` : '';
+// event actions that look like CAPEX (install, tank, solar…) — suggested items not yet in any budget
+function cxaFromEvents(C, lines){
+  const have = (lines||[]).map(l=>`${l.asset||''} ${l.description||''}`.toLowerCase()).join(' | ');
+  return C.ev.flatMap(e => (e.actions||[]).filter(a => /install|tank|storage|solar|inverter|equipment|replace|upgrade|genset|generator|chiller/i.test(a.action)).map(a => ({ e, a })))
+    .filter(x => { const k = (x.a.action.match(/tank|storage|solar|inverter|genset|generator|chiller/i)||[])[0]; return !k || !have.includes(k.toLowerCase()); });
+}
+// plant view (CAPEX tracker): every item of the open year grouped by recommendation
+async function cxaPanelHtml(){
+  const open = S.cycles.find(c=>c.status==='open'); if (!open || !isReviewer()) return '';
+  const [{ data:bs }, C] = await Promise.all([sb.from('bgt_dept_budgets').select('id,department_id').eq('cycle_id', open.id), cxaContext()]);
+  const ids = (bs||[]).map(b=>b.id); if (!ids.length) return '';
+  const L = await fetchAll(()=>sb.from('bgt_capex_lines').select('*').in('budget_id', ids));
+  const A = L.map(l => ({ l, d:(bs||[]).find(b=>b.id===l.budget_id)?.department_id, a:cxaAdvise(l, C) })).sort((x,y)=>CXA[x.a.rec].o-CXA[y.a.rec].o || y.a.amt-x.a.amt);
+  const tot = k => sum(A.filter(x=>x.a.rec===k).map(x=>x.a.amt)), sug = cxaFromEvents(C, L);
+  S._cxa = { A, C };
+  return `<div class="card cxa"><h3>${open.year} CAPEX — what to push, keep, hold or defer</h3>
+    <p class="hint" style="padding:0 14px;margin:0 0 8px">Worked out from priority, the CAPEX threshold, the cost outlook for each category, the events in the outlook${C.util!=null?` and plant loading (about ${Math.round(C.util*100)}% of capacity in ${open.year-1})`:''}. Departments see the same advice on each item.</p>
+    <div class="cxa-sum">${Object.entries(CXA).map(([k,v])=>A.some(x=>x.a.rec===k)?`<div style="--c:${v.c}"><span>${v.l}</span><b>${short(tot(k))}</b><small>${A.filter(x=>x.a.rec===k).length} item${A.filter(x=>x.a.rec===k).length>1?'s':''}</small></div>`:'').join('')}</div>
+    <div class="tbl-wrap"><table class="ledger" style="min-width:820px"><thead><tr><th>Advice</th><th>Department</th><th>Asset / project</th><th>Priority</th><th class="r">Amount</th><th>Why</th></tr></thead><tbody>
+    ${A.map(x=>`<tr><td>${cxaChip(x.a)}</td><td>${esc(deptById(x.d)?.name||'')}</td><td><div class="item">${esc(x.l.category||'')}</div><div class="act">${esc(x.l.asset||'')}</div></td><td>${priPill(x.l.priority)}</td><td class="r num">${peso(x.a.amt)}</td>
+      <td style="font-size:12.5px;max-width:420px">${esc(x.a.why)}${x.a.notes.map(n=>`<div class="hint">${esc(n)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>
+    ${sug.length?`<div style="padding:10px 14px 4px"><b>Suggested by the events</b> <span class="hint">— actions in the outlook that may need CAPEX and are not in any budget yet</span><ul style="margin:6px 0 4px 18px;font-size:13px">${sug.map(x=>`<li>${esc(x.a.action)} <span class="hint">· ${esc(x.e.title)}${x.a.owner?` · ${esc(x.a.owner)}`:''}${x.a.cost?` · about ${short(x.a.cost)}`:''}</span></li>`).join('')}</ul></div>`:''}
+    <p class="hint" style="padding:6px 14px 12px;margin:0">Advice only — nothing changes until the department or the Head of Plant Operations edits the item. To move an item to the department that should own it, open it in that budget and use <b>Transfer to another department</b>.</p></div>`;
 }
 
 /* ================= PLANT RECORDS (PO-based expenses, consumption) ================= */
@@ -5334,17 +5424,17 @@ const cxeIncoming = dept => S.cxe.filter(e => e.status==='pending' && e.to_dept=
 const cxeBadge = () => S.cxe.filter(e => e.status==='pending' && (isReviewer() ? true : e.to_dept===S.me.department_id)).length;
 
 function cxeRowNote(l){
-  const p = cxePendingFor(l.id); if (p) return `<div style="font-size:11.5px;color:var(--blue-text,var(--teal))">Endorsed to ${esc(dName(p.to_dept))} — waiting for them to accept</div>`;
+  const p = cxePendingFor(l.id); if (p) return `<div style="font-size:11.5px;color:var(--blue-text,var(--teal))">Transfer to ${esc(dName(p.to_dept))} — waiting for them to accept</div>`;
   const d = S.cxe.find(e => e.line_id===l.id && e.status==='declined');
-  if (d) return `<div style="font-size:11.5px;color:var(--red)" title="${esc(d.reply||'')}">${esc(dName(d.to_dept))} declined the endorsement: ${esc(d.reply||'')}</div>`;
+  if (d) return `<div style="font-size:11.5px;color:var(--red)" title="${esc(d.reply||'')}">${esc(dName(d.to_dept))} declined the transfer: ${esc(d.reply||'')}</div>`;
   const a = S.cxe.find(e => e.line_id===l.id && e.status==='accepted');
-  if (a) return `<div style="font-size:11.5px;color:var(--muted)">Endorsed by ${esc(dName(a.from_dept))}, accepted ${fmtDate(a.decided_at)}</div>`;
+  if (a) return `<div style="font-size:11.5px;color:var(--muted)">Transferred from ${esc(dName(a.from_dept))}, accepted ${fmtDate(a.decided_at)}</div>`;
   return '';
 }
 // card on the receiving budget: items other departments handed over
 function cxeIncomingHtml(b){
   const list = b ? cxeIncoming(b.department_id) : []; if (!list.length) return '';
-  return `<div class="card cxe-in"><h3>Endorsed to ${esc(dName(b.department_id))} — ${list.length} waiting for an answer</h3>
+  return `<div class="card cxe-in"><h3>Transferred to ${esc(dName(b.department_id))} — ${list.length} waiting for an answer</h3>
     <p class="hint" style="padding:0 14px;margin:0 0 8px">Another department says these belong to you. Accept to move the item into this budget (you can edit it after), or decline and say why.</p>
     ${list.map(e => { const s = e.snapshot||{}, can = canAnswerCxe(e); return `<div class="cxe-row">
       <div class="cxe-main"><div class="item">${esc(s.category||'')}</div><div class="act">${esc(s.asset||'CAPEX item')}</div>
@@ -5356,27 +5446,27 @@ function cxeIncomingHtml(b){
 // page banner for whoever has something to answer, on any tab of the budget
 function cxeBanner(b){
   if (!b) return ''; const n = cxeIncoming(b.department_id).length; if (!n) return '';
-  return `<div class="banner blue"><b>${n} CAPEX item${n>1?'s':''} endorsed to ${esc(dName(b.department_id))}.</b> <a style="cursor:pointer;font-weight:600" onclick="S.tab='capex';renderBudget()">Review on the CAPEX tab →</a></div>`;
+  return `<div class="banner blue"><b>${n} CAPEX item${n>1?'s':''} transferred to ${esc(dName(b.department_id))} — waiting for your answer.</b> <a style="cursor:pointer;font-weight:600" onclick="S.tab='capex';renderBudget()">Review on the CAPEX tab →</a></div>`;
 }
 function endorseBtn(b, id){
   if (!id || !canEndorse(b)) return '';
   const p = cxePendingFor(id);
-  return p ? `<button class="btn ghost" onclick="cxeCancel('${p.id}')">Withdraw endorsement</button>` : `<button class="btn ghost" onclick="endorseLine('${id}')">Endorse to another department</button>`;
+  return p ? `<button class="btn ghost" onclick="cxeCancel('${p.id}')">Withdraw transfer</button>` : `<button class="btn ghost" onclick="endorseLine('${id}')">Transfer to another department</button>`;
 }
 function endorseLine(id, preDept){
   const b = budgetById(S.budgetId), l = S.capex.find(x=>x.id===id); if (!b || !l) return;
   const sim = preDept || (l.similar_dept && S.depts.find(d=>d.name===l.similar_dept)?.id);
   const opts = S.depts.filter(d => d.id!==b.department_id && S.budgets.some(x=>x.department_id===d.id));
-  modal2(`<h3>Endorse to another department</h3>
+  modal2(`<h3>Transfer to another department</h3>
     <p class="hint">“${esc(l.asset||l.category||'This item')}” (${peso(annual(l))}) will be offered to the department you choose. It stays in ${esc(dName(b.department_id))}'s budget until they accept; if they decline you'll see their reason.</p>
     <div class="field"><label for="cxeTo">Department that should own it</label><select class="inp" id="cxeTo"><option value="">Choose…</option>${opts.map(d=>`<option value="${d.id}" ${d.id===sim?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
     <div class="field"><label for="cxeNote">Why it belongs to them (they will see this)</label><textarea class="inp" id="cxeNote" rows="3" placeholder="e.g. Same forklift as Warehouse's proposal; they operate the loading bay and own the unit. Agreed with Warehouse manager on Oct 8."></textarea></div>
-    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="cxeGo">Endorse</button></div>`);
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="cxeGo">Send transfer</button></div>`);
   $('#cxeGo').onclick = async () => {
     const to = $('#cxeTo').value, note = $('#cxeNote').value.trim();
     if (!to) return toast('Choose the department.', true); if (!note) { toast('Say why it belongs to them.', true); return $('#cxeNote').focus(); }
     const { error } = await sb.rpc('bgt_capex_endorse', { p_line:id, p_to_dept:to, p_note:note }); if (error) return fail(error);
-    closeModal2(); closeDrawer(); await loadEndorse(); toast(`Endorsed to ${dName(to)} — waiting for them to accept`); renderNav(); renderBudget();
+    closeModal2(); closeDrawer(); await loadEndorse(); toast(`Transfer sent to ${dName(to)} — waiting for them to accept`); renderNav(); renderBudget();
   };
 }
 async function cxeAccept(id){
@@ -5386,7 +5476,7 @@ async function cxeAccept(id){
 }
 function cxeDecline(id){
   const e = S.cxe.find(x=>x.id===id); if (!e) return;
-  modal2(`<h3>Decline this endorsement?</h3><p class="hint">“${esc(e.snapshot?.asset||'Item')}” stays with ${esc(dName(e.from_dept))}. Tell them why so they can keep it, change it or drop it.</p>
+  modal2(`<h3>Decline this transfer?</h3><p class="hint">“${esc(e.snapshot?.asset||'Item')}” stays with ${esc(dName(e.from_dept))}. Tell them why so they can keep it, change it or drop it.</p>
     <div class="field"><label for="cxeRe">Reason</label><textarea class="inp" id="cxeRe" rows="3" placeholder="e.g. We already have two forklifts for the press line; this unit is for the loading bay."></textarea></div>
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn danger" id="cxeReGo">Decline</button></div>`);
   $('#cxeReGo').onclick = async () => { const r = $('#cxeRe').value.trim(); if (!r) return toast('Give a reason.', true);
@@ -5395,7 +5485,7 @@ function cxeDecline(id){
 }
 async function cxeCancel(id){
   const { error } = await sb.rpc('bgt_capex_endorse_cancel', { p_id:id }); if (error) return fail(error);
-  closeDrawer(); await loadEndorse(); toast('Endorsement withdrawn'); renderNav(); renderBudget();
+  closeDrawer(); await loadEndorse(); toast('Transfer withdrawn'); renderNav(); renderBudget();
 }
 
 /* ================= 🎓 PRACTICE MODE (Rommel 2026-10-08) =================
@@ -6131,10 +6221,11 @@ async function prsGatherPlant(){
     const g = q('Electricity'), so = q('Solar'), sh = (S.utilShared||['MSSI']).map(c=>({ c, r:q('Electricity', c) })).filter(x=>x.r.length);
     if (g.length) elec = { gridQ:tq(g), gridA:ta(g), months:new Set(g.map(r=>r.month)).size, solarQ:tq(so), shared:sh.map(x=>({ c:x.c, q:tq(x.r), a:ta(x.r) })), y:Y-1 };
     if (elec) { elec.rate = elec.gridQ ? elec.gridA/elec.gridQ : null; elec.avoided = elec.solarQ && elec.rate ? elec.solarQ*elec.rate : 0; elec.own = elec.gridA - sum(elec.shared.map(x=>x.a)); } } catch(e){}
+  let cxa = null; try { const C = await cxaContext(); cxa = capex.map(l=>({ l, a:cxaAdvise(l, C) })).sort((x,y)=>CXA[x.a.rec].o-CXA[y.a.rec].o || y.a.amt-x.a.amt); } catch(e){ console.error(e); }
   let ev = null; try { const o = await loadOutlook(Y); if ((o.E||[]).some(e=>e.status!=='closed')) ev = evReserve(o, opex); } catch(e){}
   const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
-    depts, lines, over, unb, ev, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    depts, lines, over, unb, ev, cxa, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
 }
 
@@ -6212,6 +6303,15 @@ function prsDeckPlant(D){
       <div><h3>By category</h3>${prsBars(Object.entries(capCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({ label:k, v })), Math.max(...Object.values(capCat),1))}<h3 style="margin-top:18px">Payment timing</h3>${prsMonths(prsMonthVals(D.capex), 120)}</div></div>`,
     notes:() => capS.slice(0,5).map(l=>`${l.asset} (${deptById(l.department_id)?.name}) ${short(annual(l))}, ${l.priority||'no priority'}`).join('; '),
     pptx:(s, H) => { H.base(s, `CAPEX — ${short(D.capexT)}`, `${D.capex.length} items`); H.tbl(s, ['Asset / project','Department','Priority','Amount','Why'], capS.slice(0,9).map(l=>[{ text:l.asset||'', options:{ bold:true } }, deptById(l.department_id)?.name||'', l.priority||'—', short(annual(l)), (l.justification||'').slice(0,140)]), 1.5, [3.0,1.7,1.6,1.3,4.7]); } });
+  if (D.cxa?.length) { const X = D.cxa, t = k => sum(X.filter(x=>x.a.rec===k).map(x=>x.a.amt)), n = k => X.filter(x=>x.a.rec===k).length, ks = Object.keys(CXA).filter(k=>n(k));
+    const show = X.filter(x=>x.a.rec!=='proceed').slice(0,8);
+    S_.push({ id:'pcxadv', title:'CAPEX timing', live:()=>go('capex'), html:() => `<h2>CAPEX — push, keep, hold or defer</h2>
+      ${kp(ks.slice(0,4).map(k=>[CXA[k].l, short(t(k)), `${n(k)} item${n(k)>1?'s':''}`]))}
+      <table class="ps-tbl"><thead><tr><th>Advice</th><th>Asset / project</th><th>Department</th><th class="r">Amount</th><th>Why</th></tr></thead><tbody>
+        ${show.map(x=>`<tr><td><span class="ps-pri" style="background:${CXA[x.a.rec].c}">${CXA[x.a.rec].s}</span></td><td><b>${esc(x.l.asset||'')}</b></td><td>${esc(deptById(x.l.department_id)?.name||'')}</td><td class="r">${short(x.a.amt)}</td><td><small>${esc(x.a.why.length>150?x.a.why.slice(0,150).replace(/\s+\S*$/,'')+'…':x.a.why)}</small></td></tr>`).join('') || '<tr><td colspan="5">Every item is set to proceed as planned.</td></tr>'}</tbody></table>`,
+      notes:() => ks.map(k=>`${CXA[k].l}: ${short(t(k))} (${n(k)})`).join('; '),
+      pptx:(s, H) => { H.base(s, 'CAPEX — push, keep, hold or defer'); H.kpis(s, ks.slice(0,4).map(k=>[CXA[k].l, short(t(k)), `${n(k)} items`]));
+        H.tbl(s, ['Advice','Asset / project','Department','Amount','Why'], show.map(x=>[{ text:CXA[x.a.rec].s, options:{ bold:true, color:CXA[x.a.rec].c.slice(1) } }, { text:x.l.asset||'', options:{ bold:true } }, deptById(x.l.department_id)?.name||'', short(x.a.amt), x.a.why.slice(0,170)]), 3.2, [1.1,3.0,1.5,1.2,5.33]); } }); }
   const R = D.rep, cut = (t, n) => { t = String(t||'').trim(); return t.length>n ? t.slice(0, n).replace(/\s+\S*$/,'')+'…' : t; };
   const lead = R?.headline ? cut(String(R.headline).split(/(?<=[.!?])\s+/).reduce((a,t)=>a.length>=150?a:(a?a+' ':'')+t, ''), 320) : '';
   const pts = a => (a||[]).map(x=>cut(x.point||x, 90));

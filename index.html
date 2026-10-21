@@ -263,35 +263,79 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 #prsBack{position:fixed;right:20px;bottom:20px;z-index:9001;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .prs-ls{display:grid;gap:6px;margin:10px 0}.prs-ls label{display:flex;gap:8px;align-items:center}
 .prs-ex{display:grid;gap:8px;margin:10px 0}.prs-ex .btn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:10px 14px}.prs-ex small{font-weight:400;opacity:.8}
-.ps{position:relative;width:1280px;height:720px;padding:46px 60px 60px;box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif;color:#1d2939;overflow:hidden}
-.ps h2{font-size:36px;margin:0 0 6px;letter-spacing:-.01em}.ps h2 small{font-size:18px;color:#667085;font-weight:500;margin-left:10px}
-.ps h2::after{content:'';display:block;width:84px;height:5px;background:#0f5a52;border-radius:3px;margin:12px 0 22px}
-.ps h3{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:#667085;margin:0 0 12px}.ps h3.up{color:#b42318}.ps h3.down{color:#2e7d6b}
-.ps-foot-bar{position:absolute;left:60px;right:60px;bottom:18px;display:flex;justify-content:space-between;font-size:13px;color:#98a2b3;border-top:1px solid #eaecf0;padding-top:8px}
-.ps-cover{position:absolute;inset:0;background:linear-gradient(135deg,#0f5a52,#0b3f3a);color:#fff;padding:120px 80px}
-.ps-cover h1{font-size:72px;margin:10px 0 6px;letter-spacing:-.02em}.ps-eyebrow{font-size:20px;color:#cfe3df;text-transform:uppercase;letter-spacing:.08em}.ps-sub{font-size:28px}.ps-meta{position:absolute;left:80px;bottom:90px;font-size:18px;color:#cfe3df;line-height:1.6}
-.ps-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}.ps-kpis>div{background:#f2f6f5;border:1px solid #dce5e3;border-radius:12px;padding:16px 18px}
-.ps-kpis span{display:block;font-size:14px;color:#667085}.ps-kpis b{display:block;font-size:34px;margin:6px 0 2px;font-variant-numeric:tabular-nums}.ps-kpis small{font-size:13px;color:#667085}
-.ps-kpis.sm{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.ps-kpis.sm b{font-size:26px}
-.ps-kpis.two{grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}.ps-kpis.two b{font-size:24px}
-.ps-tbl td small{color:#667085}
-.ps-big{font-size:28px;line-height:1.4}.ps-big b{color:#0f5a52}.ps-big.up b{color:#b42318}
-.ps-2col{display:grid;grid-template-columns:1fr 1fr;gap:44px}
-.pb{display:grid;gap:9px}.pb-r{display:grid;grid-template-columns:250px 1fr 110px;gap:10px;align-items:center;font-size:14px}.pb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pb-t{position:relative;height:20px;background:#f2f4f7;border-radius:5px}.pb-b{height:100%;background:#0f5a52;border-radius:5px}.pb-m{position:absolute;top:-3px;bottom:-3px;width:3px;background:#1d2939}
-.pb-v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.pb-v small{display:block;font-weight:400;color:#667085;font-size:12px}
-.ps-foot{font-size:13px;color:#667085;margin:8px 0 0}.ps-flag{margin-top:16px;background:#fef3f2;color:#b42318;border-radius:8px;padding:10px 12px;font-size:15px}
-.ps-chg{margin-bottom:14px;font-size:16px}.ps-chg small{color:#667085;margin-left:6px}.ps-chg p{margin:3px 0 0;color:#475467;font-size:14px;line-height:1.4;max-height:3.9em;overflow:hidden}
+.ps{--t:#0f5a52;--t2:#0b3f3a;--acc:#e0531f;--ink:#14231f;--mute:#5f6f6b;--line:#e3e8e5;--paper:#fbfaf6;position:relative;width:1280px;height:720px;padding:34px 64px 64px;box-sizing:border-box;font-family:'IBM Plex Sans',Inter,system-ui,Arial,sans-serif;color:var(--ink);overflow:hidden;background:var(--paper);isolation:isolate}
+.ps-mark{position:absolute;right:-110px;top:-150px;width:340px;height:340px;transform:rotate(45deg);background:linear-gradient(135deg,rgba(15,90,82,.10),rgba(15,90,82,.02));border-radius:28px;pointer-events:none;z-index:-1}
+.ps-mark::after{content:'';position:absolute;left:150px;top:150px;width:120px;height:120px;border-radius:14px;background:rgba(224,83,31,.10)}
+.ps-logo{display:none}
+.ps-kick{position:relative;font:600 13px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.ps-kick b{color:#fff;background:var(--acc);border-radius:4px;padding:4px 7px;letter-spacing:.04em}
+.ps-in{position:static}
+.ps h2{font-family:Archivo,'IBM Plex Sans',Arial,sans-serif;font-stretch:80%;font-weight:800;font-size:44px;line-height:1.05;margin:0 0 4px;letter-spacing:-.01em;color:var(--ink)}
+.ps h2 small{font-family:'IBM Plex Sans',sans-serif;font-stretch:100%;font-size:17px;color:var(--mute);font-weight:500;margin-left:12px;letter-spacing:0}
+.ps h2::after{content:'';display:block;width:64px;height:4px;background:linear-gradient(90deg,var(--t) 70%,var(--acc) 70%);border-radius:2px;margin:12px 0 20px}
+.ps h3{font-family:Archivo,sans-serif;font-stretch:90%;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--t);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.ps h3::before{content:'';width:8px;height:8px;background:var(--acc);transform:rotate(45deg);flex:none}
+.ps h3.up{color:#b42318}.ps h3.down{color:#2e7d6b}
+.ps-foot-bar{position:absolute;left:64px;right:64px;bottom:16px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#8a9894;border-top:1px solid var(--line);padding-top:9px}
+.ps-foot-bar span{display:flex;align-items:center;gap:10px}.ps-foot-bar img{height:18px;width:auto}
+.ps-pg{font-family:'IBM Plex Mono',monospace}.ps-pg b{color:var(--ink)}
+/* cover */
+.ps:has(.ps-cover){padding:0;background:var(--t2)}
+.ps:has(.ps-cover) .ps-kick,.ps:has(.ps-cover) .ps-mark{display:none}
+.ps:has(.ps-cover) .ps-foot-bar{color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.15);z-index:2}.ps:has(.ps-cover) .ps-foot-bar img{display:none}.ps:has(.ps-cover) .ps-pg b{color:#fff}
+.ps:has(.ps-cover) .ps-logo{display:block;position:absolute;z-index:3;left:80px;top:64px;height:64px;width:auto;background:#fff;padding:10px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.ps-cover{position:absolute;inset:0;background:radial-gradient(1200px 600px at 85% 20%,#13756a 0%,transparent 60%),linear-gradient(135deg,#0f5a52,#082f2b);color:#fff;padding:190px 80px 0;overflow:hidden}
+.ps-cover::before{content:'';position:absolute;right:-120px;top:120px;width:520px;height:520px;transform:rotate(45deg);border:2px solid rgba(255,255,255,.14);border-radius:40px}
+.ps-cover::after{content:'';position:absolute;right:150px;top:250px;width:230px;height:230px;transform:rotate(45deg);background:linear-gradient(135deg,var(--acc),#f08a3c);border-radius:22px;opacity:.9;box-shadow:0 30px 60px rgba(0,0,0,.3)}
+.ps-cover>*{position:relative;z-index:1}
+.ps-cover h1{font-family:Archivo,sans-serif;font-stretch:75%;font-weight:800;font-size:96px;line-height:.95;margin:14px 0 14px;letter-spacing:-.01em;max-width:760px}
+.ps-eyebrow{font:600 16px 'IBM Plex Mono',monospace;color:#9fd3c9;text-transform:uppercase;letter-spacing:.14em}
+.ps-sub{font-size:28px;color:#e6f2ef;font-weight:300}
+.ps-meta{position:absolute;left:80px;bottom:80px;font-size:17px;color:#cfe3df;line-height:1.6;border-left:3px solid var(--acc);padding-left:16px}
+/* numbers */
+.ps-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.ps-kpis>div{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px 14px;box-shadow:0 1px 2px rgba(16,40,35,.05),0 8px 24px -12px rgba(16,40,35,.18);overflow:hidden}
+.ps-kpis>div::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--t)}
+.ps-kpis>div:first-child{background:linear-gradient(140deg,#0f5a52,#0b3f3a);border-color:transparent;color:#fff}.ps-kpis>div:first-child::before{background:var(--acc)}
+.ps-kpis>div:first-child span,.ps-kpis>div:first-child small{color:#bfe0d9}.ps-kpis>div:first-child b{color:#fff}
+.ps-kpis span{display:block;font:600 11.5px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+.ps-kpis b{display:block;font-family:Archivo,sans-serif;font-stretch:85%;font-weight:800;font-size:38px;margin:8px 0 2px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ps-kpis small{font-size:12.5px;color:var(--mute)}
+.ps-kpis.sm{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.ps-kpis.sm b{font-size:28px}
+.ps-kpis.two{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}.ps-kpis.two b{font-size:26px}
+.ps-kpis.two>div:first-child,.ps-kpis.sm>div:first-child{background:#fff;color:inherit;border-color:var(--line)}.ps-kpis.two>div:first-child::before,.ps-kpis.sm>div:first-child::before{background:var(--t)}
+.ps-kpis.two>div:first-child span,.ps-kpis.two>div:first-child small,.ps-kpis.sm>div:first-child span,.ps-kpis.sm>div:first-child small{color:var(--mute)}.ps-kpis.two>div:first-child b,.ps-kpis.sm>div:first-child b{color:var(--ink)}
+.ps-big{font-size:24px;line-height:1.4;background:#fff;border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:10px;padding:14px 20px;margin:0 0 6px}.ps-big:empty{display:none}.ps-big b{color:var(--t)}.ps-big.up b{color:#b42318}
+.ps-2col{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+/* bars */
+.pb{display:grid;gap:10px}.pb-r{display:grid;grid-template-columns:240px 1fr 110px;gap:12px;align-items:center;font-size:14px}.pb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.pb-t{position:relative;height:18px;background:#eef2f0;border-radius:9px}.pb-b{height:100%;background:linear-gradient(90deg,#0b3f3a,#1f8a7a);border-radius:9px}
+.pb-m{position:absolute;top:-4px;bottom:-4px;width:3px;border-radius:2px;background:var(--acc)}
+.pb-v{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px}.pb-v small{display:block;font-family:'IBM Plex Sans',sans-serif;font-weight:500;color:var(--mute);font-size:11.5px}
+.ps-foot{font-size:12.5px;color:var(--mute);margin:8px 0 0}.ps-flag{margin-top:16px;background:#fef3f2;color:#b42318;border-radius:8px;padding:10px 12px;font-size:15px}
+.ps-chg{margin-bottom:12px;font-size:16px;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:10px}.ps-chg small{color:var(--mute);margin-left:6px}.ps-chg p{margin:3px 0 0;color:#475467;font-size:13.5px;line-height:1.4;max-height:3.9em;overflow:hidden}
 .ps .up{color:#b42318}.ps .down{color:#2e7d6b}
-.ps-why{font-size:16px;color:#475467;margin:0 0 14px}
-.ps-tbl{width:100%;border-collapse:collapse;font-size:14px}.ps-tbl th{background:#0f5a52;color:#fff;text-align:left;padding:8px 10px;font-weight:600}.ps-tbl td{padding:7px 10px;border-bottom:1px solid #eaecf0;vertical-align:top}.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:#667085}
-.ps-just{font-size:13px;color:#475467;max-width:520px}.ps-pri{color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;white-space:nowrap}
-.ps ul{margin:0 0 16px;padding-left:22px;font-size:16px;line-height:1.5}.ps-chk{font-size:14px;color:#475467;margin:6px 0}
-.ps-an ul{font-size:15px;line-height:1.4;margin-bottom:10px}.ps-an h3{margin-top:4px}
-.ps-dec{font-size:24px;line-height:1.5;padding-left:34px}.ps-dec li{margin-bottom:10px}
-.ps-sum{position:absolute;left:60px;right:60px;bottom:64px;background:#0f5a52;color:#fff;font-size:24px;text-align:center;padding:16px;border-radius:12px}
-.pm{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end}.pm-c{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}.pm-b{width:70%;background:#0f5a52;border-radius:4px 4px 0 0}.pm-v{font-size:11px;color:#667085;margin-bottom:3px;white-space:nowrap}.pm-l{font-size:12px;color:#667085;margin-top:4px;border-top:1px solid #d0d5dd;width:100%;text-align:center;padding-top:3px}
-.ps-chk small{color:#667085}.ps-chk .ps-pri{margin-right:4px}
+.ps-why{font-size:16px;color:#3d4d49;margin:0 0 16px;line-height:1.5}
+/* tables */
+.ps-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ps-tbl th{background:var(--ink);color:#fff;text-align:left;padding:10px 12px;font:600 11.5px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.ps-tbl td{padding:8px 12px;border-bottom:1px solid #eef1ef;vertical-align:top}.ps-tbl tbody tr:nth-child(even) td{background:#f7f9f8}.ps-tbl tbody tr:last-child td{border-bottom:0}
+.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:var(--mute)}
+.ps-tbl tr[style*="background"] td{background:#e6f1ee!important;border-top:2px solid var(--t)}
+.ps-just{font-size:13px;color:#475467;max-width:520px}.ps-pri{color:#fff;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.ps ul{margin:0 0 16px;padding:0;list-style:none;font-size:16px;line-height:1.45}
+.ps ul li{position:relative;padding-left:20px;margin-bottom:5px}.ps ul li::before{content:'';position:absolute;left:2px;top:.55em;width:7px;height:7px;background:var(--t);transform:rotate(45deg)}
+.ps-chk{font-size:14px;color:#475467;margin:6px 0}
+.ps-an ul{font-size:15px;line-height:1.4;margin-bottom:12px}.ps-an h3{margin-top:4px}
+.ps-dec{font-size:22px;line-height:1.45;padding:0;list-style:none;counter-reset:d}
+.ps-dec li{counter-increment:d;position:relative;padding:12px 16px 12px 66px;margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.ps-dec li::before{content:counter(d);position:absolute;left:16px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:var(--t);color:#fff;font:700 17px Archivo,sans-serif;display:grid;place-items:center}
+.ps-sum{position:absolute;left:64px;right:64px;bottom:58px;background:linear-gradient(120deg,#0b3f3a,#0f5a52 60%,#13756a);color:#fff;font-size:24px;text-align:center;padding:18px;border-radius:14px;box-shadow:0 12px 30px -10px rgba(11,63,58,.6)}
+.ps-sum b{font-family:Archivo,sans-serif;font-stretch:85%;font-size:28px;color:#fff}
+.pm{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end}.pm-c{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.pm-b{width:68%;background:linear-gradient(180deg,#1f8a7a,#0b3f3a);border-radius:5px 5px 0 0}.pm-v{font:500 10.5px 'IBM Plex Mono',monospace;color:var(--mute);margin-bottom:3px;white-space:nowrap}
+.pm-l{font-size:11.5px;color:var(--mute);margin-top:4px;border-top:1px solid #cfd8d5;width:100%;text-align:center;padding-top:3px}
+.ps-chk small{color:var(--mute)}.ps-chk .ps-pri{margin-right:4px}
 #prsPrint{display:none}
 @media print{
   body.prs-printing>*:not(#prsPrint){display:none!important}
@@ -563,7 +607,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 23:10</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-21 23:18</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1058,7 +1102,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:10</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 23:18</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -5708,10 +5752,16 @@ function prsOpen(D, deck, meta){
       <button class="prs-b t" onclick="prsExportMenu()">Export</button><button class="prs-b t" onclick="prsFull()">Full screen</button><button class="prs-b t" onclick="prsExit()">Exit</button></div>`;
   document.body.classList.add('prs-on'); prsShow(); prsFit();
 }
+// the slide frame: brand mark, kicker (number + deck), body, footer with logo
+function prsFrame(s, k, n, extra=''){
+  const lg = LOGOS[(PRS.D.company?.code||'').toUpperCase()], nn = String(k+1).padStart(2,'0');
+  return `<div class="ps ps-${s.id}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
+    <div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${lg?`<img src="${lg}" alt="">`:''}${esc(PRS.meta.label)}${esc(extra)}</span><span class="ps-pg"><b>${nn}</b> / ${String(n).padStart(2,'0')}</span></div></div>`;
+}
 const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));
 function prsShow(){
   const V = prsVisible(); PRS.i = Math.max(0, Math.min(PRS.i, V.length-1)); const s = V[PRS.i]; if (!s) return;
-  $('#prsSlide').innerHTML = `<div class="ps"><div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${esc(PRS.meta.label)}</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
+  $('#prsSlide').innerHTML = prsFrame(s, PRS.i, V.length);
   $('#prsNo').textContent = `${PRS.i+1} / ${V.length}`; $('#prsProg').style.width = `${100*(PRS.i+1)/V.length}%`;
   $('#prsLive').style.visibility = s.live ? 'visible' : 'hidden'; prsShrink($('#prsSlide')); prsNotesSync();
 }
@@ -5771,14 +5821,14 @@ function prsPrint(mode){ prsPrintPrep(mode); setTimeout(() => { window.print(); 
 function prsPrintDone(){ document.body.classList.remove('prs-printing'); const h = document.getElementById('prsPrint'); if (h) h.innerHTML = ''; const pg = document.getElementById('prsPage'); if (pg) pg.textContent = ''; }
 function prsPrintPrep(mode){
   const V = prsVisible(); let host = document.getElementById('prsPrint'); if (!host) { host = document.createElement('div'); host.id = 'prsPrint'; document.body.appendChild(host); }
-  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps"><div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${esc(PRS.meta.label)} · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
+  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s">${prsFrame(s, k, V.length, ' · figures as of '+PRS.D.at.toLocaleDateString('en-PH'))}</div>
     ${mode==='handout'?`<div class="pp-n"><b>${esc(s.title)}</b><p>${esc(s.notes?s.notes():'')}</p>${prsMyNote(s.id)?`<p><b>My notes:</b> ${esc(prsMyNote(s.id))}</p>`:''}<div class="pp-lines"></div></div>`:''}</section>`).join('');
   let pg = document.getElementById('prsPage'); if (!pg) { pg = document.createElement('style'); pg.id = 'prsPage'; document.head.appendChild(pg); }
   pg.textContent = mode==='handout' ? '@page{size:A4 portrait;margin:12mm}' : '@page{size:1280px 720px;margin:0}';
   document.body.classList.add('prs-printing'); prsShrink(host);
 }
 // long text (e.g. an analysis report) never runs past the footer: scale the slide body down until it fits
-function prsShrink(root){ (root||document).querySelectorAll('.ps-in').forEach(el => { el.style.zoom = ''; const max = 720-46-60-8; let k = 1;
+function prsShrink(root){ (root||document).querySelectorAll('.ps-in').forEach(el => { el.style.zoom = ''; const max = el.closest('.ps').clientHeight - el.offsetTop - 64; let k = 1;
   while (el.scrollHeight*k > max && k > 0.55) { k -= 0.04; el.style.zoom = k; } }); }
 let PPTX_LIB = null;
 function prsLoadPptx(){ if (window.PptxGenJS) return Promise.resolve(); if (PPTX_LIB) return PPTX_LIB;
@@ -5789,20 +5839,35 @@ async function prsPptx(){
   const D = PRS.D, Y = D.Y, P = new PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.author = S.me.full_name || ''; P.company = D.company?.name || ''; P.title = PRS.meta.file;
   const T = '0F5A52', INK = '1D2939', MUTE = '667085', F = 'Arial', lg = LOGOS[(D.company?.code||'').toUpperCase()];
   const asof = `Figures as of ${D.at.toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
-  const base = (s, title, sub) => { s.background = { color:'FFFFFF' };
-    if (title) s.addText([{ text:title, options:{ bold:true } }, ...(sub?[{ text:'  '+sub, options:{ color:MUTE, fontSize:16 } }]:[])], { x:0.5, y:0.3, w:12.3, h:0.7, fontFace:F, fontSize:28, color:INK });
-    s.addShape(P.ShapeType.rect, { x:0.5, y:1.02, w:1.2, h:0.06, fill:{ color:T }, line:{ color:T } });
-    s.addText(`${PRS.meta.label} · ${asof}`, { x:0.5, y:7.05, w:9, h:0.3, fontFace:F, fontSize:10, color:MUTE }); };
-  const kpis = (s, arr, y=1.4) => arr.forEach((k,i) => { const x = 0.5 + i*3.1; s.addShape(P.ShapeType.roundRect, { x, y, w:2.95, h:1.45, fill:{ color:'F2F6F5' }, line:{ color:'DCE5E3' }, rectRadius:0.08 });
-    s.addText(k[0], { x:x+0.15, y:y+0.1, w:2.7, h:0.3, fontFace:F, fontSize:11, color:MUTE }); s.addText(k[1], { x:x+0.15, y:y+0.42, w:2.7, h:0.55, fontFace:F, fontSize:24, bold:true, color:INK }); if (k[2]) s.addText(k[2], { x:x+0.15, y:y+0.98, w:2.7, h:0.35, fontFace:F, fontSize:10, color:MUTE }); });
-  const tbl = (s, head, rows, y, colW) => s.addTable([head.map(h=>({ text:h, options:{ bold:true, color:'FFFFFF', fill:{ color:T } } })), ...rows], { x:0.5, y, w:12.3, colW, fontFace:F, fontSize:11, color:INK, border:{ type:'solid', color:'DCE5E3', pt:0.5 }, autoPage:false, valign:'middle' });
-  const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl };
+  const ACC = 'E0531F', PAPER = 'FBFAF6', LINE = 'E3E8E5'; let pno = 0; const nTot = prsVisible().length;
+  const deco = s => { s.addShape(P.ShapeType.roundRect, { x:11.9, y:-1.1, w:2.2, h:2.2, rotate:45, fill:{ color:T, transparency:94 }, line:{ type:'none' }, rectRadius:0.2 });
+    s.addShape(P.ShapeType.roundRect, { x:12.55, y:-0.3, w:0.8, h:0.8, rotate:45, fill:{ color:ACC, transparency:90 }, line:{ type:'none' }, rectRadius:0.08 }); };
+  const base = (s, title, sub) => { s.background = { color:PAPER }; deco(s); const nn = String(pno).padStart(2,'0');
+    s.addText(nn, { x:0.6, y:0.28, w:0.42, h:0.26, fontFace:'Consolas', fontSize:10, bold:true, color:'FFFFFF', fill:{ color:ACC }, align:'center', margin:0 });
+    s.addText(PRS.meta.label.toUpperCase(), { x:1.1, y:0.26, w:9, h:0.3, fontFace:'Consolas', fontSize:10, color:MUTE, charSpacing:2 });
+    if (title) s.addText([{ text:title, options:{ bold:true } }, ...(sub?[{ text:'  '+sub, options:{ color:MUTE, fontSize:15, bold:false } }]:[])], { x:0.55, y:0.58, w:12.2, h:0.65, fontFace:F, fontSize:30, color:INK });
+    s.addShape(P.ShapeType.rect, { x:0.6, y:1.25, w:0.6, h:0.05, fill:{ color:T }, line:{ type:'none' } }); s.addShape(P.ShapeType.rect, { x:1.2, y:1.25, w:0.25, h:0.05, fill:{ color:ACC }, line:{ type:'none' } });
+    s.addShape(P.ShapeType.line, { x:0.6, y:7.0, w:12.13, h:0, line:{ color:LINE, width:0.75 } });
+    if (lg) s.addImage({ data:lg, x:0.6, y:7.07, w:0.45, h:0.25, sizing:{ type:'contain', w:0.45, h:0.25 } });
+    s.addText(`${PRS.meta.label} · ${asof}`, { x:lg?1.1:0.6, y:7.05, w:9, h:0.3, fontFace:F, fontSize:9, color:'8A9894' });
+    s.addText([{ text:nn, options:{ bold:true, color:INK } }, { text:` / ${String(nTot).padStart(2,'0')}`, options:{ color:'8A9894' } }], { x:11.2, y:7.05, w:1.55, h:0.3, fontFace:'Consolas', fontSize:10, align:'right' }); };
+  const kpis = (s, arr, y=1.55) => arr.forEach((k,i) => { const x = 0.6 + i*3.06, hero = i===0;
+    s.addShape(P.ShapeType.roundRect, { x, y, w:2.9, h:1.45, fill:{ color:hero?T:'FFFFFF' }, line:{ color:hero?T:LINE, width:0.75 }, rectRadius:0.1, shadow:{ type:'outer', blur:6, offset:2, angle:90, color:'102823', opacity:0.12 } });
+    s.addShape(P.ShapeType.rect, { x, y:y+0.12, w:0.06, h:1.21, fill:{ color:hero?ACC:T }, line:{ type:'none' } });
+    s.addText(String(k[0]).toUpperCase(), { x:x+0.2, y:y+0.1, w:2.6, h:0.3, fontFace:'Consolas', fontSize:9, color:hero?'BFE0D9':MUTE, charSpacing:1 });
+    s.addText(k[1], { x:x+0.2, y:y+0.42, w:2.6, h:0.55, fontFace:F, fontSize:26, bold:true, color:hero?'FFFFFF':INK });
+    if (k[2]) s.addText(k[2], { x:x+0.2, y:y+0.98, w:2.6, h:0.35, fontFace:F, fontSize:9.5, color:hero?'BFE0D9':MUTE }); });
+  const tbl = (s, head, rows, y, colW) => s.addTable([head.map(h=>({ text:String(h).toUpperCase(), options:{ bold:true, color:'FFFFFF', fill:{ color:INK }, fontFace:'Consolas', fontSize:9 } })),
+      ...rows.map((r,i)=>r.map(c=>{ const o = typeof c==='object' && c ? c : { text:String(c??'') }; return { text:o.text, options:{ ...(o.options||{}), fill:{ color:i%2?'F7F9F8':'FFFFFF' } } }; }))],
+    { x:0.6, y, w:12.13, colW, fontFace:F, fontSize:10.5, color:INK, border:{ type:'solid', color:LINE, pt:0.5 }, autoPage:false, valign:'middle', margin:[4,6,4,6] });
+  const coverDeco = s => { s.background = { color:'0B3F3A' }; s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
+    s.addShape(P.ShapeType.roundRect, { x:9.7, y:2.4, w:2.3, h:2.3, rotate:45, fill:{ color:ACC }, line:{ type:'none' }, rectRadius:0.2 }); if (lg) { s.addShape(P.ShapeType.roundRect, { x:0.75, y:0.6, w:1.9, h:0.85, fill:{ color:'FFFFFF' }, line:{ type:'none' }, rectRadius:0.1 }); s.addImage({ data:lg, x:0.85, y:0.67, w:1.7, h:0.71, sizing:{ type:'contain', w:1.7, h:0.71 } }); } };
+  const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl, coverDeco, ACC };
   for (const sl of prsVisible()) {
-    const s = P.addSlide(); s.addNotes([sl.notes?sl.notes():'', prsMyNote(sl.id)].filter(Boolean).join('\n\n'));
+    pno++; const s = P.addSlide(); s.addNotes([sl.notes?sl.notes():'', prsMyNote(sl.id)].filter(Boolean).join('\n\n'));
     if (sl.pptx) { sl.pptx(s, H); continue; }
     const tot = D.opexT + D.capexT;
-    if (sl.id==='cover') { s.background = { color:T };
-      if (lg) s.addImage({ data:lg, x:0.6, y:0.5, w:1.6, h:0.75, sizing:{ type:'contain', w:1.6, h:0.75 } });
+    if (sl.id==='cover') { coverDeco(s);
       s.addText(`${D.company?.name||''} · ${Y} budget`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:F, fontSize:16, color:'CFE3DF' });
       s.addText(D.dept.name, { x:0.6, y:2.5, w:12, h:1.1, fontFace:F, fontSize:48, bold:true, color:'FFFFFF' });
       s.addText('Department budget review', { x:0.6, y:3.6, w:12, h:0.5, fontFace:F, fontSize:22, color:'FFFFFF' });
@@ -5814,16 +5879,16 @@ async function prsPptx(){
       s.addChart(P.ChartType.bar, [{ name:`${Y} spending`, labels:MONTHS, values:prsMonthVals([...D.opex, ...D.capex]).map(Math.round) }], { x:6.3, y:3.8, w:6.6, h:3.1, barDir:'col', chartColors:[T], catAxisLabelFontSize:9, valAxisLabelFontSize:8, valAxisLabelFormatCode:'#,##0', title:`${Y} spending by month (OPEX + CAPEX)`, showTitle:true, titleFontSize:11 }); continue; }
     if (sl.id==='where') { base(s, 'Where the money goes');
       const li = D.lines.filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt).slice(0,8).reverse();
-      s.addText('Top expense lines (OPEX)', { x:0.5, y:1.2, w:7, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
+      s.addText('Top expense lines (OPEX)', { x:0.6, y:1.45, w:7, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
       s.addChart(P.ChartType.bar, [{ name:String(Y), labels:li.map(x=>prsLi(x.item)), values:li.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:li.map(x=>prsLi(x.item)), values:li.map(x=>Math.round(x.lyView||0)) }],
-        { x:0.4, y:1.5, w:7.4, h:5.4, barDir:'bar', barGrouping:'clustered', chartColors:[T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9, catAxisLabelFontFace:F });
+        { x:0.4, y:1.75, w:7.4, h:5.15, barDir:'bar', barGrouping:'clustered', chartColors:[T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9, catAxisLabelFontFace:F });
       const pr = PRI_ORDER.filter(p=>D.pri[p]);
-      s.addText('By priority (OPEX + CAPEX)', { x:8.1, y:1.2, w:4.8, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
-      s.addChart(P.ChartType.doughnut, [{ name:'Priority', labels:pr, values:pr.map(p=>Math.round(D.pri[p])) }], { x:8.0, y:1.5, w:4.9, h:5.2, holeSize:55, chartColors:pr.map(p=>PRI_COLOR[p].slice(1)), showLegend:true, legendPos:'b', legendFontSize:9, dataLabelFontSize:9, showPercent:true }); continue; }
+      s.addText('By priority (OPEX + CAPEX)', { x:8.1, y:1.45, w:4.8, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
+      s.addChart(P.ChartType.doughnut, [{ name:'Priority', labels:pr, values:pr.map(p=>Math.round(D.pri[p])) }], { x:8.0, y:1.75, w:4.9, h:5.1, holeSize:55, chartColors:pr.map(p=>PRI_COLOR[p].slice(1)), showLegend:true, legendPos:'b', legendFontSize:9, dataLabelFontSize:9, showPercent:true }); continue; }
     if (sl.id==='changes') { base(s, 'What changed and why', `vs ${Y-1} full-year view`);
       const up = D.lines.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,4), dn = D.lines.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3);
       const row = x => [{ text:prsLi(x.item), options:{ bold:true } }, { text:(x.diff>0?'+':'−')+short(Math.abs(x.diff)), options:{ color:x.diff>0?'B42318':'2E7D6B', bold:true } }, `${short(x.lyView)} → ${short(x.amt)}`, (x.amt?(x.why||'No justification written yet.'):`Not budgeted for ${Y} — confirm it is no longer needed.`).slice(0,220)];
-      tbl(s, ['Expense line','Change','From → to','Why'], [...up, ...dn].map(row), 1.35, [3.0,1.4,2.2,5.7]); continue; }
+      tbl(s, ['Expense line','Change','From → to','Why'], [...up, ...dn].map(row), 1.5, [3.0,1.4,2.2,5.7]); continue; }
     if (sl.id.startsWith('line')) { const l = D.opex.slice().sort((a,b)=>annual(b)-annual(a))[Number(sl.id.slice(4))]; base(s, l.activity||l.line_item, l.line_item||'');
       kpis(s, [[String(Y), short(annual(l))], ['Priority', l.priority||'—'], ['Basis', l.basis||'—'], ['Type', l.expense_type||'—']], 1.3);
       if (l.purpose) s.addText('Why: '+l.purpose, { x:0.5, y:2.85, w:12.3, h:0.5, fontFace:F, fontSize:12, color:INK, italic:true });
@@ -5833,17 +5898,17 @@ async function prsPptx(){
       continue; }
     if (sl.id==='capex') { base(s, `CAPEX — ${short(D.capexT)}`);
       const C = D.capex.slice().sort((a,b)=>PRI_ORDER.indexOf(a.priority||'No priority')-PRI_ORDER.indexOf(b.priority||'No priority') || annual(b)-annual(a)).slice(0,7);
-      tbl(s, ['Asset / project','Priority','Amount','Paid','Why — and the impact if not done'], C.map(l=>[{ text:`${l.asset||''}\n${l.category||''}`, options:{ bold:true } }, l.priority||'—', short(annual(l)), MONTHS.filter((_,i)=>Number(l['m'+(i+1)])).join(', ')||'—', (l.justification||'No justification yet.').slice(0,240)]), 1.35, [2.8,1.6,1.3,1.0,5.6]); continue; }
+      tbl(s, ['Asset / project','Priority','Amount','Paid','Why — and the impact if not done'], C.map(l=>[{ text:`${l.asset||''}\n${l.category||''}`, options:{ bold:true } }, l.priority||'—', short(annual(l)), MONTHS.filter((_,i)=>Number(l['m'+(i+1)])).join(', ')||'—', (l.justification||'No justification yet.').slice(0,240)]), 1.5, [2.8,1.6,1.3,1.0,5.6]); continue; }
     if (sl.id==='volume' && D.vol) { base(s, 'Cost per board', D.vol.label);
       kpis(s, [[`${Y-1} ${D.vol.label}`, prsNum(D.vol.fy0), 'actual + projection'], [`${Y} at ${Y-1} run rate`, prsNum(D.vol.fy1), `${prsNum(D.vol.rate)} per working day`], [`OPEX per board ${Y-1}`, D.vol.perLy?peso(D.vol.perLy,2):'—'], [`OPEX per board ${Y}`, D.vol.perNew?peso(D.vol.perNew,2):'—', D.vol.perLy&&D.vol.perNew?prsPct(D.vol.perNew,D.vol.perLy):'']]); continue; }
     if (sl.id==='open') { base(s, 'Open points');
       const errs = D.checks.filter(c=>c.sev==='err'), warns = D.checks.filter(c=>c.sev==='warn');
       s.addText([{ text:`To confirm (${D.oi.length})\n`, options:{ bold:true, fontSize:14 } }, ...(D.oi.length?D.oi.slice(0,6).map(x=>({ text:x.body+'\n', options:{ bullet:true } })):[{ text:'Nothing open.' }]),
-        ...(D.preqs.length?[{ text:`\nWaiting for a board price (${D.preqs.length})\n`, options:{ bold:true, fontSize:14 } }, ...D.preqs.slice(0,3).map(r=>({ text:r.item+'\n', options:{ bullet:true } }))]:[])], { x:0.5, y:1.3, w:6.1, h:5.5, fontFace:F, fontSize:12, color:INK, valign:'top' });
-      s.addText([{ text:`Checks: ${errs.length} must fix · ${warns.length} to review\n`, options:{ bold:true, fontSize:14 } }, ...prsGroupChecks([...errs, ...warns]).slice(0,6).map(g=>({ text:`${g.msg} (${g.names.slice(0,4).join(', ')}${g.names.length>4?' +'+(g.names.length-4):''})\n`, options:{ bullet:true } }))], { x:6.8, y:1.3, w:6.0, h:5.5, fontFace:F, fontSize:11, color:INK, valign:'top' }); continue; }
+        ...(D.preqs.length?[{ text:`\nWaiting for a board price (${D.preqs.length})\n`, options:{ bold:true, fontSize:14 } }, ...D.preqs.slice(0,3).map(r=>({ text:r.item+'\n', options:{ bullet:true } }))]:[])], { x:0.6, y:1.5, w:6.0, h:5.3, fontFace:F, fontSize:12, color:INK, valign:'top' });
+      s.addText([{ text:`Checks: ${errs.length} must fix · ${warns.length} to review\n`, options:{ bold:true, fontSize:14 } }, ...prsGroupChecks([...errs, ...warns]).slice(0,6).map(g=>({ text:`${g.msg} (${g.names.slice(0,4).join(', ')}${g.names.length>4?' +'+(g.names.length-4):''})\n`, options:{ bullet:true } }))], { x:6.8, y:1.5, w:6.0, h:5.3, fontFace:F, fontSize:11, color:INK, valign:'top' }); continue; }
     if (sl.id==='decide') { base(s, 'Decisions needed');
       const dec = [...(D.capex.filter(l=>annual(l)>0).length?[`Approve ${D.capex.filter(l=>annual(l)>0).length} CAPEX items totalling ${short(D.capexT)} — or tell us which to defer`]:[]), ...(D.opexT>D.lyView*1.1&&D.lyView?[`Accept OPEX ${prsPct(D.opexT,D.lyView)} vs the ${Y-1} full-year view`]:[]), ...D.oi.slice(0,3).map(x=>'Confirm: '+x.body), ...D.preqs.slice(0,2).map(r=>'Set the board price for '+r.item)];
-      s.addText(dec.length?dec.slice(0,6).map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })):'No open decisions — ready to submit.', { x:0.5, y:1.4, w:12.3, h:4.2, fontFace:F, fontSize:18, color:INK, valign:'top', paraSpaceAfter:8 });
+      s.addText(dec.length?dec.slice(0,6).map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })):'No open decisions — ready to submit.', { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:F, fontSize:18, color:INK, valign:'top', paraSpaceAfter:8 });
       s.addText(`${D.dept.name} ${Y}: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:T }, align:'center' }); continue; }
   }
   await P.writeFile({ fileName:`${PRS.meta.file}.pptx` });
@@ -5915,7 +5980,7 @@ function prsDeckPlant(D){
   S_.push({ id:'pcover', title:'Cover', html:() => `<div class="ps-cover"><div class="ps-eyebrow">${esc(co)} · ${esc(D.site?.name||'')}</div><h1>${Y} Plant Budget</h1><div class="ps-sub">For the Managing Director's approval</div>
       <div class="ps-meta">Presented by <b>${esc(S.me.full_name||'')}</b>, Head of Plant Operations<br>${D.nBud} department budgets · ${done} approved by the Plant Head${waiting?` · ${waiting} still in the departments`:''}</div></div>`,
     notes:() => `${Y} plant budget: ${short(tot)} — ${short(D.opexT)} OPEX and ${short(D.capexT)} CAPEX across ${D.nBud} departments.`,
-    pptx:(s, H) => { s.background = { color:H.T }; if (H.lg) s.addImage({ data:H.lg, x:0.6, y:0.5, w:1.6, h:0.75, sizing:{ type:'contain', w:1.6, h:0.75 } });
+    pptx:(s, H) => { H.coverDeco(s);
       s.addText(`${co} · ${D.site?.name||''}`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:H.F, fontSize:16, color:'CFE3DF' }); s.addText(`${Y} Plant Budget`, { x:0.6, y:2.5, w:12, h:1.1, fontFace:H.F, fontSize:48, bold:true, color:'FFFFFF' });
       s.addText("For the Managing Director's approval", { x:0.6, y:3.6, w:12, h:0.5, fontFace:H.F, fontSize:22, color:'FFFFFF' });
       s.addText(`Presented by ${S.me.full_name||''}, Head of Plant Operations\n${H.asof}`, { x:0.6, y:5.4, w:12, h:0.8, fontFace:H.F, fontSize:14, color:'CFE3DF' }); } });
@@ -5947,24 +6012,24 @@ function prsDeckPlant(D){
         <p class="ps-foot">Fuel, the dollar and electricity are computed from the market outlook and what WCLI actually pays; board prices are set by the Head of Plant Operations.</p></div></div>`,
     notes:() => `Volume: boards sold ${vS?prsNum(vS.target||vS.run):'n/a'}, produced ${vP?prsNum(vP.target||vP.run):'n/a'}. ${outl.length?'Prices: '+outl.map(r=>r.join(' ')).join('; ')+'.':''}`,
     pptx:(s, H) => { H.base(s, 'Assumptions behind the numbers');
-      H.tbl(s, ['Volume', `${Y-1}`, `${Y}`], [['Boards sold', vS?prsNum(vS.fy0):'—', vS?prsNum(vS.target||vS.run)+(vS.target?' (target)':' (run rate)'):'—'], ['Boards produced', vP?prsNum(vP.fy0):'—', vP?prsNum(vP.target||vP.run)+(vP.target?' (target)':' (run rate)'):'—'], ['Working days', '', String(sum(D.wd1))]], 1.4, [3.5,2.5,3.0]);
+      H.tbl(s, ['Volume', `${Y-1}`, `${Y}`], [['Boards sold', vS?prsNum(vS.fy0):'—', vS?prsNum(vS.target||vS.run)+(vS.target?' (target)':' (run rate)'):'—'], ['Boards produced', vP?prsNum(vP.fy0):'—', vP?prsNum(vP.target||vP.run)+(vP.target?' (target)':' (run rate)'):'—'], ['Working days', '', String(sum(D.wd1))]], 1.5, [3.5,2.5,3.0]);
       H.tbl(s, ['Standard price / indicator', `${Y}`], [...outl, ...boards, ...infl].map(r=>[r[0], r[1]]), 3.6, [6,3]); } });
   S_.push({ id:'pdept', title:'By department', live:()=>go('overview'), html:() => `<h2>By department</h2><table class="ps-tbl"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX ${Y}</th><th class="r">${Y-1} view</th><th class="r">Change</th><th class="r">CAPEX ${Y}</th><th class="r">Total</th></tr></thead><tbody>
       ${deptsS.map(x=>`<tr><td><b>${esc(x.d.name)}</b></td><td>${esc(STATUS_LABEL[x.status]||'No budget')}</td><td class="r">${short(x.opex)}</td><td class="r">${x.lyView?short(x.lyView):'—'}</td><td class="r ${x.opex>x.lyView?'up':'down'}">${x.lyView?prsPct(x.opex,x.lyView):'new'}</td><td class="r">${x.capex?short(x.capex):'—'}</td><td class="r"><b>${short(x.opex+x.capex)}</b></td></tr>`).join('')}
       <tr style="background:#f2f6f5"><td><b>Plant</b></td><td></td><td class="r"><b>${short(D.opexT)}</b></td><td class="r"><b>${short(D.lyView)}</b></td><td class="r"><b>${prsPct(D.opexT,D.lyView)}</b></td><td class="r"><b>${short(D.capexT)}</b></td><td class="r"><b>${short(tot)}</b></td></tr></tbody></table>`,
     notes:() => deptsS.map(x=>`${x.d.name} ${short(x.opex+x.capex)} (${x.lyView?prsPct(x.opex,x.lyView):'new'})`).join('; '),
     pptx:(s, H) => { H.base(s, 'By department'); H.tbl(s, ['Department','Status',`OPEX ${Y}`,`${Y-1} view`,'Change',`CAPEX ${Y}`,'Total'], [...deptsS.map(x=>[{ text:x.d.name, options:{ bold:true } }, STATUS_LABEL[x.status]||'No budget', short(x.opex), x.lyView?short(x.lyView):'—', { text:x.lyView?prsPct(x.opex,x.lyView):'new', options:{ color:x.opex>x.lyView?'B42318':'2E7D6B' } }, x.capex?short(x.capex):'—', { text:short(x.opex+x.capex), options:{ bold:true } }]),
-      [{ text:'Plant', options:{ bold:true } }, '', { text:short(D.opexT), options:{ bold:true } }, { text:short(D.lyView), options:{ bold:true } }, { text:prsPct(D.opexT,D.lyView), options:{ bold:true } }, { text:short(D.capexT), options:{ bold:true } }, { text:short(tot), options:{ bold:true } }]], 1.35, [2.6,2.2,1.5,1.5,1.3,1.6,1.6]); } });
+      [{ text:'Plant', options:{ bold:true } }, '', { text:short(D.opexT), options:{ bold:true } }, { text:short(D.lyView), options:{ bold:true } }, { text:prsPct(D.opexT,D.lyView), options:{ bold:true } }, { text:short(D.capexT), options:{ bold:true } }, { text:short(tot), options:{ bold:true } }]], 1.5, [2.6,2.2,1.5,1.5,1.3,1.6,1.6]); } });
   S_.push({ id:'plines', title:'By expense line', html:() => `<h2>By expense line <small>top 10, OPEX</small></h2>${prsBars(li.map(x=>({ label:prsLi(x.item), v:x.amt, v2:x.lyView||null, note:x.lyView?prsPct(x.amt,x.lyView):'new' })), Math.max(...li.map(x=>Math.max(x.amt,x.lyView)),1))}<p class="ps-foot">Bar = ${Y}; tick = ${Y-1} full-year view.</p>`,
     notes:() => li.slice(0,5).map(x=>`${prsLi(x.item)} ${short(x.amt)} (${x.lyView?prsPct(x.amt,x.lyView):'new'})`).join('; '),
-    pptx:(s, H) => { H.base(s, 'By expense line', 'top 10, OPEX'); const r = li.slice().reverse(); s.addChart(H.P.ChartType.bar, [{ name:String(Y), labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.lyView)) }], { x:0.4, y:1.3, w:12.5, h:5.6, barDir:'bar', barGrouping:'clustered', chartColors:[H.T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9 }); } });
+    pptx:(s, H) => { H.base(s, 'By expense line', 'top 10, OPEX'); const r = li.slice().reverse(); s.addChart(H.P.ChartType.bar, [{ name:String(Y), labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.lyView)) }], { x:0.4, y:1.5, w:12.5, h:5.6, barDir:'bar', barGrouping:'clustered', chartColors:[H.T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9 }); } });
   if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
       <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}</div>
       <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}</div></div>
       <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${vS?.target||vP?.target?'target':'boards at the '+(Y-1)+' run rate'}.</p>`,
     notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),
     pptx:(s, H) => { H.base(s, 'Plant OPEX per board'); const P2 = D.per.filter(p=>p.prod||p.sold);
-      s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.4, w:12.3, h:5.4, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });
+      s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.5, w:12.3, h:5.3, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });
   if (D.elec) { const E = D.elec; S_.push({ id:'pelec', title:'Electricity', live:()=>{ S.rc.kind='utility'; S.rc.uRes='Electricity'; S.rc.uDept=''; S.rc.uSec=''; S.rc.year=E.y; go('records'); }, html:() => `<h2>Electricity <small>${E.y}, ${E.months} months of bills</small></h2>
       ${kp([['Meralco main bill', short(E.gridA), `${prsNum(E.gridQ)} kWh · ${E.rate?peso(E.rate,2)+'/kWh':''}`], ...E.shared.map(x=>[`Charged to ${x.c}`, short(x.a), `${prsNum(x.q)} kWh`]), ["WCLI's own cost", short(E.own), 'main bill − shared'], ['Solar generated', E.solarQ?prsNum(E.solarQ)+' kWh':'—', E.avoided?`${short(E.avoided)} grid cost avoided`:'not recorded yet']].slice(0,4))}
       <p class="ps-big">${E.solarQ?`Solar covered <b>${Math.round(100*E.solarQ/(E.gridQ+E.solarQ))}%</b> of the plant's electricity and saved about <b>${short(E.avoided)}</b> at the Meralco rate.`:`Electricity for ${Y} is priced at the standard rate from the outlook${stdOf(/electric/i)?` (${peso(stdOf(/electric/i).unit_price,2)}/kWh)`:''}.`}</p>`,
@@ -5975,7 +6040,7 @@ function prsDeckPlant(D){
         ${capS.slice(0,9).map(l=>`<tr><td><b>${esc(l.asset||'')}</b><br><small>${esc(l.category||'')}</small></td><td>${esc(deptById(l.department_id)?.name||'')}</td><td><span class="ps-pri" style="background:${PRI_COLOR[l.priority||'No priority']}">${esc(l.priority||'—')}</span></td><td class="r">${short(annual(l))}</td></tr>`).join('')}</tbody></table>${capS.length>9?`<p class="ps-foot">+ ${capS.length-9} more, ${short(sum(capS.slice(9).map(annual)))}</p>`:''}</div>
       <div><h3>By category</h3>${prsBars(Object.entries(capCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({ label:k, v })), Math.max(...Object.values(capCat),1))}<h3 style="margin-top:18px">Payment timing</h3>${prsMonths(prsMonthVals(D.capex), 120)}</div></div>`,
     notes:() => capS.slice(0,5).map(l=>`${l.asset} (${deptById(l.department_id)?.name}) ${short(annual(l))}, ${l.priority||'no priority'}`).join('; '),
-    pptx:(s, H) => { H.base(s, `CAPEX — ${short(D.capexT)}`, `${D.capex.length} items`); H.tbl(s, ['Asset / project','Department','Priority','Amount','Why'], capS.slice(0,9).map(l=>[{ text:l.asset||'', options:{ bold:true } }, deptById(l.department_id)?.name||'', l.priority||'—', short(annual(l)), (l.justification||'').slice(0,140)]), 1.35, [3.0,1.7,1.6,1.3,4.7]); } });
+    pptx:(s, H) => { H.base(s, `CAPEX — ${short(D.capexT)}`, `${D.capex.length} items`); H.tbl(s, ['Asset / project','Department','Priority','Amount','Why'], capS.slice(0,9).map(l=>[{ text:l.asset||'', options:{ bold:true } }, deptById(l.department_id)?.name||'', l.priority||'—', short(annual(l)), (l.justification||'').slice(0,140)]), 1.5, [3.0,1.7,1.6,1.3,4.7]); } });
   const R = D.rep, cut = (t, n) => { t = String(t||'').trim(); return t.length>n ? t.slice(0, n).replace(/\s+\S*$/,'')+'…' : t; };
   const lead = R?.headline ? cut(String(R.headline).split(/(?<=[.!?])\s+/).reduce((a,t)=>a.length>=150?a:(a?a+' ':'')+t, ''), 320) : '';
   const pts = a => (a||[]).map(x=>cut(x.point||x, 90));
@@ -5986,7 +6051,7 @@ function prsDeckPlant(D){
         <h3>Weaknesses / threats</h3><ul>${bad.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
       <div><h3>Top risks</h3><ul>${risks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h3>Recommendations</h3><ul>${recs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`,
     notes:() => [R.headline||'', ...(R.risks||[]).slice(0,3).map(x=>x.response?`${x.risk}: ${x.response}`:'')].filter(Boolean).join('\n'),
-    pptx:(s, H) => { H.base(s, 'What the analysis says'); if (lead) s.addText(lead, { x:0.5, y:1.2, w:12.3, h:0.95, fontFace:H.F, fontSize:13, italic:true, color:H.INK, valign:'top', fit:'shrink' });
+    pptx:(s, H) => { H.base(s, 'What the analysis says'); if (lead) s.addText(lead, { x:0.5, y:1.45, w:12.2, h:0.8, fontFace:H.F, fontSize:13, italic:true, color:H.INK, valign:'top', fit:'shrink' });
       const col = (blocks, x) => s.addText(blocks.flatMap(([t, arr]) => [{ text:t, options:{ bold:true, fontSize:12, color:H.MUTE, breakLine:true } }, ...arr.map(v=>({ text:v, options:{ bullet:true, breakLine:true } }))]), { x, y:2.25, w:6.0, h:4.6, fontFace:H.F, fontSize:12, color:H.INK, valign:'top', paraSpaceAfter:4, fit:'shrink' });
       col([['Strengths / opportunities', good], ['Weaknesses / threats', bad]], 0.5); col([['Top risks', risks], ['Recommendations', recs]], 6.8); } });
   S_.push({ id:'popts', title:'Options', live:()=>go('analysis'), html:() => `<h2>If the plant must spend less</h2>${kp([['Low / Discretionary OPEX', short(lowOT), `${lowO.length} lines — first to cut`], ['Medium / Low CAPEX', short(medCT), `${medC.length} items — can be deferred`], ['Budget without both', short(tot-lowOT-medCT), tot?`${Math.round(100*(lowOT+medCT)/tot)}% less`:'']].concat([['Critical / Mandatory', short(D.pri['Critical / Mandatory']||0), 'never cut — only re-price']]))}
@@ -6002,7 +6067,7 @@ function prsDeckPlant(D){
       ${waiting?`<li>Note: ${waiting} department budget${waiting>1?'s are':' is'} still being finalised.</li>`:''}</ol>
       <div class="ps-sum">${Y} plant budget: <b>${short(D.opexT)}</b> OPEX + <b>${short(D.capexT)}</b> CAPEX = <b>${short(tot)}</b></div>`,
     notes:() => `Ask for approval of ${short(tot)}.`,
-    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.5, y:1.4, w:12.3, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
+    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
       s.addText(`${Y} plant budget: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:H.F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:H.T }, align:'center' }); } });
   return S_;
 }

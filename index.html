@@ -273,6 +273,8 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}.ps-kpis>div{background:#f2f6f5;border:1px solid #dce5e3;border-radius:12px;padding:16px 18px}
 .ps-kpis span{display:block;font-size:14px;color:#667085}.ps-kpis b{display:block;font-size:34px;margin:6px 0 2px;font-variant-numeric:tabular-nums}.ps-kpis small{font-size:13px;color:#667085}
 .ps-kpis.sm{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.ps-kpis.sm b{font-size:26px}
+.ps-kpis.two{grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}.ps-kpis.two b{font-size:24px}
+.ps-tbl td small{color:#667085}
 .ps-big{font-size:28px;line-height:1.4}.ps-big b{color:#0f5a52}.ps-big.up b{color:#b42318}
 .ps-2col{display:grid;grid-template-columns:1fr 1fr;gap:44px}
 .pb{display:grid;gap:9px}.pb-r{display:grid;grid-template-columns:250px 1fr 110px;gap:10px;align-items:center;font-size:14px}.pb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -560,7 +562,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 22:31</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-21 22:48</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1055,7 +1057,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 22:31</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 22:48</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1636,7 +1638,7 @@ async function renderOverview(){
     $('#main').innerHTML = `
     <div class="ph"><div><div class="eyebrow">${S.cycle.year} budget · ${esc(S.site?.name||'')} · ${esc(S.company.name)}</div><h1>Plant overview</h1>
       <div class="sub">${S.cycle.status==='locked' ? basisChip() + ' · locked year' : `${byStatus('finance_accepted')} accepted · ${byStatus('md_approved')} with Finance · ${byStatus('plant_approved')} with MD · ${byStatus('submitted')} with Plant Head · ${byStatus('draft')+byStatus('returned')} still in the department`}</div></div>
-      <div class="actions"><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn primary" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
+      <div class="actions"><button class="btn primary" onclick="presentPlant()">Present plant budget</button><button class="btn" onclick="aiPlant()">MD summary (assistant)</button><button class="btn" onclick="exportPlant()">Export plant summary</button><button class="btn" onclick="exportAllDepts()">Download all department files</button></div></div>
     ${cxeBadge()?`<div class="banner blue"><b>${cxeBadge()} CAPEX item${cxeBadge()>1?'s':''} endorsed between departments</b> waiting to be accepted or declined: ${[...new Set(S.cxe.filter(e=>e.status==='pending').map(e=>dName(e.from_dept)+' → '+dName(e.to_dept)))].map(esc).join(', ')}. Open the receiving department's CAPEX tab to answer.</div>`:''}
     ${preqBadge()?`<div class="banner amber"><b>${preqBadge()} request${preqBadge()>1?'s':''} for a standard price</b> waiting for your answer. <a style="cursor:pointer;color:var(--teal);font-weight:600" onclick="go('prices')">Answer on the Price list →</a></div>`:''}${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
     <div class="stats">
@@ -5569,8 +5571,8 @@ function oiPenny(id){
    Department budget review (manager → Head of Plant Operations), built from the live budget.
    Figures are frozen when the deck opens ("Figures as of …"); everything is read-only.
    Slides are drawn at 1280×720 and scaled to the screen; the same data builds the PDF and the PowerPoint. */
-const PRS = { on:false, deck:[], i:0, D:null, hidden:new Set(), win:null };
-const prsK = () => `costline.present.${PRS.D?.budget.id}`;
+const PRS = { on:false, deck:[], i:0, D:null, hidden:new Set(), win:null, meta:{} };
+const prsK = () => `costline.present.${PRS.meta.key}`;
 const prsNum = n => Math.round(Number(n)||0).toLocaleString('en-PH');
 const prsPct = (a, b) => b ? `${a>=b?'+':''}${(100*(a-b)/b).toFixed(1)}%` : 'new';
 const prsLi = t => String(t||'').replace(/^REPAIRS AND MAINTENANCE - /i,'R&M — ').replace(/^UTILITIES - /i,'UTILITIES — ');
@@ -5683,15 +5685,24 @@ function prsGroupChecks(list){ const by = {}; list.forEach(c => { const k = c.se
 async function presentBudget(id){
   id = id || S.budgetId; if (!id) return toast('Open a budget first.', true);
   toast('Preparing the presentation…');
-  try { PRS.D = await prsGather(id); } catch(e){ return fail(e); }
-  PRS.deck = prsDeckDept(PRS.D); PRS.i = 0; PRS.on = true;
+  let D; try { D = await prsGather(id); } catch(e){ return fail(e); }
+  prsOpen(D, prsDeckDept(D), { key:D.budget.id, label:`${D.dept.name} · ${D.Y} budget`, file:`${D.dept.name} ${D.Y} budget review` });
+}
+async function presentPlant(){
+  if (!isReviewer()) return toast('The plant presentation is for reviewers.', true);
+  toast('Preparing the plant presentation… this reads every department.');
+  let D; try { D = await prsGatherPlant(); } catch(e){ return fail(e); }
+  prsOpen(D, prsDeckPlant(D), { key:'plant-'+D.Y, label:`${D.company?.name||''} · ${D.Y} plant budget`, file:`${D.company?.code||'Plant'} ${D.Y} plant budget` });
+}
+function prsOpen(D, deck, meta){
+  PRS.D = D; PRS.deck = deck; PRS.meta = meta; PRS.i = 0; PRS.on = true;
   try { PRS.hidden = new Set(JSON.parse(localStorage.getItem(prsK()+'.hidden')||'[]')); } catch(_){ PRS.hidden = new Set(); }
   try { pennyToggle(false); } catch(_){}
   let el = document.getElementById('prs'); if (!el) { el = document.createElement('div'); el.id = 'prs'; document.body.appendChild(el); }
   el.innerHTML = `<div class="prs-stage"><div class="prs-slide" id="prsSlide"></div></div>
     <div class="prs-bar"><div class="prs-prog"><i id="prsProg"></i></div>
       <button class="prs-b" onclick="prsGo(-1)" aria-label="Previous">‹</button><span id="prsNo" class="prs-no"></span><button class="prs-b" onclick="prsGo(1)" aria-label="Next">›</button>
-      <span class="prs-asof">Figures as of ${PRS.D.at.toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span><span style="flex:1"></span>
+      <span class="prs-asof">Figures as of ${D.at.toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span><span style="flex:1"></span>
       <button class="prs-b t" id="prsLive" onclick="prsLive()">Open live page</button><button class="prs-b t" onclick="prsList()">Slides</button><button class="prs-b t" onclick="prsNotes()">Presenter notes</button>
       <button class="prs-b t" onclick="prsExportMenu()">Export</button><button class="prs-b t" onclick="prsFull()">Full screen</button><button class="prs-b t" onclick="prsExit()">Exit</button></div>`;
   document.body.classList.add('prs-on'); prsShow(); prsFit();
@@ -5699,7 +5710,7 @@ async function presentBudget(id){
 const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));
 function prsShow(){
   const V = prsVisible(); PRS.i = Math.max(0, Math.min(PRS.i, V.length-1)); const s = V[PRS.i]; if (!s) return;
-  $('#prsSlide').innerHTML = `<div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.D.dept.name)} · ${PRS.D.Y} budget</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
+  $('#prsSlide').innerHTML = `<div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.meta.label)}</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
   $('#prsNo').textContent = `${PRS.i+1} / ${V.length}`; $('#prsProg').style.width = `${100*(PRS.i+1)/V.length}%`;
   $('#prsLive').style.visibility = s.live ? 'visible' : 'hidden'; prsNotesSync();
 }
@@ -5731,9 +5742,9 @@ function prsNotes(){
   PRS.win = window.open('', 'costline-notes', 'width=620,height=760');
   if (!PRS.win) return toast('Allow pop-ups for this site to open presenter notes.', true);
   PRS.win.document.write(`<!doctype html><meta charset="utf-8"><title>Presenter notes — Costline</title><style>body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#101413;color:#e7ecea}header{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1b2321;position:sticky;top:0}button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #2f3b38;background:#24302d;color:#e7ecea;cursor:pointer}main{padding:14px 18px}h1{font-size:22px;margin:4px 0 8px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#8fa39d;margin:18px 0 6px}.auto{font-size:17px}textarea{width:100%;min-height:140px;font:inherit;background:#0b0f0e;color:#e7ecea;border:1px solid #2f3b38;border-radius:8px;padding:8px}#clk{margin-left:auto;font-variant-numeric:tabular-nums;color:#8fa39d}</style>
-    <header><button id="pv">‹ Prev</button><button id="nx">Next ›</button><span id="no"></span><span id="clk"></span></header><main><h1 id="t"></h1><div class="auto" id="a"></div><h2>My notes</h2><textarea id="my" placeholder="Your own talking points for this slide — saved on this device"></textarea><h2>Next</h2><div id="n"></div></main>`);
+    <header><button id="pv">‹ Prev</button><button id="nx">Next ›</button><span id="no"></span><button id="pp" title="Penny writes talking points for slides you have no notes on">Draft notes with Penny</button><span id="clk"></span></header><main><div id="pn" style="color:#8fa39d;font-size:13px"></div><h1 id="t"></h1><div class="auto" id="a"></div><h2>My notes</h2><textarea id="my" placeholder="Your own talking points for this slide — saved on this device"></textarea><h2>Next</h2><div id="n"></div></main>`);
   PRS.win.document.close(); const w = PRS.win, t0 = Date.now();
-  w.document.getElementById('pv').onclick = () => prsGo(-1); w.document.getElementById('nx').onclick = () => prsGo(1);
+  w.document.getElementById('pv').onclick = () => prsGo(-1); w.document.getElementById('pp').onclick = () => prsPennyNotes(); w.document.getElementById('nx').onclick = () => prsGo(1);
   w.document.getElementById('my').oninput = e => { const s = prsVisible()[PRS.i]; try { localStorage.setItem(prsK()+'.note.'+s.id, e.target.value); } catch(_){} };
   w.document.addEventListener('keydown', e => { if (e.target.id==='my') return; if (['ArrowRight',' ','PageDown'].includes(e.key)) { e.preventDefault(); prsGo(1); } if (['ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); prsGo(-1); } });
   setInterval(() => { try { const m = Math.floor((Date.now()-t0)/60000), s = Math.floor((Date.now()-t0)/1000)%60; w.document.getElementById('clk').textContent = `${m}:${String(s).padStart(2,'0')}`; } catch(_){} }, 1000);
@@ -5750,14 +5761,15 @@ function prsExportMenu(){
   modal2(`<h3>Export the presentation</h3><p class="hint">Figures as of ${PRS.D.at.toLocaleString('en-PH')} — the same numbers shown on screen. Skipped slides are left out.</p>
     <div class="prs-ex"><button class="btn primary" onclick="closeModal2();prsPptx()">PowerPoint (.pptx)<small>editable slides, charts, tables and presenter notes</small></button>
       <button class="btn" onclick="closeModal2();prsPrint('slides')">PDF — slides<small>one slide per page, 16:9 (choose "Save as PDF")</small></button>
-      <button class="btn" onclick="closeModal2();prsPrint('handout')">PDF — handout with notes<small>slide + talking points and your notes, for the meeting folder</small></button></div>
+      <button class="btn" onclick="closeModal2();prsPrint('handout')">PDF — handout with notes<small>slide + talking points and your notes, for the meeting folder</small></button>
+      <button class="btn" onclick="closeModal2();prsDataPack()">Excel data pack<small>every number behind the slides, by department and line</small></button></div>
     <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Close</button></div>`);
 }
 function prsPrint(mode){ prsPrintPrep(mode); setTimeout(() => { window.print(); setTimeout(prsPrintDone, 500); }, 300); }
 function prsPrintDone(){ document.body.classList.remove('prs-printing'); const h = document.getElementById('prsPrint'); if (h) h.innerHTML = ''; const pg = document.getElementById('prsPage'); if (pg) pg.textContent = ''; }
 function prsPrintPrep(mode){
   const V = prsVisible(); let host = document.getElementById('prsPrint'); if (!host) { host = document.createElement('div'); host.id = 'prsPrint'; document.body.appendChild(host); }
-  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.D.dept.name)} · ${PRS.D.Y} budget · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
+  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.meta.label)} · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
     ${mode==='handout'?`<div class="pp-n"><b>${esc(s.title)}</b><p>${esc(s.notes?s.notes():'')}</p>${prsMyNote(s.id)?`<p><b>My notes:</b> ${esc(prsMyNote(s.id))}</p>`:''}<div class="pp-lines"></div></div>`:''}</section>`).join('');
   let pg = document.getElementById('prsPage'); if (!pg) { pg = document.createElement('style'); pg.id = 'prsPage'; document.head.appendChild(pg); }
   pg.textContent = mode==='handout' ? '@page{size:A4 portrait;margin:12mm}' : '@page{size:1280px 720px;margin:0}';
@@ -5769,18 +5781,20 @@ function prsLoadPptx(){ if (window.PptxGenJS) return Promise.resolve(); if (PPTX
 async function prsPptx(){
   toast('Building the PowerPoint…');
   try { await prsLoadPptx(); } catch(e){ return fail(e); }
-  const D = PRS.D, Y = D.Y, P = new PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.author = S.me.full_name || ''; P.company = D.company?.name || ''; P.title = `${D.dept.name} ${Y} budget`;
+  const D = PRS.D, Y = D.Y, P = new PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.author = S.me.full_name || ''; P.company = D.company?.name || ''; P.title = PRS.meta.file;
   const T = '0F5A52', INK = '1D2939', MUTE = '667085', F = 'Arial', lg = LOGOS[(D.company?.code||'').toUpperCase()];
   const asof = `Figures as of ${D.at.toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
   const base = (s, title, sub) => { s.background = { color:'FFFFFF' };
     if (title) s.addText([{ text:title, options:{ bold:true } }, ...(sub?[{ text:'  '+sub, options:{ color:MUTE, fontSize:16 } }]:[])], { x:0.5, y:0.3, w:12.3, h:0.7, fontFace:F, fontSize:28, color:INK });
     s.addShape(P.ShapeType.rect, { x:0.5, y:1.02, w:1.2, h:0.06, fill:{ color:T }, line:{ color:T } });
-    s.addText(`${D.dept.name} · ${Y} budget · ${asof}`, { x:0.5, y:7.05, w:9, h:0.3, fontFace:F, fontSize:10, color:MUTE }); };
+    s.addText(`${PRS.meta.label} · ${asof}`, { x:0.5, y:7.05, w:9, h:0.3, fontFace:F, fontSize:10, color:MUTE }); };
   const kpis = (s, arr, y=1.4) => arr.forEach((k,i) => { const x = 0.5 + i*3.1; s.addShape(P.ShapeType.roundRect, { x, y, w:2.95, h:1.45, fill:{ color:'F2F6F5' }, line:{ color:'DCE5E3' }, rectRadius:0.08 });
     s.addText(k[0], { x:x+0.15, y:y+0.1, w:2.7, h:0.3, fontFace:F, fontSize:11, color:MUTE }); s.addText(k[1], { x:x+0.15, y:y+0.42, w:2.7, h:0.55, fontFace:F, fontSize:24, bold:true, color:INK }); if (k[2]) s.addText(k[2], { x:x+0.15, y:y+0.98, w:2.7, h:0.35, fontFace:F, fontSize:10, color:MUTE }); });
   const tbl = (s, head, rows, y, colW) => s.addTable([head.map(h=>({ text:h, options:{ bold:true, color:'FFFFFF', fill:{ color:T } } })), ...rows], { x:0.5, y, w:12.3, colW, fontFace:F, fontSize:11, color:INK, border:{ type:'solid', color:'DCE5E3', pt:0.5 }, autoPage:false, valign:'middle' });
+  const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl };
   for (const sl of prsVisible()) {
     const s = P.addSlide(); s.addNotes([sl.notes?sl.notes():'', prsMyNote(sl.id)].filter(Boolean).join('\n\n'));
+    if (sl.pptx) { sl.pptx(s, H); continue; }
     const tot = D.opexT + D.capexT;
     if (sl.id==='cover') { s.background = { color:T };
       if (lg) s.addImage({ data:lg, x:0.6, y:0.5, w:1.6, h:0.75, sizing:{ type:'contain', w:1.6, h:0.75 } });
@@ -5827,8 +5841,204 @@ async function prsPptx(){
       s.addText(dec.length?dec.slice(0,6).map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })):'No open decisions — ready to submit.', { x:0.5, y:1.4, w:12.3, h:4.2, fontFace:F, fontSize:18, color:INK, valign:'top', paraSpaceAfter:8 });
       s.addText(`${D.dept.name} ${Y}: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:T }, align:'center' }); continue; }
   }
-  await P.writeFile({ fileName:`${D.dept.name} ${Y} budget review.pptx` });
+  await P.writeFile({ fileName:`${PRS.meta.file}.pptx` });
   toast('PowerPoint downloaded');
+}
+
+/* ================= PRESENT MODE — PLANT BUDGET (Head of Plant Operations → MD) =================
+   Every department's budget for the year, last year's actuals, volume, the cost outlook, electricity,
+   CAPEX and the latest analysis report — frozen at the moment the deck opens. Reviewers only. */
+async function prsGatherPlant(){
+  const Y = S.cycle.year, at = new Date();
+  const [cur, ly] = await Promise.all([loadYearData(Y, null), loadYearData(Y-1, null).catch(()=>null)]);
+  const M = ly ? actModel(ly, 'budget') : null;
+  const bs = (S.budgets||[]).filter(b=>b.cycle_id===S.cycle.id);
+  const opex = cur.bud, capex = cur.capBud, opexT = sum(opex.map(annual)), capexT = sum(capex.map(annual));
+  // departments: this year vs last year's full-year view
+  const lyDept = {}; (M?.rows||[]).forEach(r => Object.entries(r.depts||{}).forEach(([d,v]) => lyDept[d] = (lyDept[d]||0) + v));
+  const lyDeptBud = {}; (ly?.bud||[]).forEach(l => lyDeptBud[l.department_id] = (lyDeptBud[l.department_id]||0) + annual(l));
+  const depts = S.depts.map(d => { const b = bs.find(x=>x.department_id===d.id), o = opex.filter(l=>l.department_id===d.id), c = capex.filter(l=>l.department_id===d.id);
+    return { d, b, status:b?.status||'none', opex:sum(o.map(annual)), capex:sum(c.map(annual)), lyView:lyDept[d.id]||0, lyBud:lyDeptBud[d.id]||0 }; }).filter(x=>x.opex||x.capex||x.lyView);
+  // expense lines
+  const byLi = {}; opex.forEach(l => { const k = l.line_item||'No line item'; byLi[k] = (byLi[k]||0) + annual(l); });
+  const lines = [...new Set([...Object.keys(byLi), ...(M?.rows||[]).map(r=>r.item)])].map(k => { const r = (M?.rows||[]).find(x=>x.item===k); return { item:k, amt:byLi[k]||0, lyView:r?.projFY||0, lyBud:r?.budFY||0 }; });
+  // last year in review: lines over / under their budget so far, spending with no budget
+  const closed = M?.closed||0, rows = (M?.rows||[]).filter(r=>r.budYTD>0 || r.actYTD>0);
+  const over = rows.filter(r=>r.budYTD>0 && r.actYTD>1.1*r.budYTD).sort((a,b)=>(b.actYTD-b.budYTD)-(a.actYTD-a.budYTD)).slice(0,5);
+  const unb = rows.filter(r=>!r.budFY && r.actYTD>0).sort((a,b)=>b.actYTD-a.actYTD).slice(0,4);
+  // volume and working days
+  await loadCal(); const K0 = await loadKpis(Y-1).catch(()=>[]), K1 = await loadKpis(Y).catch(()=>[]);
+  const wd0 = MONTHS.map((_,i)=>workDays(Y-1,i+1)), wd1 = MONTHS.map((_,i)=>workDays(Y,i+1));
+  const vol = {}; ['volume_sold','production_output'].forEach(m => { const R = projRate(K0, Y-1, m); if (!R) return; const act = sum(K0.filter(k=>k.metric===m && k.month>0).map(k=>Number(k.value)));
+    const tgt = K1.find(k=>k.metric===(m==='volume_sold'?'volume_target':'production_target') && k.month===0);
+    vol[m] = { fy0:act + R.rate*sum(wd0.slice(R.last)), run:R.rate*sum(wd1), target:tgt?Number(tgt.value):null, rate:R.rate }; });
+  vol.trade = vol.volume_sold && vol.production_output ? Math.max(0, 1 - vol.production_output.fy0/vol.volume_sold.fy0) : null;
+  // unit cost: OPEX per board, three years of actuals + the budget year at the run rate
+  const per = [];
+  for (const y of [Y-3, Y-2, Y-1]) { try { const ac = await fetchAll(()=>sb.from('bgt_actuals').select('month,amount').eq('year', y).eq('kind','opex').eq('excluded', false)); if (!ac.length) continue;
+      const K = await loadKpis(y).catch(()=>[]), g = (m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
+      const f = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)>0 && ac.some(a=>a.month===mo)); return ms.length ? sum(ac.filter(a=>ms.includes(a.month)).map(a=>Number(a.amount)))/sum(ms.map(mo=>g(m,mo))) : null; };
+      per.push({ y, prod:f('production_output'), sold:f('volume_sold') }); } catch(e){} }
+  per.push({ y:Y, prod:vol.production_output?.run ? opexT/(vol.production_output.target || vol.production_output.run) : null, sold:vol.volume_sold?.run ? opexT/(vol.volume_sold.target || vol.volume_sold.run) : null, budget:true });
+  // the cost outlook: standard prices and indicators
+  const [{ data:std }, { data:asm }, { data:rep }] = await Promise.all([
+    sb.from('bgt_price_items').select('item,unit,unit_price,source_type,notes').eq('budget_year', Y).eq('active', true),
+    sb.from('bgt_assumptions').select('key,label,value,unit,value_text,category').eq('year', Y).order('sort'),
+    sb.from('bgt_reports').select('content,created_at').eq('year', Y).eq('kind','analysis').order('created_at', { ascending:false }).limit(1)]);
+  // electricity last year: grid, solar, MSSI share
+  let elec = null; try { const R = (await loadRecords(Y-1, null)).filter(r=>r.kind==='consumption' && !r.department_id);
+    const q = (res, sec) => R.filter(r=>r.resource===res && (r.section||'')===(sec||'')), tq = a => sum(a.map(r=>Number(r.qty)||0)), ta = a => sum(a.map(r=>Number(r.amount)||0));
+    const g = q('Electricity'), so = q('Solar'), sh = (S.utilShared||['MSSI']).map(c=>({ c, r:q('Electricity', c) })).filter(x=>x.r.length);
+    if (g.length) elec = { gridQ:tq(g), gridA:ta(g), months:new Set(g.map(r=>r.month)).size, solarQ:tq(so), shared:sh.map(x=>({ c:x.c, q:tq(x.r), a:ta(x.r) })), y:Y-1 };
+    if (elec) { elec.rate = elec.gridQ ? elec.gridA/elec.gridQ : null; elec.avoided = elec.solarQ && elec.rate ? elec.solarQ*elec.rate : 0; elec.own = elec.gridA - sum(elec.shared.map(x=>x.a)); } } catch(e){}
+  const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
+  return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
+    depts, lines, over, unb, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
+}
+
+function prsDeckPlant(D){
+  const Y = D.Y, tot = D.opexT + D.capexT, co = D.company?.name || '';
+  const deptsS = D.depts.slice().sort((a,b)=>b.opex+b.capex-a.opex-a.capex);
+  const li = D.lines.filter(x=>x.amt>0||x.lyView>0).sort((a,b)=>Math.max(b.amt,b.lyView)-Math.max(a.amt,a.lyView)).slice(0,10);
+  const capS = D.capex.slice().sort((a,b)=>PRI_ORDER.indexOf(a.priority||'No priority')-PRI_ORDER.indexOf(b.priority||'No priority') || annual(b)-annual(a));
+  const capCat = {}; D.capex.forEach(l => capCat[l.category||'Other'] = (capCat[l.category||'Other']||0) + annual(l));
+  const lowO = D.opex.filter(l=>/^Low/.test(l.priority||'')), medC = D.capex.filter(l=>/^(Medium|Low)/.test(l.priority||'')), lowOT = sum(lowO.map(annual)), medCT = sum(medC.map(annual));
+  const done = D.statusN(['plant_approved','md_approved','finance_accepted']), waiting = D.statusN(['draft','returned']);
+  const kp = (arr, cls='') => `<div class="ps-kpis ${cls}">${arr.map(k=>`<div><span>${esc(k[0])}</span><b>${k[1]}</b>${k[2]?`<small>${esc(k[2])}</small>`:''}</div>`).join('')}</div>`;
+  const S_ = [];
+  S_.push({ id:'pcover', title:'Cover', html:() => `<div class="ps-cover"><div class="ps-eyebrow">${esc(co)} · ${esc(D.site?.name||'')}</div><h1>${Y} Plant Budget</h1><div class="ps-sub">For the Managing Director's approval</div>
+      <div class="ps-meta">Presented by <b>${esc(S.me.full_name||'')}</b>, Head of Plant Operations<br>${D.nBud} department budgets · ${done} approved by the Plant Head${waiting?` · ${waiting} still in the departments`:''}</div></div>`,
+    notes:() => `${Y} plant budget: ${short(tot)} — ${short(D.opexT)} OPEX and ${short(D.capexT)} CAPEX across ${D.nBud} departments.`,
+    pptx:(s, H) => { s.background = { color:H.T }; if (H.lg) s.addImage({ data:H.lg, x:0.6, y:0.5, w:1.6, h:0.75, sizing:{ type:'contain', w:1.6, h:0.75 } });
+      s.addText(`${co} · ${D.site?.name||''}`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:H.F, fontSize:16, color:'CFE3DF' }); s.addText(`${Y} Plant Budget`, { x:0.6, y:2.5, w:12, h:1.1, fontFace:H.F, fontSize:48, bold:true, color:'FFFFFF' });
+      s.addText("For the Managing Director's approval", { x:0.6, y:3.6, w:12, h:0.5, fontFace:H.F, fontSize:22, color:'FFFFFF' });
+      s.addText(`Presented by ${S.me.full_name||''}, Head of Plant Operations\n${H.asof}`, { x:0.6, y:5.4, w:12, h:0.8, fontFace:H.F, fontSize:14, color:'CFE3DF' }); } });
+  S_.push({ id:'phead', title:'The headline', live:()=>go('overview'), html:() => `<h2>The ${Y} budget at a glance</h2>
+      ${kp([[`OPEX ${Y}`, short(D.opexT), `${D.opex.length} lines`], [`CAPEX ${Y}`, short(D.capexT), `${D.capex.length} items`], [`${Y-1} OPEX budget`, short(D.lyBud), D.lyBud?prsPct(D.opexT,D.lyBud)+' vs this':''], [`${Y-1} full-year view`, short(D.lyView), D.closed?`actuals Jan–${MONTHS[D.closed-1]} + projection`:'']])}
+      <div class="ps-big ${D.opexT>D.lyView?'up':''}">Plant OPEX is <b>${prsPct(D.opexT, D.lyView)}</b> (${D.opexT>=D.lyView?'+':'−'}${short(Math.abs(D.opexT-D.lyView))}) against what the plant is on track to spend in ${Y-1}${D.per.at(-1)?.prod?` — <b>${peso(D.per.at(-1).prod,0)}</b> per board produced`:''}.</div>
+      <div class="ps-2col" style="margin-top:24px"><div><h3>OPEX compared</h3>${prsBars([{ label:`${Y-1} budget`, v:D.lyBud, c:'#98a2b3' }, { label:`${Y-1} full-year view`, v:D.lyView, c:'#667085' }, { label:`${Y} proposed`, v:D.opexT }], Math.max(D.lyBud, D.lyView, D.opexT, 1))}</div>
+        <div><h3>${Y} spending by month</h3>${prsMonths(prsMonthVals([...D.opex, ...D.capex]), 160)}</div></div>`,
+    notes:() => `OPEX ${short(D.opexT)} vs ${Y-1} full-year view ${short(D.lyView)} (${prsPct(D.opexT, D.lyView)}); CAPEX ${short(D.capexT)}.`,
+    pptx:(s, H) => { H.base(s, `The ${Y} budget at a glance`); H.kpis(s, [[`OPEX ${Y}`, short(D.opexT), `${D.opex.length} lines`], [`CAPEX ${Y}`, short(D.capexT), `${D.capex.length} items`], [`${Y-1} OPEX budget`, short(D.lyBud), D.lyBud?prsPct(D.opexT,D.lyBud)+' vs this':''], [`${Y-1} full-year view`, short(D.lyView), '']]);
+      s.addText(`Plant OPEX is ${prsPct(D.opexT, D.lyView)} (${D.opexT>=D.lyView?'+':'−'}${short(Math.abs(D.opexT-D.lyView))}) against the ${Y-1} full-year view.`, { x:0.5, y:3.0, w:12.3, h:0.6, fontFace:H.F, fontSize:20, color:D.opexT>D.lyView?'B42318':H.INK });
+      s.addChart(H.P.ChartType.bar, [{ name:'OPEX', labels:[`${Y-1} budget`, `${Y-1} full-year view`, `${Y} proposed`], values:[D.lyBud, D.lyView, D.opexT].map(Math.round) }], { x:0.4, y:3.7, w:5.6, h:3.2, barDir:'bar', chartColors:['98A2B3','667085',H.T], varyColors:true, showValue:true, dataLabelFormatCode:'#,##0', dataLabelFontSize:9, valAxisHidden:true, catAxisLabelFontSize:10 });
+      s.addChart(H.P.ChartType.bar, [{ name:'Spending', labels:MONTHS, values:prsMonthVals([...D.opex, ...D.capex]).map(Math.round) }], { x:6.3, y:3.7, w:6.6, h:3.2, barDir:'col', chartColors:[H.T], catAxisLabelFontSize:9, valAxisLabelFontSize:8, valAxisLabelFormatCode:'#,##0', title:`${Y} spending by month`, showTitle:true, titleFontSize:11 }); } });
+  if (D.closed) S_.push({ id:'review', title:`${Y-1} in review`, live:()=>go('actuals'), html:() => `<h2>${Y-1} in review <small>Accounting, Jan–${MONTHS[D.closed-1]}</small></h2>
+      ${kp([[`Budget Jan–${MONTHS[D.closed-1]}`, short(D.lyBudYTD)], [`Actual Jan–${MONTHS[D.closed-1]}`, short(D.lyAct), D.lyBudYTD?`${Math.round(100*D.lyAct/D.lyBudYTD)}% of budget`:''], [`${Y-1} full-year view`, short(D.lyView), 'actuals + projection'], [`${Y-1} budget, full year`, short(D.lyBud)]])}
+      <div class="ps-2col"><div><h3 class="up">Over budget so far</h3>${D.over.length?D.over.map(r=>`<div class="ps-chg"><b>${esc(prsLi(r.item))}</b> <span class="up">+${short(r.actYTD-r.budYTD)}</span> <small>${short(r.budYTD)} → ${short(r.actYTD)}</small></div>`).join(''):'<p class="ps-foot">None more than 10% over.</p>'}</div>
+        <div><h3>Spent with no budget</h3>${D.unb.length?D.unb.map(r=>`<div class="ps-chg"><b>${esc(prsLi(r.item))}</b> <span class="up">${short(r.actYTD)}</span></div>`).join(''):'<p class="ps-foot">None.</p>'}</div></div>`,
+    notes:() => `${Y-1}: actual ${short(D.lyAct)} vs budget ${short(D.lyBudYTD)} for Jan–${MONTHS[D.closed-1]}. Over: ${D.over.map(r=>prsLi(r.item)).join(', ')||'none'}. Unbudgeted: ${D.unb.map(r=>prsLi(r.item)).join(', ')||'none'}.`,
+    pptx:(s, H) => { H.base(s, `${Y-1} in review`, `Accounting, Jan–${MONTHS[D.closed-1]}`); H.kpis(s, [[`Budget Jan–${MONTHS[D.closed-1]}`, short(D.lyBudYTD)], [`Actual Jan–${MONTHS[D.closed-1]}`, short(D.lyAct), D.lyBudYTD?`${Math.round(100*D.lyAct/D.lyBudYTD)}% of budget`:''], [`${Y-1} full-year view`, short(D.lyView)], [`${Y-1} budget`, short(D.lyBud)]]);
+      H.tbl(s, ['Expense line','Budget so far','Actual so far','Difference'], [...D.over.map(r=>[prsLi(r.item), short(r.budYTD), short(r.actYTD), { text:'+'+short(r.actYTD-r.budYTD), options:{ color:'B42318', bold:true } }]), ...D.unb.map(r=>[prsLi(r.item)+' (no budget)', '—', short(r.actYTD), { text:'+'+short(r.actYTD), options:{ color:'B42318', bold:true } }])].slice(0,9), 3.1, [6.3,2,2,2]); } });
+  const vS = D.vol.volume_sold, vP = D.vol.production_output, stdOf = re => D.std.find(p=>re.test(p.item)), a = k => D.asm.find(x=>x.key===k);
+  const outl = [[/diesel/i,'Diesel'],[/gasoline/i,'Gasoline'],[/us dollar|usd|exchange/i,'US dollar'],[/electric/i,'Electricity']].map(([re,l])=>{ const p = stdOf(re); return p ? [l, `${peso(p.unit_price,2)}/${p.unit||''}`] : null; }).filter(Boolean);
+  const boards = D.std.filter(p=>isPlantSet?.(p.item)).slice(0,3).map(p=>[p.item, `${peso(p.unit_price,2)}/${p.unit||''}`]);
+  const infl = D.asm.filter(x=>/inflation|wage|minimum/i.test(x.key+' '+x.label)).slice(0,3).map(x=>[x.label, `${x.value??''}${x.unit&&x.unit!=='%'?' '+x.unit:x.unit==='%'?'%':''}`]);
+  S_.push({ id:'assume', title:'Assumptions', live:()=>go('outlook'), html:() => `<h2>Assumptions behind the numbers</h2><div class="ps-2col">
+      <div><h3>Volume</h3>${kp([[`Boards sold ${Y-1}`, vS?prsNum(vS.fy0):'—', 'actual + projection'], [`Boards sold ${Y}`, vS?prsNum(vS.target||vS.run):'—', vS?.target?'target':'at the run rate'], [`Boards produced ${Y-1}`, vP?prsNum(vP.fy0):'—'], [`Boards produced ${Y}`, vP?prsNum(vP.target||vP.run):'—', vP?.target?'target':'at the run rate']], 'two')}
+        <p class="ps-foot">${sum(D.wd1)} working days in ${Y} (Mon–Sat, closed after Dec 23 to Jan 4)${D.vol.trade!=null?` · trade boards ≈ ${Math.round(100*D.vol.trade)}% of boards sold`:''}.</p></div>
+      <div><h3>Cost outlook — standard prices for ${Y}</h3><table class="ps-tbl"><tbody>${[...outl, ...boards, ...infl].map(r=>`<tr><td>${esc(r[0])}</td><td class="r"><b>${esc(r[1])}</b></td></tr>`).join('') || '<tr><td>No standard prices set yet.</td></tr>'}</tbody></table>
+        <p class="ps-foot">Fuel, the dollar and electricity are computed from the market outlook and what WCLI actually pays; board prices are set by the Head of Plant Operations.</p></div></div>`,
+    notes:() => `Volume: boards sold ${vS?prsNum(vS.target||vS.run):'n/a'}, produced ${vP?prsNum(vP.target||vP.run):'n/a'}. ${outl.length?'Prices: '+outl.map(r=>r.join(' ')).join('; ')+'.':''}`,
+    pptx:(s, H) => { H.base(s, 'Assumptions behind the numbers');
+      H.tbl(s, ['Volume', `${Y-1}`, `${Y}`], [['Boards sold', vS?prsNum(vS.fy0):'—', vS?prsNum(vS.target||vS.run)+(vS.target?' (target)':' (run rate)'):'—'], ['Boards produced', vP?prsNum(vP.fy0):'—', vP?prsNum(vP.target||vP.run)+(vP.target?' (target)':' (run rate)'):'—'], ['Working days', '', String(sum(D.wd1))]], 1.4, [3.5,2.5,3.0]);
+      H.tbl(s, ['Standard price / indicator', `${Y}`], [...outl, ...boards, ...infl].map(r=>[r[0], r[1]]), 3.6, [6,3]); } });
+  S_.push({ id:'pdept', title:'By department', live:()=>go('overview'), html:() => `<h2>By department</h2><table class="ps-tbl"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX ${Y}</th><th class="r">${Y-1} view</th><th class="r">Change</th><th class="r">CAPEX ${Y}</th><th class="r">Total</th></tr></thead><tbody>
+      ${deptsS.map(x=>`<tr><td><b>${esc(x.d.name)}</b></td><td>${esc(STATUS_LABEL[x.status]||'No budget')}</td><td class="r">${short(x.opex)}</td><td class="r">${x.lyView?short(x.lyView):'—'}</td><td class="r ${x.opex>x.lyView?'up':'down'}">${x.lyView?prsPct(x.opex,x.lyView):'new'}</td><td class="r">${x.capex?short(x.capex):'—'}</td><td class="r"><b>${short(x.opex+x.capex)}</b></td></tr>`).join('')}
+      <tr style="background:#f2f6f5"><td><b>Plant</b></td><td></td><td class="r"><b>${short(D.opexT)}</b></td><td class="r"><b>${short(D.lyView)}</b></td><td class="r"><b>${prsPct(D.opexT,D.lyView)}</b></td><td class="r"><b>${short(D.capexT)}</b></td><td class="r"><b>${short(tot)}</b></td></tr></tbody></table>`,
+    notes:() => deptsS.map(x=>`${x.d.name} ${short(x.opex+x.capex)} (${x.lyView?prsPct(x.opex,x.lyView):'new'})`).join('; '),
+    pptx:(s, H) => { H.base(s, 'By department'); H.tbl(s, ['Department','Status',`OPEX ${Y}`,`${Y-1} view`,'Change',`CAPEX ${Y}`,'Total'], [...deptsS.map(x=>[{ text:x.d.name, options:{ bold:true } }, STATUS_LABEL[x.status]||'No budget', short(x.opex), x.lyView?short(x.lyView):'—', { text:x.lyView?prsPct(x.opex,x.lyView):'new', options:{ color:x.opex>x.lyView?'B42318':'2E7D6B' } }, x.capex?short(x.capex):'—', { text:short(x.opex+x.capex), options:{ bold:true } }]),
+      [{ text:'Plant', options:{ bold:true } }, '', { text:short(D.opexT), options:{ bold:true } }, { text:short(D.lyView), options:{ bold:true } }, { text:prsPct(D.opexT,D.lyView), options:{ bold:true } }, { text:short(D.capexT), options:{ bold:true } }, { text:short(tot), options:{ bold:true } }]], 1.35, [2.6,2.2,1.5,1.5,1.3,1.6,1.6]); } });
+  S_.push({ id:'plines', title:'By expense line', html:() => `<h2>By expense line <small>top 10, OPEX</small></h2>${prsBars(li.map(x=>({ label:prsLi(x.item), v:x.amt, v2:x.lyView||null, note:x.lyView?prsPct(x.amt,x.lyView):'new' })), Math.max(...li.map(x=>Math.max(x.amt,x.lyView)),1))}<p class="ps-foot">Bar = ${Y}; tick = ${Y-1} full-year view.</p>`,
+    notes:() => li.slice(0,5).map(x=>`${prsLi(x.item)} ${short(x.amt)} (${x.lyView?prsPct(x.amt,x.lyView):'new'})`).join('; '),
+    pptx:(s, H) => { H.base(s, 'By expense line', 'top 10, OPEX'); const r = li.slice().reverse(); s.addChart(H.P.ChartType.bar, [{ name:String(Y), labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.lyView)) }], { x:0.4, y:1.3, w:12.5, h:5.6, barDir:'bar', barGrouping:'clustered', chartColors:[H.T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9 }); } });
+  if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
+      <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}</div>
+      <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}</div></div>
+      <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${vS?.target||vP?.target?'target':'boards at the '+(Y-1)+' run rate'}.</p>`,
+    notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),
+    pptx:(s, H) => { H.base(s, 'Plant OPEX per board'); const P2 = D.per.filter(p=>p.prod||p.sold);
+      s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.4, w:12.3, h:5.4, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });
+  if (D.elec) { const E = D.elec; S_.push({ id:'pelec', title:'Electricity', live:()=>{ S.rc.kind='utility'; S.rc.uRes='Electricity'; S.rc.uDept=''; S.rc.uSec=''; S.rc.year=E.y; go('records'); }, html:() => `<h2>Electricity <small>${E.y}, ${E.months} months of bills</small></h2>
+      ${kp([['Meralco main bill', short(E.gridA), `${prsNum(E.gridQ)} kWh · ${E.rate?peso(E.rate,2)+'/kWh':''}`], ...E.shared.map(x=>[`Charged to ${x.c}`, short(x.a), `${prsNum(x.q)} kWh`]), ["WCLI's own cost", short(E.own), 'main bill − shared'], ['Solar generated', E.solarQ?prsNum(E.solarQ)+' kWh':'—', E.avoided?`${short(E.avoided)} grid cost avoided`:'not recorded yet']].slice(0,4))}
+      <p class="ps-big">${E.solarQ?`Solar covered <b>${Math.round(100*E.solarQ/(E.gridQ+E.solarQ))}%</b> of the plant's electricity and saved about <b>${short(E.avoided)}</b> at the Meralco rate.`:`Electricity for ${Y} is priced at the standard rate from the outlook${stdOf(/electric/i)?` (${peso(stdOf(/electric/i).unit_price,2)}/kWh)`:''}.`}</p>`,
+    notes:() => `Main bill ${short(E.gridA)} (${prsNum(E.gridQ)} kWh); ${E.shared.map(x=>`${x.c} ${short(x.a)}`).join(', ')||'no shared part'}; WCLI's own ${short(E.own)}; solar ${prsNum(E.solarQ)} kWh.`,
+    pptx:(s, H) => { H.base(s, 'Electricity', `${E.y}`); H.kpis(s, [['Meralco main bill', short(E.gridA), `${prsNum(E.gridQ)} kWh`], ...E.shared.map(x=>[`Charged to ${x.c}`, short(x.a), `${prsNum(x.q)} kWh`]), ["WCLI's own cost", short(E.own)], ['Solar generated', E.solarQ?prsNum(E.solarQ)+' kWh':'—', E.avoided?`${short(E.avoided)} avoided`:'']].slice(0,4)); } }); }
+  S_.push({ id:'pcapex', title:'CAPEX', live:()=>go('capex'), html:() => `<h2>CAPEX — ${short(D.capexT)} <small>${D.capex.length} items</small></h2><div class="ps-2col" style="grid-template-columns:1.6fr 1fr">
+      <div><table class="ps-tbl"><thead><tr><th>Asset / project</th><th>Department</th><th>Priority</th><th class="r">Amount</th></tr></thead><tbody>
+        ${capS.slice(0,9).map(l=>`<tr><td><b>${esc(l.asset||'')}</b><br><small>${esc(l.category||'')}</small></td><td>${esc(deptById(l.department_id)?.name||'')}</td><td><span class="ps-pri" style="background:${PRI_COLOR[l.priority||'No priority']}">${esc(l.priority||'—')}</span></td><td class="r">${short(annual(l))}</td></tr>`).join('')}</tbody></table>${capS.length>9?`<p class="ps-foot">+ ${capS.length-9} more, ${short(sum(capS.slice(9).map(annual)))}</p>`:''}</div>
+      <div><h3>By category</h3>${prsBars(Object.entries(capCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({ label:k, v })), Math.max(...Object.values(capCat),1))}<h3 style="margin-top:18px">Payment timing</h3>${prsMonths(prsMonthVals(D.capex), 120)}</div></div>`,
+    notes:() => capS.slice(0,5).map(l=>`${l.asset} (${deptById(l.department_id)?.name}) ${short(annual(l))}, ${l.priority||'no priority'}`).join('; '),
+    pptx:(s, H) => { H.base(s, `CAPEX — ${short(D.capexT)}`, `${D.capex.length} items`); H.tbl(s, ['Asset / project','Department','Priority','Amount','Why'], capS.slice(0,9).map(l=>[{ text:l.asset||'', options:{ bold:true } }, deptById(l.department_id)?.name||'', l.priority||'—', short(annual(l)), (l.justification||'').slice(0,140)]), 1.35, [3.0,1.7,1.6,1.3,4.7]); } });
+  const R = D.rep;
+  if (R) S_.push({ id:'panal', title:'Analysis', live:()=>go('analysis'), html:() => `<h2>What the analysis says <small>report of ${fmtDate(D.repAt)}</small></h2>
+      ${R.headline?`<p class="ps-why" style="font-size:18px">${esc(R.headline)}</p>`:''}<div class="ps-2col"><div><h3>Strengths / opportunities</h3><ul>${[...(R.swot?.strengths||[]), ...(R.swot?.opportunities||[])].slice(0,5).map(x=>`<li>${esc(x.point||x)}</li>`).join('')}</ul>
+        <h3>Weaknesses / threats</h3><ul>${[...(R.swot?.weaknesses||[]), ...(R.swot?.threats||[])].slice(0,4).map(x=>`<li>${esc(x.point||x)}</li>`).join('')}</ul></div>
+      <div><h3>Top risks</h3><ul>${(R.risks||[]).slice(0,4).map(x=>`<li>${esc(x.risk||x)}${x.response?` — <small>${esc(x.response)}</small>`:''}</li>`).join('')}</ul><h3>Recommendations</h3><ul>${(R.recommendations||[]).slice(0,4).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`,
+    notes:() => R.headline || '',
+    pptx:(s, H) => { H.base(s, 'What the analysis says'); if (R.headline) s.addText(R.headline, { x:0.5, y:1.25, w:12.3, h:0.9, fontFace:H.F, fontSize:14, italic:true, color:H.INK });
+      const col = (t, arr, x) => s.addText([{ text:t+'\n', options:{ bold:true, fontSize:13, color:H.MUTE } }, ...arr.map(v=>({ text:v+'\n', options:{ bullet:true } }))], { x, y:2.2, w:6.0, h:4.7, fontFace:H.F, fontSize:12, color:H.INK, valign:'top' });
+      col('Strengths, opportunities, weaknesses and threats', [...(R.swot?.strengths||[]).slice(0,2), ...(R.swot?.opportunities||[]).slice(0,2), ...(R.swot?.weaknesses||[]).slice(0,2), ...(R.swot?.threats||[]).slice(0,2)].map(x=>x.point||x), 0.5);
+      col('Risks and recommendations', [...(R.risks||[]).slice(0,3).map(x=>x.risk||x), ...(R.recommendations||[]).slice(0,4)], 6.8); } });
+  S_.push({ id:'popts', title:'Options', live:()=>go('analysis'), html:() => `<h2>If the plant must spend less</h2>${kp([['Low / Discretionary OPEX', short(lowOT), `${lowO.length} lines — first to cut`], ['Medium / Low CAPEX', short(medCT), `${medC.length} items — can be deferred`], ['Budget without both', short(tot-lowOT-medCT), tot?`${Math.round(100*(lowOT+medCT)/tot)}% less`:'']].concat([['Critical / Mandatory', short(D.pri['Critical / Mandatory']||0), 'never cut — only re-price']]))}
+      <div class="ps-2col"><div><h3>CAPEX that could wait</h3><ul>${medC.slice(0,6).map(l=>`<li>${esc(l.asset)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Medium or Low.</li>'}</ul></div>
+        <div><h3>Largest discretionary OPEX</h3><ul>${lowO.sort((a,b)=>annual(b)-annual(a)).slice(0,6).map(l=>`<li>${esc(l.activity||l.line_item)} — ${esc(deptById(l.department_id)?.name||'')}, ${short(annual(l))}</li>`).join('')||'<li>None marked Low / Discretionary.</li>'}</ul></div></div>`,
+    notes:() => `Deferral room: ${short(lowOT)} discretionary OPEX and ${short(medCT)} medium/low CAPEX.`,
+    pptx:(s, H) => { H.base(s, 'If the plant must spend less'); H.kpis(s, [['Low / Discretionary OPEX', short(lowOT), `${lowO.length} lines`], ['Medium / Low CAPEX', short(medCT), `${medC.length} items`], ['Budget without both', short(tot-lowOT-medCT)], ['Critical / Mandatory', short(D.pri['Critical / Mandatory']||0), 'never cut']]);
+      H.tbl(s, ['Could wait','Department','Amount'], [...medC.slice(0,5).map(l=>[l.asset+' (CAPEX)', deptById(l.department_id)?.name||'', short(annual(l))]), ...lowO.slice(0,4).map(l=>[(l.activity||l.line_item)+' (OPEX)', deptById(l.department_id)?.name||'', short(annual(l))])], 3.2, [7,3,2.3]); } });
+  S_.push({ id:'papprove', title:'Approval requested', html:() => `<h2>Approval requested</h2><ol class="ps-dec">
+      <li>Approve the ${Y} plant OPEX of <b>${short(D.opexT)}</b> (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).</li>
+      <li>Approve <b>${D.capex.length}</b> CAPEX items totalling <b>${short(D.capexT)}</b>${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.</li>
+      <li>Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.</li>
+      ${waiting?`<li>Note: ${waiting} department budget${waiting>1?'s are':' is'} still being finalised.</li>`:''}</ol>
+      <div class="ps-sum">${Y} plant budget: <b>${short(D.opexT)}</b> OPEX + <b>${short(D.capexT)}</b> CAPEX = <b>${short(tot)}</b></div>`,
+    notes:() => `Ask for approval of ${short(tot)}.`,
+    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.5, y:1.4, w:12.3, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
+      s.addText(`${Y} plant budget: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:H.F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:H.T }, align:'center' }); } });
+  return S_;
+}
+
+/* ---------- Excel data pack: every number behind the slides ---------- */
+async function prsDataPack(){
+  const D = PRS.D, wb = new ExcelJS.Workbook(), Y = D.Y, hd = ws => { ws.getRow(1).font = { bold:true }; ws.getRow(1).fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFE2EEEC' } }; };
+  const info = wb.addWorksheet('About'); [[PRS.meta.file], [`Figures as of ${D.at.toLocaleString('en-PH')}`], ['Source: Costline — the same numbers shown in the presentation.']].forEach(r=>info.addRow(r)); info.getColumn(1).width = 80; info.getRow(1).font = { bold:true, size:14 };
+  const lineSheet = (name, ls, withDept) => { const ws = wb.addWorksheet(name); ws.addRow([...(withDept?['Department']:[]), 'Expense line','Activity','Type','Priority','Basis', ...MONTHS, 'Year', 'Business purpose']); hd(ws);
+    ls.forEach(l => ws.addRow([...(withDept?[deptById(l.department_id)?.name||'']:[]), l.line_item, l.activity, l.expense_type, l.priority, l.basis, ...MONTHS.map((_,i)=>Number(l['m'+(i+1)])||0), annual(l), l.purpose||''])); ws.columns.forEach((c,i)=>c.width = i<(withDept?6:5)?24:12); return ws; };
+  const capSheet = (ls, withDept) => { const ws = wb.addWorksheet('CAPEX'); ws.addRow([...(withDept?['Department']:[]), 'Category','Asset / project','Priority','Qty','Unit cost','Amount','Payment months','Justification']); hd(ws);
+    ls.forEach(l => ws.addRow([...(withDept?[deptById(l.department_id)?.name||'']:[]), l.category, l.asset, l.priority, Number(l.qty)||null, Number(l.unit_cost)||null, annual(l), MONTHS.filter((_,i)=>Number(l['m'+(i+1)])).join(', '), l.justification||''])); ws.columns.forEach(c=>c.width = 18); };
+  if (D.kind==='plant') {
+    const s1 = wb.addWorksheet('By department'); s1.addRow(['Department','Status',`OPEX ${Y}`,`${Y-1} full-year view`,`${Y-1} budget`,`CAPEX ${Y}`,'Total']); hd(s1);
+    D.depts.forEach(x=>s1.addRow([x.d.name, STATUS_LABEL[x.status]||'No budget', x.opex, x.lyView, x.lyBud, x.capex, x.opex+x.capex])); s1.columns.forEach(c=>c.width = 20);
+    const s2 = wb.addWorksheet('By expense line'); s2.addRow(['Expense line',`${Y}`,`${Y-1} full-year view`,`${Y-1} budget`]); hd(s2); D.lines.forEach(x=>s2.addRow([x.item, x.amt, x.lyView, x.lyBud])); s2.columns.forEach((c,i)=>c.width = i?18:48);
+    const s3 = wb.addWorksheet('Per board'); s3.addRow(['Year','OPEX per board produced','OPEX per board sold','Note']); hd(s3); D.per.forEach(p=>s3.addRow([p.y, p.prod, p.sold, p.budget?'budget ÷ planned boards':'Accounting actuals ÷ boards'])); s3.columns.forEach(c=>c.width = 26);
+    const s4 = wb.addWorksheet('Standard prices'); s4.addRow(['Item','Unit','Price','Source']); hd(s4); D.std.forEach(p=>s4.addRow([p.item, p.unit, Number(p.unit_price), p.source_type||''])); s4.columns.forEach(c=>c.width = 28);
+    lineSheet('OPEX lines', D.opex, true); capSheet(D.capex, true);
+  } else {
+    const s1 = wb.addWorksheet('By expense line'); s1.addRow(['Expense line',`${Y}`,`${Y-1} full-year view`,`${Y-1} budget`,'Why']); hd(s1); D.lines.forEach(x=>s1.addRow([x.item, x.amt, x.lyView, x.lyBud, x.why])); s1.columns.forEach((c,i)=>c.width = i?18:44);
+    lineSheet('OPEX lines', D.opex, false);
+    const s3 = wb.addWorksheet('Items'); s3.addRow(['Line','Item','Qty','Unit','Price','Allowance %','Source','How often','Year']); hd(s3);
+    D.opex.forEach(l => (l.items||[]).forEach(it => s3.addRow([l.activity||l.line_item, it.name, Number(it.qty)||0, it.unit||'', Number(it.price)||0, Number(it.adj)||0, it.std?'Standard '+it.std:srcLbl(it.src), freqText(it), itemAnnual(it)]))); s3.columns.forEach(c=>c.width = 18);
+    capSheet(D.capex, false);
+  }
+  wb.worksheets.forEach(ws => ws.eachRow((r,i)=>{ if (i>1) r.eachCell(c=>{ if (typeof c.value==='number') c.numFmt = '#,##0.00'; }); }));
+  download(await wb.xlsx.writeBuffer(), `${PRS.meta.file} - data.xlsx`); toast('Data pack downloaded');
+}
+
+/* ---------- Penny drafts the talking points ---------- */
+async function prsPennyNotes(){
+  const V = prsVisible(), w = PRS.win;
+  const say = t => { try { w.document.getElementById('pn').textContent = t; } catch(_){} };
+  say('Penny is drafting talking points for every slide… about a minute.');
+  const brief = V.map(s=>`[${s.id}] ${s.title}: ${s.notes?s.notes():''}`).join('\n');
+  const ask = `I am presenting "${PRS.meta.file}" (${PRS.D.kind==='plant'?'to the Managing Director':'to the Head of Plant Operations'}). For EACH slide below write 2–4 short spoken talking points in plain English (numbers first, what to emphasise, the likely question and a one-line answer). Reply ONLY with JSON: {"<slide id>": "talking points", ...}. Use only these figures:\n${brief}`;
+  try { const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ page:pennyContext(), messages:[{ role:'user', content:ask }] } });
+    if (error || data?.error) throw new Error(data?.error || error.message);
+    const m = String(data.reply||'').match(/\{[\s\S]*\}/); if (!m) throw new Error('Penny did not return the notes in the expected form — try again.');
+    const J = JSON.parse(m[0]); let n = 0;
+    V.forEach(s => { const t = J[s.id]; if (!t || prsMyNote(s.id)) return; try { localStorage.setItem(prsK()+'.note.'+s.id, String(t)); n++; } catch(_){} });
+    say(n ? `Penny drafted notes for ${n} slide${n>1?'s':''} (slides where you already wrote notes were left alone). Edit them below.` : 'Every slide already has your notes — nothing changed.'); prsNotesSync();
+  } catch(e){ say('Could not draft notes: ' + e.message); }
 }
 
 boot();

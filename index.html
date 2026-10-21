@@ -247,6 +247,58 @@ main{padding:16px 28px 64px;min-width:0}
   .lc-total{display:flex;justify-content:space-between;padding:10px 12px;font-weight:600;border-top:2px solid var(--line-strong);margin-bottom:70px}
 }
 details.oi>summary{cursor:pointer;list-style:none;padding:12px 14px}details.oi>summary::-webkit-details-marker{display:none}.oi-row{padding:10px 14px;border-top:1px solid var(--line)}.oi-q{margin-bottom:6px;font-size:13.5px}.oi-done{padding:6px 0;border-top:1px solid var(--line);font-size:13px}.ab-q{margin:8px 0}.ab-q label{display:block;font-size:13.5px;margin-bottom:4px}
+
+/* ---------- present mode ---------- */
+body.prs-on{overflow:hidden}
+#prs{position:fixed;inset:0;z-index:9000;background:#0d1211;display:flex;flex-direction:column}
+#prs .prs-stage{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.prs-slide{width:1280px;height:720px;flex:none;transform-origin:center center;background:#fff;color:#1d2939;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+#prs .prs-stage .prs-slide{position:absolute;left:50%;top:50%;margin:-360px 0 0 -640px}
+.prs-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#141b19;color:#c9d6d2;font-size:13px;position:relative}
+.prs-prog{position:absolute;left:0;right:0;top:0;height:3px;background:#24302d}.prs-prog i{display:block;height:100%;background:#2bb39a;transition:width .2s}
+.prs-b{background:#1f2a27;border:1px solid #2f3b38;color:#e7ecea;border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}.prs-b:hover{background:#2a3734}
+.prs-no{font-variant-numeric:tabular-nums;min-width:52px;text-align:center}.prs-asof{color:#8fa39d;margin-left:8px}
+#prsBack{position:fixed;right:20px;bottom:20px;z-index:9001;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.prs-ls{display:grid;gap:6px;margin:10px 0}.prs-ls label{display:flex;gap:8px;align-items:center}
+.prs-ex{display:grid;gap:8px;margin:10px 0}.prs-ex .btn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:10px 14px}.prs-ex small{font-weight:400;opacity:.8}
+.ps{position:relative;width:1280px;height:720px;padding:46px 60px 60px;box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif;color:#1d2939;overflow:hidden}
+.ps h2{font-size:36px;margin:0 0 6px;letter-spacing:-.01em}.ps h2 small{font-size:18px;color:#667085;font-weight:500;margin-left:10px}
+.ps h2::after{content:'';display:block;width:84px;height:5px;background:#0f5a52;border-radius:3px;margin:12px 0 22px}
+.ps h3{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:#667085;margin:0 0 12px}.ps h3.up{color:#b42318}.ps h3.down{color:#2e7d6b}
+.ps-foot-bar{position:absolute;left:60px;right:60px;bottom:18px;display:flex;justify-content:space-between;font-size:13px;color:#98a2b3;border-top:1px solid #eaecf0;padding-top:8px}
+.ps-cover{position:absolute;inset:0;background:linear-gradient(135deg,#0f5a52,#0b3f3a);color:#fff;padding:120px 80px}
+.ps-cover h1{font-size:72px;margin:10px 0 6px;letter-spacing:-.02em}.ps-eyebrow{font-size:20px;color:#cfe3df;text-transform:uppercase;letter-spacing:.08em}.ps-sub{font-size:28px}.ps-meta{position:absolute;left:80px;bottom:90px;font-size:18px;color:#cfe3df;line-height:1.6}
+.ps-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}.ps-kpis>div{background:#f2f6f5;border:1px solid #dce5e3;border-radius:12px;padding:16px 18px}
+.ps-kpis span{display:block;font-size:14px;color:#667085}.ps-kpis b{display:block;font-size:34px;margin:6px 0 2px;font-variant-numeric:tabular-nums}.ps-kpis small{font-size:13px;color:#667085}
+.ps-kpis.sm{grid-template-columns:repeat(4,1fr);margin-bottom:16px}.ps-kpis.sm b{font-size:26px}
+.ps-big{font-size:28px;line-height:1.4}.ps-big b{color:#0f5a52}.ps-big.up b{color:#b42318}
+.ps-2col{display:grid;grid-template-columns:1fr 1fr;gap:44px}
+.pb{display:grid;gap:9px}.pb-r{display:grid;grid-template-columns:250px 1fr 110px;gap:10px;align-items:center;font-size:14px}.pb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pb-t{position:relative;height:20px;background:#f2f4f7;border-radius:5px}.pb-b{height:100%;background:#0f5a52;border-radius:5px}.pb-m{position:absolute;top:-3px;bottom:-3px;width:3px;background:#1d2939}
+.pb-v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.pb-v small{display:block;font-weight:400;color:#667085;font-size:12px}
+.ps-foot{font-size:13px;color:#667085;margin:8px 0 0}.ps-flag{margin-top:16px;background:#fef3f2;color:#b42318;border-radius:8px;padding:10px 12px;font-size:15px}
+.ps-chg{margin-bottom:14px;font-size:16px}.ps-chg small{color:#667085;margin-left:6px}.ps-chg p{margin:3px 0 0;color:#475467;font-size:14px;line-height:1.4;max-height:3.9em;overflow:hidden}
+.ps .up{color:#b42318}.ps .down{color:#2e7d6b}
+.ps-why{font-size:16px;color:#475467;margin:0 0 14px}
+.ps-tbl{width:100%;border-collapse:collapse;font-size:14px}.ps-tbl th{background:#0f5a52;color:#fff;text-align:left;padding:8px 10px;font-weight:600}.ps-tbl td{padding:7px 10px;border-bottom:1px solid #eaecf0;vertical-align:top}.ps-tbl .r{text-align:right;font-variant-numeric:tabular-nums}.ps-tbl small{color:#667085}
+.ps-just{font-size:13px;color:#475467;max-width:520px}.ps-pri{color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;white-space:nowrap}
+.ps ul{margin:0 0 16px;padding-left:22px;font-size:16px;line-height:1.5}.ps-chk{font-size:14px;color:#475467;margin:6px 0}
+.ps-dec{font-size:24px;line-height:1.5;padding-left:34px}.ps-dec li{margin-bottom:10px}
+.ps-sum{position:absolute;left:60px;right:60px;bottom:64px;background:#0f5a52;color:#fff;font-size:24px;text-align:center;padding:16px;border-radius:12px}
+.pm{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end}.pm-c{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}.pm-b{width:70%;background:#0f5a52;border-radius:4px 4px 0 0}.pm-v{font-size:11px;color:#667085;margin-bottom:3px;white-space:nowrap}.pm-l{font-size:12px;color:#667085;margin-top:4px;border-top:1px solid #d0d5dd;width:100%;text-align:center;padding-top:3px}
+.ps-chk small{color:#667085}.ps-chk .ps-pri{margin-right:4px}
+#prsPrint{display:none}
+@media print{
+  body.prs-printing>*:not(#prsPrint){display:none!important}
+  body.prs-printing #prsPrint{display:block}
+  #prsPrint.slides{}
+  #prsPrint .pp{break-after:page;page-break-after:always}
+  #prsPrint.slides .pp-s{transform:none;box-shadow:none}
+  #prsPrint.handout .pp-s{transform:scale(.56);transform-origin:top left;margin-bottom:-316px;box-shadow:none;border:1px solid #ccc}
+  #prsPrint .pp-n{font:13px/1.5 Arial,sans-serif;color:#222;padding:12px 0}.pp-lines{height:150px;background:repeating-linear-gradient(#fff 0 27px,#ccc 27px 28px)}
+}
+body.prs-printing.prs-p-slides{}
+
 td.proj{font-style:italic;color:var(--muted)}
 .build-tag{font-size:10.5px;opacity:.55;margin:6px 0 2px}
 .cxe-in{margin-bottom:14px;border-left:4px solid var(--teal)}
@@ -506,7 +558,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-21 22:09</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-10-21 22:30</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1001,7 +1053,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 22:09</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-21 22:30</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1133,6 +1185,7 @@ function renderBudget(){
       ${actionsFor(b).map(([a,l,cls])=>`<button class="btn ${cls}" onclick="doAction('${a}')">${l}</button>`).join('')}
       ${ed?'<button class="btn" onclick="aiBudgetDialog()">Draft budget with assistant</button>':''}
       ${isReviewer() && b.status!=='draft' ? `<button class="btn" onclick="pennyToggle(true);pennyAsk('Is the ${esc(d?.name||'')} budget aligned with the ${S.cycle.year} direction, SWOT and scenarios? What should I ask them?')">Alignment check (Penny)</button>` : ''}
+      <button class="btn" onclick="presentBudget()">Present</button>
       <button class="btn" onclick="aiReview()">Review with assistant</button>
       <button class="btn" onclick="exportDept()">Export for Finance</button>
       ${ed?'<button class="btn ghost" onclick="importDialog()">Import Excel</button>':''}
@@ -4947,6 +5000,7 @@ function pennyClear(){ S.penny.msgs = []; pennySave(); pennyRender(); }
 async function pennyAsk(text){
   text = String(text||'').trim(); if (!text || S.penny.busy) return;
   if (!PRT.on && /^(🎓|start practice|practice|training|train me|tutorial)/i.test(text)) { pennyToggle(false); practiceMenu(); return; }
+  if (/^(present|presentation|present (this|my) budget|slides?)$/i.test(text)) { if (S.view==='budget' && S.budgetId) { pennyToggle(false); presentBudget(); } else toast('Open a department budget, then say "present".'); return; }
   S.penny.msgs.push({ role:'user', content:text }); S.penny.busy = true; pennySave(); pennyRender();
   try {
     const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ page:pennyContext(), messages:S.penny.msgs.map(m=>({ role:m.role, content:m.content })) } });
@@ -5507,6 +5561,272 @@ async function oiDrop(id){
 function oiPenny(id){
   const x = S.oi.find(o=>o.id===id); if (!x) return;
   pennyCall(); pennyAsk(`The budget draft ${x.kind==='gap'?'had this data gap':'asked'}: "${x.body}"\nMy answer: ${x.answer}\nPlease update the affected lines in this budget to reflect it (amount, months, items and justification), or tell me if nothing needs to change.`);
+}
+
+/* ================= PRESENT MODE =================
+   Department budget review (manager → Head of Plant Operations), built from the live budget.
+   Figures are frozen when the deck opens ("Figures as of …"); everything is read-only.
+   Slides are drawn at 1280×720 and scaled to the screen; the same data builds the PDF and the PowerPoint. */
+const PRS = { on:false, deck:[], i:0, D:null, hidden:new Set(), win:null };
+const prsK = () => `costline.present.${PRS.D?.budget.id}`;
+const prsNum = n => Math.round(Number(n)||0).toLocaleString('en-PH');
+const prsPct = (a, b) => b ? `${a>=b?'+':''}${(100*(a-b)/b).toFixed(1)}%` : 'new';
+const prsLi = t => String(t||'').replace(/^REPAIRS AND MAINTENANCE - /i,'R&M — ').replace(/^UTILITIES - /i,'UTILITIES — ');
+function prsMonths(vals, h=150){ const mx = Math.max(...vals, 1);
+  return `<div class="pm" style="height:${h}px">${vals.map((v,i)=>`<div class="pm-c"><div class="pm-v">${v?short(v).replace('₱',''):''}</div><div class="pm-b" style="height:${Math.max(v?2:0, (h-40)*v/mx)}px"></div><div class="pm-l">${MONTHS[i]}</div></div>`).join('')}</div>`; }
+const prsMonthVals = ls => MONTHS.map((_,i)=>sum(ls.map(l=>Number(l['m'+(i+1)])||0)));
+const VOL_DRIVER = { PROD:'production_output', ENG:'production_output', QA:'production_output', PPIC:'production_output', WH:'volume_sold', LOG:'volume_sold' };
+
+/* ---------- 1. snapshot of the figures ---------- */
+async function prsGather(budgetId){
+  const b = budgetById(budgetId), d = deptById(b.department_id), Y = S.cycle.year;
+  const [o, c, ly] = await Promise.all([
+    sb.from('bgt_opex_lines').select('*').eq('budget_id', b.id).order('sort'),
+    sb.from('bgt_capex_lines').select('*').eq('budget_id', b.id).order('sort'),
+    loadYearData(Y-1, b.department_id).catch(()=>null)]);
+  if (o.error) throw o.error; if (c.error) throw c.error;
+  await Promise.all([loadOpenItems(b.id).catch(()=>[]), loadPriceReqs().catch(()=>[]), loadEndorse().catch(()=>[])]);
+  const opex = o.data||[], capex = c.data||[], M = ly ? actModel(ly, 'budget') : null;
+  const opexT = sum(opex.map(annual)), capexT = sum(capex.map(annual));
+  // by expense line, against last year's budget and full-year view (actuals + projection)
+  const byLi = {}; opex.forEach(l => { const k = l.line_item || 'No line item'; (byLi[k] ||= { item:k, amt:0, lines:[] }); byLi[k].amt += annual(l); byLi[k].lines.push(l); });
+  (M?.rows||[]).forEach(r => { const x = (byLi[r.item] ||= { item:r.item, amt:0, lines:[] }); x.lyBud = r.budFY; x.lyView = r.projFY; });
+  const lines = Object.values(byLi).map(x => ({ ...x, lyBud:x.lyBud||0, lyView:x.lyView||0, diff:x.amt-(x.lyView||0),
+    why: (x.lines.find(l=>l.purpose)?.purpose || x.lines.find(l=>l.remarks)?.remarks || '').replace(/^Assistant draft[^:]*:\s*/,'') }));
+  const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
+  // volume link for volume-driven departments
+  let vol = null; const metric = VOL_DRIVER[d.code];
+  if (metric) { try { await loadCal(); const K = await loadKpis(Y-1), R = projRate(K, Y-1, metric);
+      if (R) { const act = sum(K.filter(k=>k.metric===metric && k.month>0).map(k=>Number(k.value))), wd0 = MONTHS.map((_,i)=>workDays(Y-1,i+1)), wd1 = MONTHS.map((_,i)=>workDays(Y,i+1));
+        const fy0 = act + R.rate*sum(wd0.slice(R.last)), fy1 = R.rate*sum(wd1);
+        vol = { metric, label: metric==='volume_sold' ? 'boards sold' : 'boards produced', fy0, fy1, ly:M?.projFY||0, perLy: fy0 ? (M?.projFY||0)/fy0 : null, perNew: fy1 ? opexT/fy1 : null, rate:R.rate }; } } catch(e){ console.warn(e); } }
+  const prev = S.budgetId; S.budgetId = b.id; const so = S.opex, sc = S.capex; S.opex = opex; S.capex = capex;
+  let checks = []; try { checks = runChecks(); } catch(e){} S.opex = so; S.capex = sc; S.budgetId = prev;
+  return { at:new Date(), Y, budget:b, dept:d, company:S.company, by:b.prepared_by || userName(b.updated_by) || S.me.full_name || '', head:b.dept_head || '',
+    opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyClosed:M?.closed||0, lines, pri, vol,
+    oi:(S.oi||[]).filter(x=>x.status==='open'), checks, preqs:(S.preqs||[]).filter(r=>r.department_id===b.department_id && r.status==='open'),
+    cxe:(S.cxe||[]).filter(e=>e.from_dept===b.department_id || e.to_dept===b.department_id) };
+}
+
+/* ---------- 2. slides ---------- */
+const PRI_ORDER = ['Critical / Mandatory','High','Medium','Low / Discretionary','No priority'];
+const PRI_COLOR = { 'Critical / Mandatory':'#b42318', 'High':'#c4320a', 'Medium':'#b88a00', 'Low / Discretionary':'#2e7d6b', 'No priority':'#98a2b3' };
+function prsBars(rows, max){   // rows: [{label, v, v2?, note?}]
+  return `<div class="pb">${rows.map(r=>`<div class="pb-r"><div class="pb-l">${esc(r.label)}</div><div class="pb-t"><div class="pb-b" style="width:${max?Math.max(1,100*r.v/max):0}%;${r.c?`background:${r.c}`:''}"></div>${r.v2!=null?`<div class="pb-m" style="left:${max?Math.min(100,100*r.v2/max):0}%" title="last year"></div>`:''}</div><div class="pb-v">${short(r.v)}${r.note?`<small>${esc(r.note)}</small>`:''}</div></div>`).join('')}</div>`;
+}
+function prsDeckDept(D){
+  const Y = D.Y, dn = D.dept.name, tot = D.opexT + D.capexT;
+  const up = D.lines.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,4), down = D.lines.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3);
+  const top = D.opex.slice().sort((a,b)=>annual(b)-annual(a)).slice(0,4);
+  const errs = D.checks.filter(c=>c.sev==='err'), warns = D.checks.filter(c=>c.sev==='warn');
+  const capNeed = D.capex.filter(l=>annual(l)>0);
+  const decisions = [
+    ...(capNeed.length ? [`Approve ${capNeed.length} CAPEX item${capNeed.length>1?'s':''} totalling ${short(D.capexT)} — or tell us which to defer`] : []),
+    ...(D.opexT > D.lyView*1.1 && D.lyView ? [`Accept OPEX ${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view (${short(D.opexT-D.lyView)} more)`] : []),
+    ...D.oi.slice(0,3).map(x=>`Confirm: ${x.body}`),
+    ...D.preqs.slice(0,2).map(r=>`Set the board price for ${r.item}`)];
+  const S_ = [];
+  S_.push({ id:'cover', title:'Cover', html:() => `<div class="ps-cover"><div class="ps-eyebrow">${esc(D.company?.name||'')} · ${Y} budget</div><h1>${esc(dn)}</h1><div class="ps-sub">Department budget review</div>
+      <div class="ps-meta">${D.by?`Presented by <b>${esc(D.by)}</b>`:''}${D.head?` · Department head <b>${esc(D.head)}</b>`:''}<br>Status: <b>${esc(STATUS_LABEL[D.budget.status]||D.budget.status)}</b> · Version ${D.budget.version}</div></div>`,
+    notes:() => `Introduce the ${dn} ${Y} budget: ${short(tot)} in total (${short(D.opexT)} OPEX, ${short(D.capexT)} CAPEX). Status: ${STATUS_LABEL[D.budget.status]||D.budget.status}.` });
+  S_.push({ id:'ask', title:'The ask', live:()=>{ S.tab='opex'; go('budget', D.budget.id); }, html:() => `<h2>The ask — ${Y}</h2>
+      <div class="ps-kpis sm"><div><span>OPEX ${Y}</span><b>${short(D.opexT)}</b><small>${D.opex.length} lines</small></div><div><span>CAPEX ${Y}</span><b>${short(D.capexT)}</b><small>${D.capex.length} item${D.capex.length===1?'':'s'}</small></div>
+        <div><span>${Y-1} budget (OPEX)</span><b>${D.lyBud?short(D.lyBud):'—'}</b><small>${D.lyBud?prsPct(D.opexT, D.lyBud)+' vs this':''}</small></div><div><span>${Y-1} full-year view</span><b>${D.lyView?short(D.lyView):'—'}</b><small>${D.lyClosed?`actuals Jan–${MONTHS[D.lyClosed-1]} + projection`:'no actuals loaded'}</small></div></div>
+      <div class="ps-big ${D.lyView && D.opexT>D.lyView?'up':'down'}">${D.lyView?`OPEX is <b>${prsPct(D.opexT, D.lyView)}</b> (${D.opexT>=D.lyView?'+':'−'}${short(Math.abs(D.opexT-D.lyView))}) against what ${dn} is on track to spend in ${Y-1}.`:`No ${Y-1} actuals to compare with.`}</div>
+      <div class="ps-2col" style="margin-top:26px"><div><h3>OPEX compared</h3>${prsBars([{ label:`${Y-1} budget`, v:D.lyBud, c:'#98a2b3' }, { label:`${Y-1} full-year view`, v:D.lyView, c:'#667085' }, { label:`${Y} proposed`, v:D.opexT }], Math.max(D.lyBud, D.lyView, D.opexT, 1))}</div>
+        <div><h3>${Y} spending by month (OPEX + CAPEX)</h3>${prsMonths(prsMonthVals([...D.opex, ...D.capex]), 170)}</div></div>`,
+    notes:() => `OPEX ${short(D.opexT)} vs ${Y-1} budget ${short(D.lyBud)} and ${Y-1} full-year view ${short(D.lyView)} (${prsPct(D.opexT, D.lyView)}). CAPEX ${short(D.capexT)}.` });
+  const li = D.lines.filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt), shown = li.slice(0,8), mx = Math.max(...shown.map(x=>Math.max(x.amt, x.lyView||0)), 1);
+  S_.push({ id:'where', title:'Where the money goes', live:()=>{ S.tab='opex'; go('budget', D.budget.id); }, html:() => `<h2>Where the money goes</h2><div class="ps-2col"><div><h3>Top expense lines (OPEX)</h3>${prsBars(shown.map(x=>({ label:prsLi(x.item), v:x.amt, v2:x.lyView||null, note:x.lyView?prsPct(x.amt,x.lyView):'new' })), mx)}${li.length>8?`<p class="ps-foot">+ ${li.length-8} more lines, ${short(sum(li.slice(8).map(x=>x.amt)))}</p>`:''}<p class="ps-foot">Bar = ${Y}; tick = ${Y-1} full-year view.</p></div>
+      <div><h3>By priority (OPEX + CAPEX)</h3>${prsBars(PRI_ORDER.filter(p=>D.pri[p]).map(p=>({ label:p, v:D.pri[p], c:PRI_COLOR[p], note:`${Math.round(100*D.pri[p]/(tot||1))}%` })), Math.max(...Object.values(D.pri),1))}
+      ${(D.pri['Critical / Mandatory']||0)/(tot||1) > 0.6 ? `<p class="ps-flag">${Math.round(100*(D.pri['Critical / Mandatory']||0)/tot)}% marked Critical — not everything can be critical.</p>`:''}</div></div>`,
+    notes:() => `Biggest lines: ${shown.slice(0,3).map(x=>`${x.item} ${short(x.amt)}`).join('; ')}. Priority split: ${PRI_ORDER.filter(p=>D.pri[p]).map(p=>`${p} ${Math.round(100*D.pri[p]/(tot||1))}%`).join(', ')}.` });
+  S_.push({ id:'changes', title:'What changed and why', html:() => `<h2>What changed and why <small>vs ${Y-1} full-year view</small></h2>
+      <div class="ps-2col"><div><h3 class="up">Up</h3>${up.length?up.map(x=>`<div class="ps-chg"><div><b>${esc(prsLi(x.item))}</b> <span class="up">+${short(x.diff)}</span> <small>${short(x.lyView)} → ${short(x.amt)}</small></div><p>${esc(x.why||'No justification written yet.')}</p></div>`).join(''):'<p class="ps-foot">No increases.</p>'}</div>
+      <div><h3 class="down">Down</h3>${down.length?down.map(x=>`<div class="ps-chg"><div><b>${esc(prsLi(x.item))}</b> <span class="down">−${short(-x.diff)}</span> <small>${short(x.lyView)} → ${short(x.amt)}</small></div><p>${esc(x.amt?(x.why||'No justification written yet.'):`Spent in ${Y-1}, not budgeted for ${Y} — confirm it is no longer needed.`)}</p></div>`).join(''):'<p class="ps-foot">No decreases.</p>'}</div></div>`,
+    notes:() => `Explain each big change. Up: ${up.map(x=>`${x.item} +${short(x.diff)}`).join('; ')||'none'}. Down: ${down.map(x=>`${x.item} −${short(-x.diff)}`).join('; ')||'none'}.` });
+  top.forEach((l,k) => S_.push({ id:'line'+k, title:`Line: ${l.activity||l.line_item}`, live:()=>{ go('budget', D.budget.id); setTimeout(()=>editLine('opex', l.id), 400); }, html:() => `<h2>${esc(l.activity||l.line_item)} <small>${esc(prsLi(l.line_item||''))}</small></h2>
+      <div class="ps-line"><div class="ps-kpis sm"><div><span>${Y}</span><b>${short(annual(l))}</b></div><div><span>Priority</span><b style="font-size:20px">${esc(l.priority||'—')}</b></div><div><span>Basis</span><b style="font-size:16px">${esc(l.basis||'—')}</b></div><div><span>Type</span><b style="font-size:16px">${esc(l.expense_type||'—')}</b></div></div>
+      ${l.purpose?`<p class="ps-why"><b>Why:</b> ${esc(l.purpose)}</p>`:''}
+      <table class="ps-tbl"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th>Source</th><th>When</th><th class="r">Year</th></tr></thead><tbody>
+      ${(l.items||[]).slice(0,9).map(it=>`<tr><td>${esc(it.name)}</td><td class="r">${prsNum(it.qty)} ${esc(it.unit||'')}</td><td class="r">${peso(it.price,2)}${Number(it.adj)?` <small>+${it.adj}%</small>`:''}</td><td>${esc(it.std?'Standard '+it.std:srcLbl(it.src))}</td><td>${esc(freqText(it))}</td><td class="r">${short(itemAnnual(it))}</td></tr>`).join('') || '<tr><td colspan="6">No items listed yet.</td></tr>'}
+      ${(l.items||[]).length>9?`<tr><td colspan="6" class="ps-foot">+ ${(l.items||[]).length-9} more items</td></tr>`:''}</tbody></table>
+      ${(l.items||[]).length<=5?`<h3 style="margin-top:22px">When it is spent</h3>${prsMonths(prsMonthVals([l]), (l.items||[]).length?140:190)}`:''}</div>`,
+    notes:() => `${l.activity||l.line_item}: ${short(annual(l))}, ${l.priority||'no priority'}. ${l.purpose||''} Items: ${(l.items||[]).slice(0,4).map(it=>`${it.name} ${prsNum(it.qty)} ${it.unit||''} × ${peso(it.price,2)}`).join('; ')}.` }));
+  if (D.capex.length) S_.push({ id:'capex', title:'CAPEX', live:()=>{ S.tab='capex'; go('budget', D.budget.id); }, html:() => `<h2>CAPEX — ${short(D.capexT)}</h2>
+      <table class="ps-tbl"><thead><tr><th>Asset / project</th><th>Priority</th><th class="r">Amount</th><th>Paid</th><th>Why — and the impact if not done</th></tr></thead><tbody>
+      ${D.capex.slice().sort((a,b)=>PRI_ORDER.indexOf(a.priority||'No priority')-PRI_ORDER.indexOf(b.priority||'No priority') || annual(b)-annual(a)).slice(0,7).map(l=>{ const m = MONTHS.filter((_,i)=>Number(l['m'+(i+1)])).join(', '), e = D.cxe.find(x=>x.line_id===l.id);
+        return `<tr><td><b>${esc(l.asset||'')}</b><br><small>${esc(l.category||'')}${l.qty?` · ${prsNum(l.qty)} × ${short(l.unit_cost)}`:''}${e?` · endorsed ${e.status}`:''}${l.similar_dept?` · similar to ${esc(l.similar_dept)}`:''}</small></td><td><span class="ps-pri" style="background:${PRI_COLOR[l.priority||'No priority']}">${esc(l.priority||'—')}</span></td><td class="r">${short(annual(l))}</td><td>${m||'—'}</td><td class="ps-just">${esc(l.justification||'No justification yet.')}</td></tr>`; }).join('')}
+      </tbody></table>${D.capex.length>7?`<p class="ps-foot">+ ${D.capex.length-7} more items</p>`:''}`,
+    notes:() => D.capex.map(l=>`${l.asset} ${short(annual(l))} (${l.priority||'no priority'})`).join('; ') });
+  if (D.vol) S_.push({ id:'volume', title:'Volume link', live:()=>go('perf'), html:() => `<h2>Cost per board <small>${esc(D.vol.label)}</small></h2>
+      <div class="ps-kpis"><div><span>${Y-1} ${esc(D.vol.label)}</span><b>${prsNum(D.vol.fy0)}</b><small>actual + projection by working day</small></div><div><span>${Y} at the ${Y-1} run rate</span><b>${prsNum(D.vol.fy1)}</b><small>${prsNum(D.vol.rate)} per working day</small></div>
+        <div><span>OPEX per board ${Y-1}</span><b>${D.vol.perLy?peso(D.vol.perLy,2):'—'}</b><small>full-year view ÷ boards</small></div><div><span>OPEX per board ${Y}</span><b>${D.vol.perNew?peso(D.vol.perNew,2):'—'}</b><small>${D.vol.perLy&&D.vol.perNew?prsPct(D.vol.perNew,D.vol.perLy):''}</small></div></div>
+      <p class="ps-big ${D.vol.perNew>D.vol.perLy?'up':''}">${D.vol.perLy && D.vol.perNew ? `At the same volume, ${esc(dn)} would cost <b>${peso(D.vol.perNew,2)}</b> per board ${D.vol.label.split(' ')[1]} — ${D.vol.perNew>D.vol.perLy?'up':'down'} ${peso(Math.abs(D.vol.perNew-D.vol.perLy),2)} from ${Y-1}.`:''}</p>`,
+    notes:() => `Volume: ${prsNum(D.vol.fy0)} ${D.vol.label} in ${Y-1}; ${Y} at the run rate ${prsNum(D.vol.fy1)}. OPEX per board ${peso(D.vol.perLy||0,2)} → ${peso(D.vol.perNew||0,2)}.` });
+  S_.push({ id:'open', title:'Open points', live:()=>{ S.tab='checks'; go('budget', D.budget.id); }, html:() => `<h2>Open points</h2><div class="ps-2col">
+      <div><h3>To confirm (${D.oi.length})</h3>${D.oi.length?`<ul>${D.oi.slice(0,6).map(x=>`<li>${esc(x.body)}</li>`).join('')}</ul>`:'<p class="ps-foot">Nothing open.</p>'}
+        ${D.preqs.length?`<h3>Waiting for a board price (${D.preqs.length})</h3><ul>${D.preqs.slice(0,3).map(r=>`<li>${esc(r.item)}</li>`).join('')}</ul>`:''}</div>
+      <div><h3>Checks</h3><div class="ps-kpis sm"><div><span>Must fix</span><b class="${errs.length?'up':''}">${errs.length}</b></div><div><span>To review</span><b>${warns.length}</b></div></div>
+        ${prsGroupChecks([...errs, ...warns]).slice(0,5).map(g=>`<p class="ps-chk"><span class="ps-pri" style="background:${g.sev==='err'?'#b42318':'#b88a00'}">${g.sev==='err'?'Fix':'Review'}</span> ${esc(g.msg)}<br><small>${esc(g.names.slice(0,4).join(', '))}${g.names.length>4?` +${g.names.length-4} more`:''}</small></p>`).join('')}</div></div>`,
+    notes:() => `${D.oi.length} open questions, ${errs.length} must-fix and ${warns.length} to-review checks.` });
+  S_.push({ id:'decide', title:'Decisions needed', html:() => `<h2>Decisions needed</h2>${decisions.length?`<ol class="ps-dec">${decisions.slice(0,6).map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`:'<p class="ps-big">No open decisions — ready to submit.</p>'}
+      <div class="ps-sum">${esc(dn)} ${Y}: <b>${short(D.opexT)}</b> OPEX + <b>${short(D.capexT)}</b> CAPEX = <b>${short(tot)}</b></div>`,
+    notes:() => decisions.join(' · ') || 'No open decisions.' });
+  return S_;
+}
+
+function prsGroupChecks(list){ const by = {}; list.forEach(c => { const k = c.sev+'|'+c.msg; (by[k] ||= { sev:c.sev, msg:c.msg, names:[] }).names.push(c.name); }); return Object.values(by).sort((a,b)=>(a.sev==='err'?0:1)-(b.sev==='err'?0:1) || b.names.length-a.names.length); }
+/* ---------- 3. viewer ---------- */
+async function presentBudget(id){
+  id = id || S.budgetId; if (!id) return toast('Open a budget first.', true);
+  toast('Preparing the presentation…');
+  try { PRS.D = await prsGather(id); } catch(e){ return fail(e); }
+  PRS.deck = prsDeckDept(PRS.D); PRS.i = 0; PRS.on = true;
+  try { PRS.hidden = new Set(JSON.parse(localStorage.getItem(prsK()+'.hidden')||'[]')); } catch(_){ PRS.hidden = new Set(); }
+  try { pennyToggle(false); } catch(_){}
+  let el = document.getElementById('prs'); if (!el) { el = document.createElement('div'); el.id = 'prs'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="prs-stage"><div class="prs-slide" id="prsSlide"></div></div>
+    <div class="prs-bar"><div class="prs-prog"><i id="prsProg"></i></div>
+      <button class="prs-b" onclick="prsGo(-1)" aria-label="Previous">‹</button><span id="prsNo" class="prs-no"></span><button class="prs-b" onclick="prsGo(1)" aria-label="Next">›</button>
+      <span class="prs-asof">Figures as of ${PRS.D.at.toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span><span style="flex:1"></span>
+      <button class="prs-b t" id="prsLive" onclick="prsLive()">Open live page</button><button class="prs-b t" onclick="prsList()">Slides</button><button class="prs-b t" onclick="prsNotes()">Presenter notes</button>
+      <button class="prs-b t" onclick="prsExportMenu()">Export</button><button class="prs-b t" onclick="prsFull()">Full screen</button><button class="prs-b t" onclick="prsExit()">Exit</button></div>`;
+  document.body.classList.add('prs-on'); prsShow(); prsFit();
+}
+const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));
+function prsShow(){
+  const V = prsVisible(); PRS.i = Math.max(0, Math.min(PRS.i, V.length-1)); const s = V[PRS.i]; if (!s) return;
+  $('#prsSlide').innerHTML = `<div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.D.dept.name)} · ${PRS.D.Y} budget</span><span>${PRS.i+1} / ${V.length}</span></div></div>`;
+  $('#prsNo').textContent = `${PRS.i+1} / ${V.length}`; $('#prsProg').style.width = `${100*(PRS.i+1)/V.length}%`;
+  $('#prsLive').style.visibility = s.live ? 'visible' : 'hidden'; prsNotesSync();
+}
+function prsGo(d){ const n = prsVisible().length; PRS.i = Math.max(0, Math.min(n-1, PRS.i + d)); prsShow(); }
+function prsFit(){ const st = document.querySelector('#prs .prs-stage'), sl = $('#prsSlide'); if (!st || !sl) return; const k = Math.min(st.clientWidth/1280, st.clientHeight/720); sl.style.transform = `scale(${k})`; }
+window.addEventListener('resize', () => PRS.on && prsFit());
+document.addEventListener('keydown', e => { if (!PRS.on || e.target.closest?.('input,textarea,select')) return;
+  if (['ArrowRight','PageDown',' ','Enter'].includes(e.key)) { e.preventDefault(); prsGo(1); }
+  else if (['ArrowLeft','PageUp','Backspace'].includes(e.key)) { e.preventDefault(); prsGo(-1); }
+  else if (e.key==='Home') { PRS.i = 0; prsShow(); } else if (e.key==='End') { PRS.i = prsVisible().length-1; prsShow(); }
+  else if (e.key==='Escape' && !document.fullscreenElement) prsExit(); else if (e.key==='f' || e.key==='F') prsFull(); });
+function prsFull(){ const el = document.getElementById('prs'); if (!document.fullscreenElement) el?.requestFullscreen?.().catch(()=>{}); else document.exitFullscreen?.(); setTimeout(prsFit, 200); }
+function prsExit(){ PRS.on = false; document.body.classList.remove('prs-on'); document.getElementById('prs')?.remove(); if (document.fullscreenElement) document.exitFullscreen?.(); try { PRS.win?.close(); } catch(_){} }
+// drill down: leave the deck open in the background, show the real page, come back with "Back to slides"
+function prsLive(){ const s = prsVisible()[PRS.i]; if (!s?.live) return; document.getElementById('prs').style.display = 'none'; document.body.classList.remove('prs-on'); s.live();
+  let b = document.getElementById('prsBack'); if (!b) { b = document.createElement('button'); b.id = 'prsBack'; b.className = 'btn primary'; b.textContent = '◂ Back to slides'; b.onclick = prsBack; document.body.appendChild(b); } }
+function prsBack(){ document.getElementById('prsBack')?.remove(); closeDrawer?.(); const el = document.getElementById('prs'); if (!el) return; el.style.display = ''; document.body.classList.add('prs-on'); prsShow(); prsFit(); }
+function prsList(){
+  modal2(`<h3>Slides for this meeting</h3><p class="hint">Untick a slide to skip it — remembered on this device for this budget.</p>
+    <div class="prs-ls">${PRS.deck.map(s=>`<label><input type="checkbox" data-id="${s.id}" ${PRS.hidden.has(s.id)?'':'checked'}> ${esc(s.title)}</label>`).join('')}</div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn primary" id="prsLsGo">Done</button></div>`);
+  $('#prsLsGo').onclick = () => { PRS.hidden = new Set([...document.querySelectorAll('.prs-ls input')].filter(x=>!x.checked).map(x=>x.dataset.id));
+    try { localStorage.setItem(prsK()+'.hidden', JSON.stringify([...PRS.hidden])); } catch(_){} closeModal2(); PRS.i = 0; prsShow(); };
+}
+/* presenter notes: a second window (move it to your laptop screen); your own notes are kept on this device */
+const prsMyNote = id => { try { return localStorage.getItem(prsK()+'.note.'+id) || ''; } catch(_){ return ''; } };
+function prsNotes(){
+  if (PRS.win && !PRS.win.closed) { PRS.win.focus(); return; }
+  PRS.win = window.open('', 'costline-notes', 'width=620,height=760');
+  if (!PRS.win) return toast('Allow pop-ups for this site to open presenter notes.', true);
+  PRS.win.document.write(`<!doctype html><meta charset="utf-8"><title>Presenter notes — Costline</title><style>body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#101413;color:#e7ecea}header{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1b2321;position:sticky;top:0}button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #2f3b38;background:#24302d;color:#e7ecea;cursor:pointer}main{padding:14px 18px}h1{font-size:22px;margin:4px 0 8px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#8fa39d;margin:18px 0 6px}.auto{font-size:17px}textarea{width:100%;min-height:140px;font:inherit;background:#0b0f0e;color:#e7ecea;border:1px solid #2f3b38;border-radius:8px;padding:8px}#clk{margin-left:auto;font-variant-numeric:tabular-nums;color:#8fa39d}</style>
+    <header><button id="pv">‹ Prev</button><button id="nx">Next ›</button><span id="no"></span><span id="clk"></span></header><main><h1 id="t"></h1><div class="auto" id="a"></div><h2>My notes</h2><textarea id="my" placeholder="Your own talking points for this slide — saved on this device"></textarea><h2>Next</h2><div id="n"></div></main>`);
+  PRS.win.document.close(); const w = PRS.win, t0 = Date.now();
+  w.document.getElementById('pv').onclick = () => prsGo(-1); w.document.getElementById('nx').onclick = () => prsGo(1);
+  w.document.getElementById('my').oninput = e => { const s = prsVisible()[PRS.i]; try { localStorage.setItem(prsK()+'.note.'+s.id, e.target.value); } catch(_){} };
+  w.document.addEventListener('keydown', e => { if (e.target.id==='my') return; if (['ArrowRight',' ','PageDown'].includes(e.key)) { e.preventDefault(); prsGo(1); } if (['ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); prsGo(-1); } });
+  setInterval(() => { try { const m = Math.floor((Date.now()-t0)/60000), s = Math.floor((Date.now()-t0)/1000)%60; w.document.getElementById('clk').textContent = `${m}:${String(s).padStart(2,'0')}`; } catch(_){} }, 1000);
+  prsNotesSync();
+}
+function prsNotesSync(){
+  const w = PRS.win; if (!w || w.closed) return; const V = prsVisible(), s = V[PRS.i], n = V[PRS.i+1]; const d = w.document;
+  try { d.getElementById('no').textContent = `${PRS.i+1} / ${V.length}`; d.getElementById('t').textContent = s.title; d.getElementById('a').textContent = s.notes ? s.notes() : '';
+    d.getElementById('my').value = prsMyNote(s.id); d.getElementById('n').textContent = n ? n.title : '— end —'; } catch(_){}
+}
+
+/* ---------- 4. exports ---------- */
+function prsExportMenu(){
+  modal2(`<h3>Export the presentation</h3><p class="hint">Figures as of ${PRS.D.at.toLocaleString('en-PH')} — the same numbers shown on screen. Skipped slides are left out.</p>
+    <div class="prs-ex"><button class="btn primary" onclick="closeModal2();prsPptx()">PowerPoint (.pptx)<small>editable slides, charts, tables and presenter notes</small></button>
+      <button class="btn" onclick="closeModal2();prsPrint('slides')">PDF — slides<small>one slide per page, 16:9 (choose "Save as PDF")</small></button>
+      <button class="btn" onclick="closeModal2();prsPrint('handout')">PDF — handout with notes<small>slide + talking points and your notes, for the meeting folder</small></button></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Close</button></div>`);
+}
+function prsPrint(mode){ prsPrintPrep(mode); setTimeout(() => { window.print(); setTimeout(prsPrintDone, 500); }, 300); }
+function prsPrintDone(){ document.body.classList.remove('prs-printing'); const h = document.getElementById('prsPrint'); if (h) h.innerHTML = ''; const pg = document.getElementById('prsPage'); if (pg) pg.textContent = ''; }
+function prsPrintPrep(mode){
+  const V = prsVisible(); let host = document.getElementById('prsPrint'); if (!host) { host = document.createElement('div'); host.id = 'prsPrint'; document.body.appendChild(host); }
+  host.className = mode; host.innerHTML = V.map((s,k)=>`<section class="pp"><div class="prs-slide pp-s"><div class="ps">${s.html()}<div class="ps-foot-bar"><span>${esc(PRS.D.dept.name)} · ${PRS.D.Y} budget · figures as of ${PRS.D.at.toLocaleDateString('en-PH')}</span><span>${k+1} / ${V.length}</span></div></div></div>
+    ${mode==='handout'?`<div class="pp-n"><b>${esc(s.title)}</b><p>${esc(s.notes?s.notes():'')}</p>${prsMyNote(s.id)?`<p><b>My notes:</b> ${esc(prsMyNote(s.id))}</p>`:''}<div class="pp-lines"></div></div>`:''}</section>`).join('');
+  let pg = document.getElementById('prsPage'); if (!pg) { pg = document.createElement('style'); pg.id = 'prsPage'; document.head.appendChild(pg); }
+  pg.textContent = mode==='handout' ? '@page{size:A4 portrait;margin:12mm}' : '@page{size:1280px 720px;margin:0}';
+  document.body.classList.add('prs-printing');
+}
+let PPTX_LIB = null;
+function prsLoadPptx(){ if (window.PptxGenJS) return Promise.resolve(); if (PPTX_LIB) return PPTX_LIB;
+  return PPTX_LIB = new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'; s.onload = ok; s.onerror = () => { PPTX_LIB = null; no(new Error('Could not load the PowerPoint maker — check the internet connection.')); }; document.head.appendChild(s); }); }
+async function prsPptx(){
+  toast('Building the PowerPoint…');
+  try { await prsLoadPptx(); } catch(e){ return fail(e); }
+  const D = PRS.D, Y = D.Y, P = new PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.author = S.me.full_name || ''; P.company = D.company?.name || ''; P.title = `${D.dept.name} ${Y} budget`;
+  const T = '0F5A52', INK = '1D2939', MUTE = '667085', F = 'Arial', lg = LOGOS[(D.company?.code||'').toUpperCase()];
+  const asof = `Figures as of ${D.at.toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
+  const base = (s, title, sub) => { s.background = { color:'FFFFFF' };
+    if (title) s.addText([{ text:title, options:{ bold:true } }, ...(sub?[{ text:'  '+sub, options:{ color:MUTE, fontSize:16 } }]:[])], { x:0.5, y:0.3, w:12.3, h:0.7, fontFace:F, fontSize:28, color:INK });
+    s.addShape(P.ShapeType.rect, { x:0.5, y:1.02, w:1.2, h:0.06, fill:{ color:T }, line:{ color:T } });
+    s.addText(`${D.dept.name} · ${Y} budget · ${asof}`, { x:0.5, y:7.05, w:9, h:0.3, fontFace:F, fontSize:10, color:MUTE }); };
+  const kpis = (s, arr, y=1.4) => arr.forEach((k,i) => { const x = 0.5 + i*3.1; s.addShape(P.ShapeType.roundRect, { x, y, w:2.95, h:1.45, fill:{ color:'F2F6F5' }, line:{ color:'DCE5E3' }, rectRadius:0.08 });
+    s.addText(k[0], { x:x+0.15, y:y+0.1, w:2.7, h:0.3, fontFace:F, fontSize:11, color:MUTE }); s.addText(k[1], { x:x+0.15, y:y+0.42, w:2.7, h:0.55, fontFace:F, fontSize:24, bold:true, color:INK }); if (k[2]) s.addText(k[2], { x:x+0.15, y:y+0.98, w:2.7, h:0.35, fontFace:F, fontSize:10, color:MUTE }); });
+  const tbl = (s, head, rows, y, colW) => s.addTable([head.map(h=>({ text:h, options:{ bold:true, color:'FFFFFF', fill:{ color:T } } })), ...rows], { x:0.5, y, w:12.3, colW, fontFace:F, fontSize:11, color:INK, border:{ type:'solid', color:'DCE5E3', pt:0.5 }, autoPage:false, valign:'middle' });
+  for (const sl of prsVisible()) {
+    const s = P.addSlide(); s.addNotes([sl.notes?sl.notes():'', prsMyNote(sl.id)].filter(Boolean).join('\n\n'));
+    const tot = D.opexT + D.capexT;
+    if (sl.id==='cover') { s.background = { color:T };
+      if (lg) s.addImage({ data:lg, x:0.6, y:0.5, w:1.6, h:0.75, sizing:{ type:'contain', w:1.6, h:0.75 } });
+      s.addText(`${D.company?.name||''} · ${Y} budget`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:F, fontSize:16, color:'CFE3DF' });
+      s.addText(D.dept.name, { x:0.6, y:2.5, w:12, h:1.1, fontFace:F, fontSize:48, bold:true, color:'FFFFFF' });
+      s.addText('Department budget review', { x:0.6, y:3.6, w:12, h:0.5, fontFace:F, fontSize:22, color:'FFFFFF' });
+      s.addText(`${D.by?'Presented by '+D.by:''}${D.head?'  ·  Department head '+D.head:''}\n${STATUS_LABEL[D.budget.status]||D.budget.status} · Version ${D.budget.version} · ${asof}`, { x:0.6, y:5.3, w:12, h:0.9, fontFace:F, fontSize:14, color:'CFE3DF' }); continue; }
+    if (sl.id==='ask') { base(s, `The ask — ${Y}`);
+      kpis(s, [[`OPEX ${Y}`, short(D.opexT), `${D.opex.length} lines`], [`CAPEX ${Y}`, short(D.capexT), `${D.capex.length} items`], [`${Y-1} budget (OPEX)`, D.lyBud?short(D.lyBud):'—', D.lyBud?prsPct(D.opexT,D.lyBud)+' vs this':''], [`${Y-1} full-year view`, D.lyView?short(D.lyView):'—', D.lyClosed?`actuals Jan–${MONTHS[D.lyClosed-1]} + projection`:'']]);
+      s.addText(D.lyView?`OPEX is ${prsPct(D.opexT, D.lyView)} (${D.opexT>=D.lyView?'+':'−'}${short(Math.abs(D.opexT-D.lyView))}) against what ${D.dept.name} is on track to spend in ${Y-1}.`:`No ${Y-1} actuals to compare with.`, { x:0.5, y:3.0, w:12.3, h:0.7, fontFace:F, fontSize:20, color:D.lyView&&D.opexT>D.lyView?'B42318':INK });
+      s.addChart(P.ChartType.bar, [{ name:'OPEX', labels:[`${Y-1} budget`, `${Y-1} full-year view`, `${Y} proposed`], values:[Math.round(D.lyBud), Math.round(D.lyView), Math.round(D.opexT)] }], { x:0.4, y:3.8, w:5.6, h:3.1, barDir:'bar', chartColors:['98A2B3','667085',T], showValue:true, dataLabelFormatCode:'#,##0', dataLabelFontSize:9, valAxisHidden:true, catAxisLabelFontSize:10, varyColors:true, title:'OPEX compared', showTitle:true, titleFontSize:11 });
+      s.addChart(P.ChartType.bar, [{ name:`${Y} spending`, labels:MONTHS, values:prsMonthVals([...D.opex, ...D.capex]).map(Math.round) }], { x:6.3, y:3.8, w:6.6, h:3.1, barDir:'col', chartColors:[T], catAxisLabelFontSize:9, valAxisLabelFontSize:8, valAxisLabelFormatCode:'#,##0', title:`${Y} spending by month (OPEX + CAPEX)`, showTitle:true, titleFontSize:11 }); continue; }
+    if (sl.id==='where') { base(s, 'Where the money goes');
+      const li = D.lines.filter(x=>x.amt>0).sort((a,b)=>b.amt-a.amt).slice(0,8).reverse();
+      s.addText('Top expense lines (OPEX)', { x:0.5, y:1.2, w:7, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
+      s.addChart(P.ChartType.bar, [{ name:String(Y), labels:li.map(x=>prsLi(x.item)), values:li.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:li.map(x=>prsLi(x.item)), values:li.map(x=>Math.round(x.lyView||0)) }],
+        { x:0.4, y:1.5, w:7.4, h:5.4, barDir:'bar', barGrouping:'clustered', chartColors:[T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9, catAxisLabelFontFace:F });
+      const pr = PRI_ORDER.filter(p=>D.pri[p]);
+      s.addText('By priority (OPEX + CAPEX)', { x:8.1, y:1.2, w:4.8, h:0.3, fontFace:F, fontSize:13, bold:true, color:MUTE });
+      s.addChart(P.ChartType.doughnut, [{ name:'Priority', labels:pr, values:pr.map(p=>Math.round(D.pri[p])) }], { x:8.0, y:1.5, w:4.9, h:5.2, holeSize:55, chartColors:pr.map(p=>PRI_COLOR[p].slice(1)), showLegend:true, legendPos:'b', legendFontSize:9, dataLabelFontSize:9, showPercent:true }); continue; }
+    if (sl.id==='changes') { base(s, 'What changed and why', `vs ${Y-1} full-year view`);
+      const up = D.lines.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,4), dn = D.lines.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3);
+      const row = x => [{ text:prsLi(x.item), options:{ bold:true } }, { text:(x.diff>0?'+':'−')+short(Math.abs(x.diff)), options:{ color:x.diff>0?'B42318':'2E7D6B', bold:true } }, `${short(x.lyView)} → ${short(x.amt)}`, (x.amt?(x.why||'No justification written yet.'):`Not budgeted for ${Y} — confirm it is no longer needed.`).slice(0,220)];
+      tbl(s, ['Expense line','Change','From → to','Why'], [...up, ...dn].map(row), 1.35, [3.0,1.4,2.2,5.7]); continue; }
+    if (sl.id.startsWith('line')) { const l = D.opex.slice().sort((a,b)=>annual(b)-annual(a))[Number(sl.id.slice(4))]; base(s, l.activity||l.line_item, l.line_item||'');
+      kpis(s, [[String(Y), short(annual(l))], ['Priority', l.priority||'—'], ['Basis', l.basis||'—'], ['Type', l.expense_type||'—']], 1.3);
+      if (l.purpose) s.addText('Why: '+l.purpose, { x:0.5, y:2.85, w:12.3, h:0.5, fontFace:F, fontSize:12, color:INK, italic:true });
+      const its = (l.items||[]).slice(0,9);
+      tbl(s, ['Item','Qty','Price','Source','When','Year'], its.length ? its.map(it=>[it.name, `${prsNum(it.qty)} ${it.unit||''}`, peso(it.price,2)+(Number(it.adj)?` +${it.adj}%`:''), it.std?'Standard '+it.std:srcLbl(it.src), freqText(it), short(itemAnnual(it))]) : [[{ text:'No items listed yet.', options:{ colspan:6, italic:true, color:MUTE } }]], 3.4, [4.3,1.5,1.7,1.6,2.0,1.2]);
+      if (its.length <= 5) s.addChart(P.ChartType.bar, [{ name:'Month', labels:MONTHS, values:prsMonthVals([l]).map(Math.round) }], { x:0.4, y:3.9 + 0.4*Math.max(1, its.length), w:12.5, h:Math.max(1.6, 3.0 - 0.4*Math.max(1, its.length)), barDir:'col', chartColors:[T], catAxisLabelFontSize:9, valAxisHidden:true, showValue:true, dataLabelFormatCode:'#,##0', dataLabelFontSize:8 });
+      continue; }
+    if (sl.id==='capex') { base(s, `CAPEX — ${short(D.capexT)}`);
+      const C = D.capex.slice().sort((a,b)=>PRI_ORDER.indexOf(a.priority||'No priority')-PRI_ORDER.indexOf(b.priority||'No priority') || annual(b)-annual(a)).slice(0,7);
+      tbl(s, ['Asset / project','Priority','Amount','Paid','Why — and the impact if not done'], C.map(l=>[{ text:`${l.asset||''}\n${l.category||''}`, options:{ bold:true } }, l.priority||'—', short(annual(l)), MONTHS.filter((_,i)=>Number(l['m'+(i+1)])).join(', ')||'—', (l.justification||'No justification yet.').slice(0,240)]), 1.35, [2.8,1.6,1.3,1.0,5.6]); continue; }
+    if (sl.id==='volume' && D.vol) { base(s, 'Cost per board', D.vol.label);
+      kpis(s, [[`${Y-1} ${D.vol.label}`, prsNum(D.vol.fy0), 'actual + projection'], [`${Y} at ${Y-1} run rate`, prsNum(D.vol.fy1), `${prsNum(D.vol.rate)} per working day`], [`OPEX per board ${Y-1}`, D.vol.perLy?peso(D.vol.perLy,2):'—'], [`OPEX per board ${Y}`, D.vol.perNew?peso(D.vol.perNew,2):'—', D.vol.perLy&&D.vol.perNew?prsPct(D.vol.perNew,D.vol.perLy):'']]); continue; }
+    if (sl.id==='open') { base(s, 'Open points');
+      const errs = D.checks.filter(c=>c.sev==='err'), warns = D.checks.filter(c=>c.sev==='warn');
+      s.addText([{ text:`To confirm (${D.oi.length})\n`, options:{ bold:true, fontSize:14 } }, ...(D.oi.length?D.oi.slice(0,6).map(x=>({ text:x.body+'\n', options:{ bullet:true } })):[{ text:'Nothing open.' }]),
+        ...(D.preqs.length?[{ text:`\nWaiting for a board price (${D.preqs.length})\n`, options:{ bold:true, fontSize:14 } }, ...D.preqs.slice(0,3).map(r=>({ text:r.item+'\n', options:{ bullet:true } }))]:[])], { x:0.5, y:1.3, w:6.1, h:5.5, fontFace:F, fontSize:12, color:INK, valign:'top' });
+      s.addText([{ text:`Checks: ${errs.length} must fix · ${warns.length} to review\n`, options:{ bold:true, fontSize:14 } }, ...prsGroupChecks([...errs, ...warns]).slice(0,6).map(g=>({ text:`${g.msg} (${g.names.slice(0,4).join(', ')}${g.names.length>4?' +'+(g.names.length-4):''})\n`, options:{ bullet:true } }))], { x:6.8, y:1.3, w:6.0, h:5.5, fontFace:F, fontSize:11, color:INK, valign:'top' }); continue; }
+    if (sl.id==='decide') { base(s, 'Decisions needed');
+      const dec = [...(D.capex.filter(l=>annual(l)>0).length?[`Approve ${D.capex.filter(l=>annual(l)>0).length} CAPEX items totalling ${short(D.capexT)} — or tell us which to defer`]:[]), ...(D.opexT>D.lyView*1.1&&D.lyView?[`Accept OPEX ${prsPct(D.opexT,D.lyView)} vs the ${Y-1} full-year view`]:[]), ...D.oi.slice(0,3).map(x=>'Confirm: '+x.body), ...D.preqs.slice(0,2).map(r=>'Set the board price for '+r.item)];
+      s.addText(dec.length?dec.slice(0,6).map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })):'No open decisions — ready to submit.', { x:0.5, y:1.4, w:12.3, h:4.2, fontFace:F, fontSize:18, color:INK, valign:'top', paraSpaceAfter:8 });
+      s.addText(`${D.dept.name} ${Y}: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:T }, align:'center' }); continue; }
+  }
+  await P.writeFile({ fileName:`${D.dept.name} ${Y} budget review.pptx` });
+  toast('PowerPoint downloaded');
 }
 
 boot();

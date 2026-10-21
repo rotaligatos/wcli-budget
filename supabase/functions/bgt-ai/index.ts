@@ -37,14 +37,16 @@ async function master(db: SupabaseClient) {
   return L;
 }
 async function outlook(db: SupabaseClient, year: number) {
-  const [a, d] = await Promise.all([db.from('bgt_assumptions').select('*').eq('year', year).order('sort'), db.from('bgt_cost_drivers').select('*').eq('year', year)]);
-  return { A:a.data || [], D:d.data || [] };
+  const [a, d, e] = await Promise.all([db.from('bgt_assumptions').select('*').eq('year', year).order('sort'), db.from('bgt_cost_drivers').select('*').eq('year', year), db.from('bgt_risk_events').select('*').eq('year', year).neq('status', 'closed')]);
+  return { A:a.data || [], D:d.data || [], E:e.data || [] };
 }
 function outlookText(o: any) {
   const a = o.A.map((x: any) => `- ${x.label}: ${x.value ?? ''} ${x.unit ?? ''} — ${x.value_text ?? ''}. Budget note: ${x.outlook ?? ''} (as of ${x.as_of}; source: ${x.source_title ?? ''})`).join('\n');
   const d = o.D.map((x: any) => `- ${x.line_item}: next year ${x.next_year_pct >= 0 ? '+' : ''}${x.next_year_pct}%. ${x.rationale ?? ''}`).join('\n');
   const gen = o.A.find((x: any) => /^inflation_\d{4}$/.test(x.key));
-  return `INDICATORS\n${a || '(none)'}\n\nASSUMED COST CHANGE BY EXPENSE LINE (others: general inflation ${gen?.value ?? 5}%)\n${d || '(none)'}`;
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const ev = (o.E || []).map((x: any) => `- ${x.title} [${x.status === 'active' ? 'IN THE BUDGET: the likely increase is already added to the standard prices and the suggested change per line' : 'WATCHING, ' + x.probability + '% likely: not in the prices, covered by the plant reserve'}], months ${(x.months || []).map((m: number) => M[m - 1]).join(',')}. ${x.summary || ''} Lines: ${(x.impacts || []).map((i: any) => `${i.line} likely +${i.likely}% / worst +${i.worst}% in those months`).join('; ')}. Actions: ${(x.actions || []).map((a: any) => a.action).join('; ')}`).join('\n');
+  return `INDICATORS\n${a || '(none)'}\n\nASSUMED COST CHANGE BY EXPENSE LINE (others: general inflation ${gen?.value ?? 5}%; events below are added on top)\n${d || '(none)'}\n\nEVENTS AND RISKS (the worst-case gap is a plant contingency reserve held by the MD — do NOT add it again to department lines)\n${ev || '(none)'}`;
 }
 async function deptHistory(db: SupabaseClient, deptId: string, year: number, nYears = 2) {
   // previous budgets + actuals per line item for this department
@@ -613,6 +615,36 @@ async function priceLookup(key: string, braveKey: string, p: any) {
   return await claude(key, system, `Looking for: ${q}\n\nSEARCH RESULTS\n${ctx}`, tool, 2000);
 }
 
+async function draftEvent(key: string, braveKey: string, p: any) {
+  const q = String(p.query || '').trim().slice(0, 200); if (!q) throw new Error('Type the event first');
+  const year = Number(p.year) || new Date().getFullYear() + 1, lines: string[] = (p.lines || []).map(String).slice(0, 80);
+  const search = async (qq: string) => { const u = new URL('https://api.search.brave.com/res/v1/web/search');
+    u.searchParams.set('q', qq); u.searchParams.set('count', '8'); u.searchParams.set('country', 'ph'); u.searchParams.set('search_lang', 'en'); u.searchParams.set('freshness', 'py');
+    const r = await fetch(u, { headers:{ 'Accept':'application/json', 'X-Subscription-Token':braveKey } }); if (!r.ok) return []; return ((await r.json()).web?.results || []); };
+  const res0 = [...await search(`${q} Philippines`), ...await search(`${q} Philippines ${year} impact prices electricity water food`)];
+  const seen = new Set<string>(), res = res0.filter((x: any) => !seen.has(x.url) && seen.add(x.url)).slice(0, 10);
+  const pages = await Promise.all(res.slice(0, 6).map(async (x: any) => { try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+    const h = await fetch(x.url, { signal:ctl.signal, headers:{ 'User-Agent':'Mozilla/5.0' } }); clearTimeout(t); if (!h.ok) return '';
+    return (await h.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').slice(0, 3500);
+  } catch { return ''; } }));
+  const ctx = res.map((x: any, i: number) => `[${i + 1}] ${x.title}\n${x.url}\n${x.description}${x.age ? ' (' + x.age + ')' : ''}${pages[i] ? '\nPAGE TEXT: ' + pages[i] : ''}`).join('\n\n');
+  const tool = { name:'draft_event', description:'A budget risk event', input_schema:{ type:'object', properties:{
+    title:{ type:'string', description:'Short name, e.g. "Very strong El Niño 2026–27"' },
+    kind:{ type:'string', enum:['event','planned'], description:'event = climate/market/supply; planned = wage order, rate hike, tax change' },
+    status:{ type:'string', enum:['active','watch'], description:'active if it is already happening or officially declared/approved; watch if only possible' },
+    probability:{ type:'integer', description:'0-100 chance it affects ' + year },
+    months:{ type:'array', items:{ type:'integer' }, description:'Months of ' + year + ' (1-12) when costs are affected' },
+    summary:{ type:'string', description:'2-4 plain sentences: what is happening, timing, how it reaches a manufacturer\'s costs in Metro Manila. Cite figures from the sources.' },
+    impacts:{ type:'array', items:{ type:'object', properties:{ line:{ type:'string', enum:lines.length ? lines : undefined }, likely:{ type:'number', description:'% increase in the affected months, likely case' }, worst:{ type:'number', description:'% increase in the affected months, worst case (>= likely)' }, why:{ type:'string' } }, required:['line','likely','worst','why'] } },
+    actions:{ type:'array', items:{ type:'object', properties:{ action:{ type:'string', description:'Concrete thing the plant can do to avoid, lessen or eliminate the impact' }, lines:{ type:'array', items:{ type:'string' } }, owner:{ type:'string', description:'Department: Engineering, Plant Admin, Production, Warehouse, Logistics, Purchasing…' }, cost:{ type:'number' }, saving:{ type:'number' }, note:{ type:'string' } }, required:['action'] } },
+    sources:{ type:'array', items:{ type:'object', properties:{ title:{ type:'string' }, url:{ type:'string' } }, required:['title','url'] } } },
+    required:['title','kind','status','probability','months','summary','impacts','actions','sources'] } };
+  const system = `You help a laminated-board manufacturer in Pasig, Metro Manila (WCLI) prepare its ${year} budget. Draft ONE risk event from the search results: when it affects ${year}, which expense lines it moves and by how much, and what the plant can do about it.
+Rules: use facts and figures from the results and cite them in sources (only URLs from the results). Percentages are increases DURING the affected months, not annualised. Keep likely realistic and worst case a plausible bad case. Only use expense lines from the allowed list, and only lines the event really moves (usually 1-5). Do not invent peso costs for actions unless you can estimate sensibly; leave cost/saving empty otherwise. 3-6 concrete actions (e.g. maximise solar, shift loads off-peak, water storage, forward-buy consumables, rate-review clauses in contracts, fuel-price clauses). If the results say little, say so in the summary and keep percentages modest.`;
+  return await claude(key, system, `Event: ${q}\nWhat we already know: ${p.notes || '(nothing)'}\nAllowed expense lines: ${lines.join(' | ')}\n\nSEARCH RESULTS\n${ctx || '(no results)'}`, tool, 3000);
+}
+
 /* ---------- handler ---------- */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers:cors });
@@ -660,6 +692,7 @@ Deno.serve(async (req) => {
     else if (mode === 'dept_analysis') { if (!IS_REV && !(['dept_manager','preparer'].includes(me.role) && me.department_id === body.department_id)) throw new Error('You can only analyse your own department.'); result = await deptAnalysis(db, svc, key, body); }
     else if (mode === 'draft_items') result = await draftItems(db, key, body);
     else if (mode === 'price_lookup') { const bk = Deno.env.get('BRAVE_API_KEY'); if (!bk) throw new Error('Web search is not configured (no BRAVE_API_KEY).'); result = await priceLookup(key, bk, body); }
+    else if (mode === 'draft_event') { if (!['admin','plant_head'].includes(me.role)) throw new Error('Only the plant head can add events'); const bk = Deno.env.get('BRAVE_API_KEY'); if (!bk) throw new Error('Web search is not configured (no BRAVE_API_KEY).'); result = await draftEvent(key, bk, body); }
     else throw new Error('Unknown request');
   } catch (e) { err = (e as Error).message; }
   await svc.from('bgt_ai_log').insert({ user_id:me.id, mode, budget_id:body.budget_id || null, request:{ mode, budget_id:body.budget_id, cycle_id:body.cycle_id, kind:body.kind, text:String(body.text || body.query || '').slice(0, 500) }, response:result?.out || null,

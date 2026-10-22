@@ -2777,12 +2777,31 @@ async function renderConsider(item, prev, dept){
       </div>`;
   } catch(e){ console.error(e); box.innerHTML = ''; }
 }
+/* Last year's months as booked by Accounting can skip a month (a bill booked late lands in the next one, e.g. May in June).
+   For a cost booked in most months, a skipped month shares the late booking: the next month within two that is well above
+   the usual, else the next booked month. Only the shape changes — the total stays the same. */
+function bookingGapsFilled(vals, closed){
+  const v = vals.slice(0, 12).map(x => Number(x)||0), n = Math.min(12, closed||0);
+  const booked = v.slice(0, n).filter(x => x > 0); if (booked.length < 3) return v;
+  const typ = booked.slice().sort((a,b)=>a-b)[Math.floor(booked.length/2)];
+  for (let i = 0; i < n; i++) {
+    if (v[i] > 0) continue;
+    let j = -1;
+    for (let k = i+1; k < n && k <= i+2; k++) if (v[k] > 1.5*typ) { j = k; break; }
+    if (j < 0) for (let k = i+1; k < n; k++) if (v[k] > 0) { j = k; break; }
+    if (j < 0) { v[i] = typ; continue; }          // nothing booked after it this year — use the usual month
+    const gaps = []; for (let k = i; k < j; k++) if (!(v[k] > 0)) gaps.push(k);
+    const share = v[j] / (gaps.length + 1); gaps.forEach(k => v[k] = share); v[j] = share;
+  }
+  return v;
+}
 async function applySuggestion(){
   const s = S._sug; if (!s) return;
   const amt = Math.max(0, s.sug - s.others);
   if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
   const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);
-  const pat = r && sum(r.proj) ? r.proj.map(v=>v/sum(r.proj)) : Array(12).fill(1/12);
+  const w = r ? bookingGapsFilled(r.proj, M.closed) : null;
+  const pat = w && sum(w) ? w.map(v=>v/sum(w)) : Array(12).fill(1/12);
   let left = amt; pat.forEach((p,i)=>{ const v = i<11 ? Math.round(amt*p*100)/100 : Math.round(left*100)/100; left -= v; $('#m'+(i+1)).value = v || ''; });
   const note = `Suggested from ${s.Y-1} full-year view ${peso(s.base)} ${s.pct>=0?'+':''}${s.pct}% (cost outlook) — confirm against plan/quotation.`;
   const rem = $('#f_remarks'); if (rem && !rem.value.includes('Suggested from')) rem.value = (rem.value ? rem.value.trim()+' ' : '') + note;

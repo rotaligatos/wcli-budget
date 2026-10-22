@@ -2778,14 +2778,15 @@ async function renderConsider(item, prev, dept){
   } catch(e){ console.error(e); box.innerHTML = ''; }
 }
 /* Last year's months as booked by Accounting can skip a month (a bill booked late lands in the next one, e.g. May in June).
-   For a cost booked in most months, a skipped month shares the late booking: the next month within two that is well above
-   the usual, else the next booked month. Only the shape changes — the total stays the same. */
-function bookingGapsFilled(vals, closed){
+   A skipped month shares the late booking: the next month within two that is well above the usual, else the next booked month.
+   With plant records (used[]), they decide: usage that month → it was a booking gap, fill it; no usage → a real zero, keep it.
+   Without them, only a cost booked in most months is filled. Only the shape changes — the total stays the same. */
+function bookingGapsFilled(vals, closed, used){
   const v = vals.slice(0, 12).map(x => Number(x)||0), n = Math.min(12, closed||0);
-  const booked = v.slice(0, n).filter(x => x > 0); if (booked.length < 3) return v;
+  const booked = v.slice(0, n).filter(x => x > 0); if (!booked.length || (!used && booked.length < 3)) return v;
   const typ = booked.slice().sort((a,b)=>a-b)[Math.floor(booked.length/2)];
   for (let i = 0; i < n; i++) {
-    if (v[i] > 0) continue;
+    if (v[i] > 0 || (used && !used[i])) continue;
     let j = -1;
     for (let k = i+1; k < n && k <= i+2; k++) if (v[k] > 1.5*typ) { j = k; break; }
     if (j < 0) for (let k = i+1; k < n; k++) if (v[k] > 0) { j = k; break; }
@@ -2800,7 +2801,10 @@ async function applySuggestion(){
   const amt = Math.max(0, s.sug - s.others);
   if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
   const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);
-  const w = r ? bookingGapsFilled(r.proj, M.closed) : null;
+  // plant records (bills/meters, usage) for the same line and department — a check on Accounting's skipped months, not the basis
+  const recs = (await loadRecords(s.Y-1, b.department_id).catch(()=>[])).filter(x => x.line_item===s.item && x.status!=='Cancelled');
+  const used = recs.length ? Array.from({length:12}, (_,i) => recs.some(x => (Number(x.month) || new Date(x.rec_date).getMonth()+1)===i+1 && (recAmt(x)>0 || Number(x.qty)>0))) : null;
+  const w = r ? bookingGapsFilled(r.proj, M.closed, used) : null;
   const pat = w && sum(w) ? w.map(v=>v/sum(w)) : Array(12).fill(1/12);
   let left = amt; pat.forEach((p,i)=>{ const v = i<11 ? Math.round(amt*p*100)/100 : Math.round(left*100)/100; left -= v; $('#m'+(i+1)).value = v || ''; });
   const note = `Suggested from ${s.Y-1} full-year view ${peso(s.base)} ${s.pct>=0?'+':''}${s.pct}% (cost outlook) — confirm against plan/quotation.`;

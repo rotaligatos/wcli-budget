@@ -2766,6 +2766,8 @@ async function renderConsider(item, prev, dept){
 }
 async function applySuggestion(){
   const s = S._sug; if (!s) return;
+  // a line with items is computed from them (and saved that way) — never paint other figures over its locked months
+  if ((S._items||[]).length) { itemsChanged(); toast(`This line is computed from its items (${peso(sum(S._items.map(itemAnnual)))}). To use the suggested ${peso(Math.max(0, s.sug - s.others))}, change the items' qty, price or how often — or remove the items to phase the months by hand.`, true); return; }
   const amt = Math.max(0, s.sug - s.others);
   if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
   const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);
@@ -5010,9 +5012,9 @@ function removeItem(i){ S._items.splice(i,1); drawItems(); }
 /* the line's months follow its items */
 function itemsChanged(){
   const tot = sum(S._items.map(itemAnnual)); const t = $('#itemsTot'); if (t) t.textContent = S._items.length ? peso(tot,2) : '—';
-  if (!S._items.length) { document.querySelectorAll('.months input').forEach(e=>{ if (!e.dataset.lock) return; e.readOnly = false; delete e.dataset.lock; }); return; }
+  if (!S._items.length) { document.querySelectorAll('.months input').forEach(e=>{ if (!e.dataset.lock) return; e.readOnly = false; delete e.dataset.lock; e.title = ''; }); return; }
   const m = itemsMonths(S._items);
-  m.forEach((v,k)=>{ const e = $('#m'+(k+1)); if (e) { e.value = v ? Math.round(v*100)/100 : ''; e.readOnly = true; e.dataset.lock = 1; } });
+  m.forEach((v,k)=>{ const e = $('#m'+(k+1)); if (e) { e.value = v ? Math.round(v*100)/100 : ''; e.readOnly = true; e.dataset.lock = 1; e.title = 'Set by the items above — change their qty, price or how often'; } });
   const sp = $('#spreadBox'); if (sp) sp.classList.add('hidden');
   liveTotals('opex');
 }

@@ -850,6 +850,19 @@ const REVIEWERS = ['plant_head','md','finance','admin'];
 /* ================= UTIL ================= */
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* app-wide: numbers never show more than 2 decimals — boxes filled from data are rounded, typing stops at 2 decimals */
+(() => {
+  const isNum = e => e && e.tagName==='INPUT' && (e.type==='number' || e.classList.contains('num'));
+  const r2s = v => { const t = String(v ?? ''); if (!/\.\d{3,}/.test(t)) return null; const n = Number(t); return isFinite(n) ? String(Math.round(n*100)/100) : null; };
+  const D = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(HTMLInputElement.prototype, 'value', { configurable:true, enumerable:D.enumerable, get(){ return D.get.call(this); },
+    set(v){ if (isNum(this)) { const r = r2s(v); if (r != null) v = r; } D.set.call(this, v); } });
+  const fix = root => { if (!root || root.nodeType!==1) return; const list = root.tagName==='INPUT' ? [root] : root.querySelectorAll('input'); list.forEach(e => { if (!isNum(e)) return; const r = r2s(D.get.call(e)); if (r != null) D.set.call(e, r); }); };
+  const start = () => { fix(document.body); new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(fix))).observe(document.body, { childList:true, subtree:true }); };
+  document.body ? start() : document.addEventListener('DOMContentLoaded', start);
+  // while typing: cut anything past the 2nd decimal before the field's own handler reads it
+  document.addEventListener('input', ev => { const e = ev.target; if (!isNum(e)) return; const t = D.get.call(e), m = /^(-?\d*\.\d{2})\d+$/.exec(t); if (m) D.set.call(e, m[1]); }, true);
+})();
 const peso = (n, dp=0) => '₱' + (Number(n)||0).toLocaleString('en-PH', {minimumFractionDigits:dp, maximumFractionDigits:dp});
 const short = n => { n = Number(n)||0; const a = Math.abs(n); return a>=1e6 ? '₱'+(n/1e6).toFixed(2)+'M' : a>=1e3 ? '₱'+(n/1e3).toFixed(1)+'K' : peso(n); };
 const months = l => { const a=[]; for(let i=1;i<=12;i++) a.push(Number(l['m'+i])||0); return a; };
@@ -2448,7 +2461,7 @@ function drvPct(o, item, which){
   const base = d ? Number(d.next_year_pct)||0 : generalPct(o);
   return Math.round((base + evLikely(o, item))*10)/10;   // + the likely effect of events in the budget (El Niño, wage order…)
 }
-const fmtVal = a => a.value==null ? '' : (a.unit && a.unit.startsWith('₱') ? '₱'+Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + ' ' + a.unit.replace(/^₱\s*/,'') : Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:4}) + (a.unit==='%'?'%':a.unit?' '+a.unit:''));
+const fmtVal = a => a.value==null ? '' : (a.unit && a.unit.startsWith('₱') ? '₱'+Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:2}) + ' ' + a.unit.replace(/^₱\s*/,'') : Number(a.value).toLocaleString('en-PH',{maximumFractionDigits:2}) + (a.unit==='%'?'%':a.unit?' '+a.unit:''));
 async function outlookYear(){ // budget year whose outlook applies: the open cycle, else the latest with data
   const y = S.cycle.year; const o = await loadOutlook(y); if (o.A.length) return y;
   const { data } = await sb.from('bgt_assumptions').select('year').order('year',{ascending:false}); return data?.[0]?.year || y;
@@ -3046,7 +3059,7 @@ function olpCompute(d){
     const crudeEff = (P.share/100)*(crudeNext/P.crude_now-1), fxEff = (P.share/100)*(fxNext/fxNow-1), pump27 = pump*(1+crudeEff+fxEff);
     const diesel = r2(pump27*ratio*(1+P.fuel_buffer/100));
     rows.push({ key:'diesel', item:'Diesel', unit:'liter', category:'GAS AND OIL', price:diesel,
-      how:`Pump now ₱${pump.toFixed(2)}/L × (1 ${crudeEff<0?'−':'+'} ${Math.abs(crudeEff*100).toFixed(1)}% crude $${P.crude_now}→$${crudeNext} ${fxEff<0?'−':'+'} ${Math.abs(fxEff*100).toFixed(1)}% peso ${fxNow}→${fxNext}, on the ${P.share}% of the pump price that follows oil) = ₱${pump27.toFixed(2)} pump in 2027; × ${ratio.toFixed(3)} what WCLI pays vs pump; + ${P.fuel_buffer}% volatility buffer` });
+      how:`Pump now ₱${pump.toFixed(2)}/L × (1 ${crudeEff<0?'−':'+'} ${Math.abs(crudeEff*100).toFixed(1)}% crude $${P.crude_now}→$${crudeNext} ${fxEff<0?'−':'+'} ${Math.abs(fxEff*100).toFixed(1)}% peso ${fxNow}→${fxNext}, on the ${P.share}% of the pump price that follows oil) = ₱${pump27.toFixed(2)} pump in 2027; × ${ratio.toFixed(2)} what WCLI pays vs pump; + ${P.fuel_buffer}% volatility buffer` });
     rows.push({ key:'gasoline', item:'Gasoline', unit:'liter', category:'GAS AND OIL', price:r2(diesel*P.gas_ratio), how:`Diesel price × ${P.gas_ratio} (WCLI's gasoline-to-diesel price ratio in its stores records)`, approx:true });
   }
   if (fxNow && fxNext) rows.push({ key:'usd', item:'US dollar exchange rate', unit:'US$', category:null, price:r2((fxNow+fxNext)/2*(1+P.fx_buffer/100)),
@@ -3072,7 +3085,7 @@ async function olpCardHtml(y){
     ${rows.map(r=>{ const p = pub(r.key); return `<tr><td class="act">${esc(r.item)}${r.approx?' <span class="pri pri-med" style="font-size:10px">approx.</span>':''}</td><td class="r num"><b>${peso(r.price,2)}</b>/${esc(r.unit)}</td><td style="font-size:12px;max-width:420px">${esc(r.how)}</td>
       <td style="font-size:12px">${p ? (Math.abs(Number(p.unit_price)-r.price)<0.005 ? '<span style="color:var(--green)">✓ in use</span>' : `<span style="color:var(--amber)">in use: ${peso(p.unit_price,2)}</span>`) : '<span class="hint">not yet</span>'}</td></tr>`; }).join('')}
     </tbody></table></div>
-    ${d.pairs.length?`<p class="hint" style="padding:6px 14px 0;margin:0">WCLI paid ${d.pairs.map(p=>`₱${p.wcli.toFixed(2)}/L in ${p.y} vs pump ₱${p.pump.toFixed(2)}`).join('; ')} → factor ${d.ratio.toFixed(3)}.</p>`:''}
+    ${d.pairs.length?`<p class="hint" style="padding:6px 14px 0;margin:0">WCLI paid ${d.pairs.map(p=>`₱${p.wcli.toFixed(2)}/L in ${p.y} vs pump ₱${p.pump.toFixed(2)}`).join('; ')} → factor ${d.ratio.toFixed(2)}.</p>`:''}
     ${!d.P.water_rate && !d.bill?.water?'<p class="hint" style="padding:4px 14px 0;margin:0">Water: import WCLI\'s water bills in <b>Plant records → Electricity and water</b> (or enter the ₱/m³ under Settings) to publish a water price; until then managers estimate it.</p>':''}
     ${ed?`<div class="row-flex" style="padding:10px 14px"><button class="btn primary" onclick="olpPublish()">Publish as ${y} standard prices</button><button class="btn ghost" onclick="olpSettings()">Settings</button></div>`:''}</div>`;
 }

@@ -2779,8 +2779,6 @@ async function renderConsider(item, prev, dept){
 }
 async function applySuggestion(){
   const s = S._sug; if (!s) return;
-  // a line with items is computed from them (and saved that way) — never paint other figures over its locked months
-  if ((S._items||[]).length) { itemsChanged(); toast(`This line is computed from its items (${peso(sum(S._items.map(itemAnnual)))}). To use the suggested ${peso(Math.max(0, s.sug - s.others))}, change the items' qty, price or how often — or remove the items to phase the months by hand.`, true); return; }
   const amt = Math.max(0, s.sug - s.others);
   if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
   const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);

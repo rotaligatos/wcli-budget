@@ -6341,7 +6341,7 @@ function prsOpen(D, deck, meta){
 // the slide frame: brand mark, kicker (number + deck), body, footer with logo
 function prsFrame(s, k, n, extra=''){
   const lg = LOGOS[(PRS.D.company?.code||'').toUpperCase()], nn = String(k+1).padStart(2,'0');
-  return `<div class="ps ps-${s.id}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
+  return `<div class="ps ps-s-${s.id}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
     <div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${lg?`<img src="${lg}" alt="">`:''}${esc(PRS.meta.label)}${esc(extra)}</span><span class="ps-pg"><b>${nn}</b> / ${String(n).padStart(2,'0')}</span></div></div>`;
 }
 const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));

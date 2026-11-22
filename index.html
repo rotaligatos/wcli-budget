@@ -2054,6 +2054,7 @@ async function renderActuals(){
       <div class="stat"><div class="eyebrow">Projected vs budget</div><div class="v" style="color:${varFY>0?'var(--red)':'var(--green)'}">${varFY>0?'+':''}${short(varFY)}</div><div class="s">${varFY>0?'Over':'Under'} budget${M.budFY?' by '+Math.abs(Math.round(100*varFY/M.budFY))+'%':''}</div></div>
     </div>
     ${ins ? `<div class="ins-grid">${ins}</div>` : ''}
+    ${cfCard(M)}
     ${await exclCard(D)}
     ${gapCard(M)}
     <div class="card" style="margin-bottom:16px"><h3 style="display:flex;align-items:center;gap:10px">${S.act.trend==='year'?'Year by year':'Month by month'}${trendToggle(S.act.trend||'month','actTrend')}</h3><div style="padding:14px">${S.act.trend==='year' ? yearTrendHtml(await yearTrendData(S.act.dept, S.act.method)) : `
@@ -2107,22 +2108,30 @@ function actItem(item){
    questionable = look into it · keep = checked, it belongs · leave_out = stays in the actual (Accounting is official) but is not a basis for next year.
    "Not plant OPEX" opens the exclusion rule, pre-filled — that takes it out of plant OPEX altogether. */
 const CF = { questionable:{ l:'Questionable', c:'#b88a00' }, keep:{ l:'Keep', c:'#2e7d6b' }, leave_out:{ l:'Left out of next budget', c:'#b42318' } };
-S.cf = { year:null, rows:[] };
-async function loadFlags(Y, force){ if (S.cf.year===Y && !force) return S.cf.rows; try { const { data, error } = await sb.from('bgt_charge_flags').select('*').eq('year', Y); if (error) throw error; S.cf = { year:Y, rows:data||[] }; } catch(e){ console.warn('flags', e); S.cf = { year:Y, rows:[] }; } return S.cf.rows; }
+S.cf = { year:null, rows:[] }; S.cfY = {};
+// tags for year Y plus every earlier year (an earlier tag follows the same payee and line into later years until it is re-tagged)
+async function loadFlags(Y, force){ if (S.cfY[Y] && !force) return S.cfY[Y].filter(f=>f.year===Y);
+  try { const { data, error } = await sb.from('bgt_charge_flags').select('*').lte('year', Y).order('year', { ascending:false }); if (error) throw error; S.cfY[Y] = data||[]; } catch(e){ console.warn('flags', e); S.cfY[Y] = []; }
+  S.cf = { year:Y, rows:S.cfY[Y].filter(f=>f.year===Y) }; return S.cf.rows; }
 const normP = p => String(p||'').trim().replace(/\s+/g,' ').toLowerCase();
-const flagOf = (Y, item, partner, dept) => S.cf.year!==Y ? null : S.cf.rows.filter(f=>f.line_item===item && normP(f.partner)===normP(partner) && (!f.department_id || !dept || f.department_id===dept)).sort((a,b)=>(a.department_id?0:1)-(b.department_id?0:1))[0] || null;
+const flagOf = (Y, item, partner, dept) => { const all = (S.cfY[Y]||[]).filter(f=>f.line_item===item && normP(f.partner)===normP(partner) && (!f.department_id || !dept || f.department_id===dept));
+  const cur = all.filter(f=>f.year===Y).sort((a,b)=>(a.department_id?0:1)-(b.department_id?0:1))[0]; if (cur) return cur;
+  const old = all.filter(f=>f.year<Y && f.status!=='keep')[0]; return old ? { ...old, prior:true } : null; };
+// every tagged payee on a line this year (its own tag, or an earlier year's tag still being charged)
+const flagsOnLine = (Y, r) => Object.entries(r?.partners||{}).map(([p,v]) => ({ p, v, f:flagOf(Y, r.item, p, S.act.dept) })).filter(x=>x.f && x.f.status!=='keep');
 function cfPayeeRow(Y, item, p, v){
   const f = flagOf(Y, item, p, S.act.dept), a = JSON.stringify([item, p]).replace(/"/g,'&quot;');
-  return `<div class="sumline" style="font-weight:400;align-items:center;gap:8px"><span style="flex:1">${esc(p)}${f?` <span class="chip" style="background:${CF[f.status].c};color:#fff;font-size:11px;padding:1px 7px">${CF[f.status].l}</span>${f.reason?`<div class="hint" style="margin:2px 0 0">${esc(f.reason)}</div>`:''}`:''}</span>
+  return `<div class="sumline" style="font-weight:400;align-items:center;gap:8px"><span style="flex:1">${esc(p)}${f?` <span class="chip" style="background:${CF[f.status].c};color:#fff;font-size:11px;padding:1px 7px">${f.prior?`Tagged in ${f.year}: `:''}${CF[f.status].l}</span>${f.reason?`<div class="hint" style="margin:2px 0 0">${esc(f.reason)}</div>`:''}${f.prior?`<div class="hint" style="margin:2px 0 0;color:#b42318">Still being charged in ${Y} — confirm or re-tag it for ${Y}.</div>`:''}`:''}</span>
     <span class="num">${peso(v)}</span>${isReviewer()?`<button class="btn sm" style="white-space:nowrap" title="Tag this charge or ask Penny what it is" onclick='cfDialog(...${a})'>${canManageData()?(f?'Edit tag':'Tag / Ask Penny'):'Ask Penny'}</button>`:''}</div>`;
 }
 function cfDialog(item, partner){
-  const Y = S.act.year, dept = S.act.dept, f = flagOf(Y, item, partner, dept), man = canManageData();
+  const Y = S.act.year, dept = S.act.dept, f0 = flagOf(Y, item, partner, dept), f = f0?.prior ? null : f0, man = canManageData();
   const amt = S.act.model?.rows.find(x=>x.item===item)?.partners?.[partner] || 0;
   modal2(`<h3>${esc(partner)}</h3><p class="hint" style="margin-top:-6px">${esc(item)} · ${Y} · ${peso(amt)} so far${dept?` · ${esc(deptById(dept)?.name||'')}`:''}</p>
     ${man ? `<div class="field"><label>What should happen with this charge?</label>
       ${[['questionable','Questionable — look into it'],['keep','Keep — checked, it belongs'],['leave_out','Leave out of next budget — stays in the actual, not a basis for '+(Y+1)],['','No tag']].map(([k,l])=>`<label style="display:block;margin:4px 0"><input type="radio" name="cfS" value="${k}" ${(f?.status||'')===k?'checked':''}> ${l}</label>`).join('')}</div>
-      <div class="field"><label for="cfR">Reason</label><textarea class="inp" id="cfR" rows="3" placeholder="e.g. Not familiar with this supplier — check with Accounting / head office cost, not plant">${esc(f?.reason||'')}</textarea></div>` : (f ? `<p><b>${CF[f.status].l}</b>${f.reason?` — ${esc(f.reason)}`:''}</p>` : '')}
+      <div class="field"><label for="cfR">Reason</label><textarea class="inp" id="cfR" rows="3" placeholder="e.g. Not familiar with this supplier — check with Accounting / head office cost, not plant">${esc(f?.reason||f0?.reason||'')}</textarea></div>` : (f ? `<p><b>${CF[f.status].l}</b>${f.reason?` — ${esc(f.reason)}`:''}</p>` : '')}
+    ${f0?.prior ? `<div class="box" style="font-size:13px">Tagged in ${f0.year}: <b>${CF[f0.status].l}</b>${f0.reason?` — ${esc(f0.reason)}`:''}. Choose what to do with it for ${Y}.</div>` : ''}
     ${f?.ai_note ? `<div class="box" style="font-size:13px"><b>Penny:</b> ${esc(f.ai_note)}</div>` : ''}
     <div class="actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div class="actions"><button class="btn" id="cfAsk">Ask Penny what this is</button>${man?`<button class="btn ghost" id="cfOut" title="Takes it out of plant OPEX altogether, like value-added resale">Not plant OPEX…</button>`:''}</div>
@@ -2138,10 +2147,19 @@ function cfDialog(item, partner){
         if (!st) { if (f) { const r = await sb.from('bgt_charge_flags').delete().eq('id', f.id); if (r.error) throw r.error; } }
         else if (f) { const r = await sb.from('bgt_charge_flags').update({ status:st, reason:reason||null, updated_by:S.me.id, updated_at:new Date().toISOString() }).eq('id', f.id); if (r.error) throw r.error; }
         else { const r = await sb.from('bgt_charge_flags').insert({ company_id:S.company.id, year:Y, line_item:item, partner, department_id:dept||null, status:st, reason:reason||null, created_by:S.me.id, updated_by:S.me.id }); if (r.error) throw r.error; }
-        await loadFlags(Y, true); S.act.cache = {}; closeModal2(); toast(st ? `Tagged: ${CF[st].l}` : 'Tag removed'); actItem(item);
+        S.cfY = {}; await loadFlags(Y, true); S.act.cache = {}; closeModal2(); toast(st ? `Tagged: ${CF[st].l}` : 'Tag removed'); actItem(item);
       } catch(e){ fail(e); }
     };
   }
+}
+/* Actuals page: every tagged charge for the year, and earlier tags still being charged — so nobody has to remember them */
+function cfCard(M){
+  const Y = S.act.year, L = (M?.rows||[]).flatMap(r => flagsOnLine(Y, r).map(x=>({ ...x, item:r.item }))); if (!L.length) return '';
+  const cur = L.filter(x=>!x.f.prior), old = L.filter(x=>x.f.prior), tot = k => sum(L.filter(x=>!x.f.prior && x.f.status===k).map(x=>x.v));
+  const row = x => `<tr style="cursor:pointer" onclick='actItem(${JSON.stringify(x.item).replace(/'/g,"&#39;")})'><td><b>${esc(x.p)}</b><div class="item" style="text-transform:none">${esc(x.item)}</div></td><td><span class="chip" style="background:${CF[x.f.status].c};color:#fff">${x.f.prior?`${x.f.year}: `:''}${CF[x.f.status].l}</span></td><td style="font-size:12.5px;max-width:420px">${esc(x.f.reason||'')}</td><td class="r num">${peso(x.v)}</td></tr>`;
+  return `<div class="card" style="margin-top:16px;border-left:4px solid #b42318"><h3>⚑ Tagged charges — ${Y}</h3>
+    <p class="hint" style="padding:0 14px 8px;margin:0">${[tot('questionable')?`Questionable ${short(tot('questionable'))}`:'', tot('leave_out')?`Left out of the ${Y+1} budget ${short(tot('leave_out'))} (still in the actuals — Accounting is the official record)`:''].filter(Boolean).join(' · ')}${old.length?`${cur.length?' · ':''}${old.length} tagged in an earlier year and still being charged — confirm or re-tag for ${Y}`:''}. Click a row to open the line.</p>
+    <div class="tbl-wrap"><table class="ledger"><thead><tr><th>Paid to · line</th><th>Tag</th><th>Reason</th><th class="r">Amount ${thru(M.closed)}</th></tr></thead><tbody>${[...cur, ...old].sort((a,b)=>(a.f.prior?1:0)-(b.f.prior?1:0) || b.v-a.v).map(row).join('')}</tbody></table></div></div>`;
 }
 /* Users and settings: every tagged charge, to review or undo */
 async function cfAdmin(){
@@ -2153,7 +2171,7 @@ async function cfAdmin(){
       </tbody></table></div>` : '<p class="hint" style="margin:0">No charges tagged yet. Tag them from Actuals and projection → open a line → Paid to.</p>';
   } catch(e){ el.innerHTML = `<p class="hint">Could not load tagged charges: ${esc(e.message||e)}</p>`; }
 }
-async function cfUntag(id){ const r = await sb.from('bgt_charge_flags').delete().eq('id', id); if (r.error) return fail(r.error); S.cf.year = null; S.act.cache = {}; toast('Tag removed'); cfAdmin(); }
+async function cfUntag(id){ const r = await sb.from('bgt_charge_flags').delete().eq('id', id); if (r.error) return fail(r.error); S.cfY = {}; S.cf.year = null; S.act.cache = {}; toast('Tag removed'); cfAdmin(); }
 async function saveProjection(item){
   const dept = S.act.dept, Y = S.act.year, ups = [], dels = [];
   document.querySelectorAll('.pj').forEach(e => { const m = Number(e.dataset.m); if (e.value.trim()==='') dels.push(m); else ups.push({ company_id:S.company.id, department_id:dept, year:Y, line_item:item, month:m, amount:Number(e.value)||0, updated_by:S.me.id }); });
@@ -2449,12 +2467,14 @@ async function refreshRef(){
     const res = [];
     for (const y of years) { const D = await loadYearData(y, dept), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===item);
       const lo = sum(D.act.filter(a=>a.left_out && a.line_item===item).map(a=>Number(a.amount)||0)), rB = lo ? actModel(basisData(D), 'budget').rows.find(x=>x.item===item) : r;
-      res.push({ y, closed:M.closed, bud:r?.budFY||0, act:r?.actYTD||0, proj:r?.projFY||0, projB:rB?.projFY||0, leftOut:lo, hasAct:M.closed>0, basis:S.cycles.find(c=>c.year===y)?.basis }); }
+      let tagged = [];
+      if (y === Y-1 && r) { await loadFlags(y); tagged = Object.entries(r.partners||{}).map(([p,v])=>({ p, v, f:flagOf(y, item, p, dept) })).filter(x=>x.f && x.f.status!=='keep'); }
+      res.push({ y, closed:M.closed, bud:r?.budFY||0, act:r?.actYTD||0, proj:r?.projFY||0, projB:rB?.projFY||0, leftOut:lo, tagged, hasAct:M.closed>0, basis:S.cycles.find(c=>c.year===y)?.basis }); }
     if ($('#f_line_item')?.value !== item) return;
     box.innerHTML = `<table class="ref"><thead><tr><th>${esc(deptById(dept)?.name)} · ${esc(item)}</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Full-year view</th></tr></thead><tbody>
       ${res.map(r=>`<tr><td>${r.y}${r.basis&&r.basis!=='approved'?` <small>${r.basis==='submitted'?'(submitted, not approved)':''}</small>`:''}</td><td class="r num">${r.bud?peso(r.bud):'—'}</td>
         <td class="r num">${r.hasAct?peso(r.act)+` <small>${thru(r.closed)}</small>`:'<small>not loaded</small>'}</td><td class="r num">${r.hasAct&&r.closed<12?peso(r.proj)+' <small>projected</small>':r.hasAct?peso(r.act):'—'}</td></tr>`).join('')}
-      </tbody></table><span class="hint">History is a check, not the basis — budget from the ${Y} activity plan, quotation or contract.</span>`;
+      </tbody></table>${(()=>{ const T = res.find(r=>r.y===Y-1)?.tagged||[]; return T.length ? `<div class="box" style="border-left:4px solid #b42318;margin:8px 0;font-size:13px"><b>⚑ Questioned charges on this line in ${Y-1}</b> — check before you budget them again:${T.map(x=>`<div style="margin-top:4px"><b>${esc(x.p)}</b> ${peso(x.v)} · <span style="color:${CF[x.f.status].c};font-weight:600">${CF[x.f.status].l}</span>${x.f.reason?` — ${esc(x.f.reason)}`:''}</div>`).join('')}</div>` : ''; })()}<span class="hint">History is a check, not the basis — budget from the ${Y} activity plan, quotation or contract.</span>`;
     renderConsider(item, res.find(r=>r.y===Y-1), dept);
   } catch(e){ box.innerHTML = '<span class="hint">History not available.</span>'; console.error(e); }
 }
@@ -4956,7 +4976,11 @@ function gapsFor(item, dept){ return (S.gap?.rows||[]).filter(g => g.line_item==
 function gapCanEdit(dept){ return dept ? (canEditDept(dept) || canManageData()) : canManageData(); }
 
 // one line under the item name in the actuals table
-function gapRowNote(r){
+function gapRowNote(r){ return cfRowNote(r) + gapRowNote0(r); }
+function cfRowNote(r){ const L = flagsOnLine(S.act.year, r); if (!L.length) return '';
+  const x = L.sort((a,b)=>b.v-a.v)[0];
+  return `<div class="item" style="text-transform:none;color:#b42318;font-weight:600">⚑ ${x.f.prior?`Tagged in ${x.f.year} — `:''}${CF[x.f.status].l}: ${esc(x.p)} ${short(x.v)}${L.length>1?` (+${L.length-1})`:''}</div>`; }
+function gapRowNote0(r){
   const g = gapsFor(r.item, S.act.dept), t = gapTypeOf(r);
   if (g.length) return `<div class="item" style="text-transform:none;color:var(--teal)" title="${esc(g.map(x=>x.remark).join(' | '))}">Gap remark: ${esc(gapLbl(GAP_CAUSES, g[0].cause))}${g.length>1?` (+${g.length-1})`:''}</div>`;
   return t && t!=='under' ? `<div class="item" style="text-transform:none;color:var(--amber)">Gap not explained yet</div>` : '';

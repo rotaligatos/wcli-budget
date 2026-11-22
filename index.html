@@ -6144,9 +6144,9 @@ function prsNotes(){
   PRS.win = window.open('', 'costline-notes', 'width=620,height=760');
   if (!PRS.win) return toast('Allow pop-ups for this site to open presenter notes.', true);
   PRS.win.document.write(`<!doctype html><meta charset="utf-8"><title>Presenter notes — Costline</title><style>body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#101413;color:#e7ecea}header{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#1b2321;position:sticky;top:0}button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #2f3b38;background:#24302d;color:#e7ecea;cursor:pointer}main{padding:14px 18px}h1{font-size:22px;margin:4px 0 8px}h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#8fa39d;margin:18px 0 6px}.auto{font-size:17px}textarea{width:100%;min-height:140px;font:inherit;background:#0b0f0e;color:#e7ecea;border:1px solid #2f3b38;border-radius:8px;padding:8px}#clk{margin-left:auto;font-variant-numeric:tabular-nums;color:#8fa39d}</style>
-    <header><button id="pv">‹ Prev</button><button id="nx">Next ›</button><span id="no"></span><button id="pp" title="Penny writes talking points for slides you have no notes on">Draft notes with Penny</button><span id="clk"></span></header><main><div id="pn" style="color:#8fa39d;font-size:13px"></div><h1 id="t"></h1><div class="auto" id="a"></div><h2>My notes</h2><textarea id="my" placeholder="Your own talking points for this slide — saved on this device"></textarea><h2>Next</h2><div id="n"></div></main>`);
+    <header><button id="pv">‹ Prev</button><button id="nx">Next ›</button><span id="no"></span><button id="p1" title="Penny writes talking points for the slide you are on">Penny: this slide</button><button id="pp" title="Penny writes talking points for every slide you have no notes on yet, a few slides at a time">Penny: all slides</button><span id="clk"></span></header><main><div id="pn" style="color:#8fa39d;font-size:13px"></div><h1 id="t"></h1><div class="auto" id="a"></div><h2>My notes</h2><textarea id="my" placeholder="Your own talking points for this slide — saved on this device"></textarea><h2>Next</h2><div id="n"></div></main>`);
   PRS.win.document.close(); const w = PRS.win, t0 = Date.now();
-  w.document.getElementById('pv').onclick = () => prsGo(-1); w.document.getElementById('pp').onclick = () => prsPennyNotes(); w.document.getElementById('nx').onclick = () => prsGo(1);
+  w.document.getElementById('pv').onclick = () => prsGo(-1); w.document.getElementById('pp').onclick = () => prsPennyNotes(); w.document.getElementById('p1').onclick = () => prsPennyNotes(true); w.document.getElementById('nx').onclick = () => prsGo(1);
   w.document.getElementById('my').oninput = e => { const s = prsVisible()[PRS.i]; try { localStorage.setItem(prsK()+'.note.'+s.id, e.target.value); } catch(_){} };
   w.document.addEventListener('keydown', e => { if (e.target.id==='my') return; if (['ArrowRight',' ','PageDown'].includes(e.key)) { e.preventDefault(); prsGo(1); } if (['ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); prsGo(-1); } });
   setInterval(() => { try { const m = Math.floor((Date.now()-t0)/60000), s = Math.floor((Date.now()-t0)/1000)%60; w.document.getElementById('clk').textContent = `${m}:${String(s).padStart(2,'0')}`; } catch(_){} }, 1000);
@@ -6479,19 +6479,31 @@ async function prsDataPack(){
 }
 
 /* ---------- Penny drafts the talking points ---------- */
-async function prsPennyNotes(){
-  const V = prsVisible(), w = PRS.win;
+async function prsPennyNotes(one){
+  const V = prsVisible(), w = PRS.win, cur = V[PRS.i];
   const say = t => { try { w.document.getElementById('pn').textContent = t; } catch(_){} };
-  say('Penny is drafting talking points for every slide… about a minute.');
-  const brief = V.map(s=>`[${s.id}] ${s.title}: ${s.notes?s.notes():''}`).join('\n');
-  const ask = `I am presenting "${PRS.meta.file}" (${PRS.D.kind==='plant'?'to the Managing Director':'to the Head of Plant Operations'}). For EACH slide below write 2–4 short spoken talking points in plain English (numbers first, what to emphasise, the likely question and a one-line answer). Reply ONLY with JSON: {"<slide id>": "talking points", ...}. Use only these figures:\n${brief}`;
-  try { const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ page:pennyContext(), messages:[{ role:'user', content:ask }] } });
-    if (error || data?.error) throw new Error(data?.error || error.message);
-    const m = String(data.reply||'').match(/\{[\s\S]*\}/); if (!m) throw new Error('Penny did not return the notes in the expected form — try again.');
-    const J = JSON.parse(m[0]); let n = 0;
-    V.forEach(s => { const t = J[s.id]; if (!t || prsMyNote(s.id)) return; try { localStorage.setItem(prsK()+'.note.'+s.id, String(t)); n++; } catch(_){} });
-    say(n ? `Penny drafted notes for ${n} slide${n>1?'s':''} (slides where you already wrote notes were left alone). Edit them below.` : 'Every slide already has your notes — nothing changed.'); prsNotesSync();
-  } catch(e){ say('Could not draft notes: ' + e.message); }
+  const btns = on => ['p1','pp'].forEach(id => { try { w.document.getElementById(id).disabled = !on; } catch(_){} });
+  // this slide: always (your own notes are kept, Penny's draft goes under them); all slides: only slides with no notes yet
+  const todo = one ? [cur] : V.filter(s => !prsMyNote(s.id));
+  if (!todo.length) { say('Every slide already has your notes — nothing to draft.'); return; }
+  const who = PRS.D.kind==='plant' ? 'to the Managing Director' : 'to the Head of Plant Operations';
+  const ask1 = list => `I am presenting "${PRS.meta.file}" (${who}). For EACH slide below write 2–4 short spoken talking points in plain English (numbers first, what to emphasise, the likely question and a one-line answer). Reply ONLY with JSON: {"<slide id>": "talking points", ...}. Use only these figures:\n` + list.map(s=>`[${s.id}] ${s.title}: ${s.notes?s.notes():''}`).join('\n');
+  const groups = []; for (let i = 0; i < todo.length; i += 4) groups.push(todo.slice(i, i+4));   // a few slides per request, so no answer gets cut off
+  btns(false); let n = 0, failed = 0;
+  for (let g = 0; g < groups.length; g++) {
+    say(one ? `Penny is drafting notes for "${cur.title}"…` : `Penny is drafting notes — slides ${g*4+1}–${g*4+groups[g].length} of ${todo.length}…`);
+    try {
+      const { data, error } = await sb.functions.invoke('bgt-penny', { body:{ task:'notes', page:pennyContext(), messages:[{ role:'user', content:ask1(groups[g]) }] } });
+      if (error || data?.error) throw new Error(data?.error || error.message);
+      const m = String(data.reply||'').match(/\{[\s\S]*\}/); if (!m) throw new Error('Penny did not return the notes in the expected form.');
+      const J = JSON.parse(m[0]);
+      groups[g].forEach(s => { const t = J[s.id]; if (!t) return; const mine = prsMyNote(s.id);
+        try { localStorage.setItem(prsK()+'.note.'+s.id, mine ? `${mine}\n\n— Penny —\n${t}` : String(t)); n++; } catch(_){} });
+    } catch(e){ failed += groups[g].length; if (one || groups.length===1) { btns(true); say('Could not draft notes: ' + e.message); return; } }
+  }
+  btns(true); prsNotesSync();
+  say(one ? (n ? `Penny drafted notes for this slide${prsMyNote(cur.id).includes('— Penny —')?' (added under your own notes)':''}. Edit them below.` : 'Penny returned nothing for this slide — try again.')
+    : `Penny drafted notes for ${n} slide${n===1?'':'s'}${failed?`; ${failed} could not be drafted — use "Penny: this slide" on those`:''}. Slides with your own notes were left alone.`);
 }
 
 boot();

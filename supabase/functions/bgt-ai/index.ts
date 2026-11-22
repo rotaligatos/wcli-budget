@@ -12,16 +12,24 @@ const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const sum = (a: number[]) => a.reduce((s, x) => s + (Number(x) || 0), 0);
 const peso = (n: number) => '₱' + Math.round(n || 0).toLocaleString('en-PH');
 
+// Sonnet 5.5 refuses a forced tool_choice (that is why every call used to fall back to the dearer Sonnet 4.6), so on 5.5 the tool
+// is offered with tool_choice 'auto' and the prompt says to answer through it; thinking is kept at its lowest ('between_tools').
+// Its tokenizer counts about 30% more tokens for the same text, so the ceiling is raised to match — you pay only for what is written.
 async function claude(key: string, system: string, user: string, tool: any, maxTokens = 3000) {
   let lastErr = '';
   for (const model of MODELS) {
+    const v55 = model === 'claude-sonnet-5-5';
+    const body: any = { model, max_tokens:v55 ? Math.ceil(maxTokens * 1.4) : maxTokens, messages:[{ role:'user', content:user }], tools:[tool] };
+    if (v55) { body.system = system + `\n\nGive your whole answer by calling the ${tool.name} tool once, with every required field. Do not answer in plain text.`; body.tool_choice = { type:'auto' }; body.thinking = { type:'between_tools' }; }
+    else { body.system = system; body.tool_choice = { type:'tool', name:tool.name }; }
     const r = await fetch('https://api.anthropic.com/v1/messages', { method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01' },
-      body: JSON.stringify({ model, max_tokens:maxTokens, system, messages:[{ role:'user', content:user }], tools:[tool], tool_choice:{ type:'tool', name:tool.name } }) });
+      body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { lastErr = `${r.status} ${d?.error?.message || ''}`; if (r.status === 404 || /model/i.test(lastErr)) continue; throw new Error('Claude API: ' + lastErr); }
     const tu = (d.content || []).find((c: any) => c.type === 'tool_use');
-    if (!tu) throw new Error('No structured answer returned');
+    if (!tu && d.stop_reason !== 'max_tokens' && v55) { lastErr = 'answered without the tool'; continue; }   // rare: fall back once
+    if (!tu && d.stop_reason !== 'max_tokens') throw new Error('No structured answer returned');
     if (d.stop_reason === 'max_tokens') throw new Error('The assistant\'s answer was too long and got cut off. Please try again, or add a note to narrow it down.');
     return { out: tu.input, model, usage: d.usage || {} };
   }
@@ -361,7 +369,7 @@ GAP REMARKS (check the budget closes these gaps)\n${gap}
 ${outlookText(o)}
 
 SALES AND PRODUCTION\n${kp}`;
-  return await claude(key, system, user, tool, 6000);
+  return await claude(key, system, user, tool, 10000);
 }
 
 async function reviewPlant(db: SupabaseClient, key: string, p: any) {

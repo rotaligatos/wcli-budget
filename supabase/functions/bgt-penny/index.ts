@@ -31,12 +31,17 @@ function itemMonthList(it: any) { const m = Math.min(12, Math.max(1, Number(it.m
 const itemAnnual = (it: any) => (Number(it.qty) || 0) * (Number(it.price) || 0) * (1 + (Number(it.adj ?? it.adj_pct) || 0) / 100) * itemMonthList(it).length;
 const itemTxt = (it: any) => `${it.name}: ${it.qty} ${it.unit || ''} × ₱${it.price}${Number(it.adj) ? ` +${it.adj}%` : ''}${it.std ? ` (standard ${it.std})` : it.src ? ` (${it.src})` : ''}, ${it.freq || 'monthly'}${it.freq === 'once' ? ' ' + M[(Number(it.m) || 1) - 1] : ''} = ${peso(itemAnnual(it))}/yr`;
 
-async function claude(key: string, system: string, messages: any[], tools: any[]) {
+// Sonnet 5.5 thinks before answering unless told not to; 'between_tools' (its lowest setting) keeps the room and the cost for the answer.
+// The system prompt is cached, so the tool rounds of one question (and quick follow-ups) re-read it at a fraction of the price.
+async function claude(key: string, system: string, messages: any[], tools: any[], maxTokens = 8000) {
   let lastErr = '';
   for (const model of MODELS) {
+    const body: any = { model, max_tokens:maxTokens, system:[{ type:'text', text:system, cache_control:{ type:'ephemeral' } }], messages };
+    if (tools.length) body.tools = tools;
+    if (model === 'claude-sonnet-5-5') body.thinking = { type:'between_tools' };
     const r = await fetch('https://api.anthropic.com/v1/messages', { method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01' },
-      body: JSON.stringify({ model, max_tokens:2500, system, messages, tools }) });
+      body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { lastErr = `${r.status} ${d?.error?.message || ''}`; if (r.status === 404 || /model/i.test(lastErr)) continue; throw new Error('Claude API: ' + lastErr); }
     return { ...d, model };
@@ -336,6 +341,19 @@ Deno.serve(async (req) => {
   const [{ data:depts }, { data:lis }] = await Promise.all([db.from('bgt_departments').select('id,name,code'), db.from('bgt_line_items').select('name').eq('kind', 'opex').eq('active', true).order('sort')]);
   const { data:bn } = await svc.from('bgt_settings').select('value').eq('key', 'ai_business_notes').maybeSingle();
   const c: Ctx = { db, svc, me, rev, Y:cy?.year, cycleId:cy?.id, depts:depts || [], page:body.page || {}, proposals:[], thr:Number(cy?.capex_threshold) || 20000, due:cy?.due_date || '', lis:[...new Set<string>((lis || []).map((x: any) => String(x.name)))] };
+  // presenter notes: the app sends the slides' own figures, so no tools or budget context are needed (a fraction of a full Penny turn)
+  if (body.task === 'notes') {
+    const ask = String(body.messages?.[body.messages.length - 1]?.content || '').slice(0, 12000);
+    let reply = '', model = '', err = '', inT = 0, outT = 0;
+    try {
+      const d = await claude(key, `You are Penny, the budget assistant in Costline (WCLI's plant cost app). You write short spoken talking points for a budget presentation by ${me.full_name || 'the presenter'}. Use only the figures you are given; never invent numbers. Plain English, peso amounts as given. Reply ONLY with the JSON asked for.`, [{ role:'user', content:ask }], [], 4000);
+      model = d.model; inT = d.usage?.input_tokens || 0; outT = d.usage?.output_tokens || 0;
+      reply = (d.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+      if (d.stop_reason === 'max_tokens') throw new Error('The notes got too long and were cut off — try fewer slides at a time.');
+    } catch (e) { err = (e as Error).message; }
+    await svc.from('bgt_ai_log').insert({ user_id:me.id, mode:'penny_notes', request:{ mode:'penny_notes', text:ask.slice(0, 500) }, response:{ reply:reply.slice(0, 4000) }, model:model || null, input_tokens:inT || null, output_tokens:outT || null, ok:!err, error:err || null, ms:Date.now() - t0 });
+    return err ? json({ error:err }, 400) : json({ reply, model });
+  }
   // conversation: last 16 turns from the app (text only) + the new message
   const msgs: any[] = (body.messages || []).slice(-16).filter((m: any) => m && m.content).map((m: any) => ({ role:m.role === 'assistant' ? 'assistant' : 'user', content:String(m.content).slice(0, 4000) }));
   while (msgs.length && msgs[0].role !== 'user') msgs.shift();
@@ -348,7 +366,8 @@ Deno.serve(async (req) => {
       const blocks = d.content || [];
       const text = blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
       const calls = blocks.filter((b: any) => b.type === 'tool_use');
-      if (!calls.length || d.stop_reason !== 'tool_use') { reply = text; break; }
+      if (d.stop_reason === 'max_tokens') { reply = (text ? text + '\n\n' : '') + '_My answer got too long and was cut off. Ask about one line or one point at a time and I\'ll go into detail._'; break; }
+      if (!calls.length || d.stop_reason !== 'tool_use') { reply = text || 'Sorry — I didn\'t manage an answer that time. Please ask again, a little more specifically.'; break; }
       msgs.push({ role:'assistant', content:blocks });
       const results = [];
       for (const t of calls) { used.push(t.name); let out = ''; try { out = await runTool(c, t.name, t.input || {}); } catch (e) { out = 'Tool error: ' + (e as Error).message; }

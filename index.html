@@ -6353,8 +6353,18 @@ async function prsGatherPlant(){
   let cxa = null; try { const C = await cxaContext(); cxa = capex.map(l=>({ l, a:cxaAdvise(l, C) })).sort((x,y)=>CXA[x.a.rec].o-CXA[y.a.rec].o || y.a.amt-x.a.amt); } catch(e){ console.error(e); }
   let ev = null; try { const o = await loadOutlook(Y); if ((o.E||[]).some(e=>e.status!=='closed')) ev = evReserve(o, opex); } catch(e){}
   const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
+  // peso per board by department: production-side departments per board produced, the rest per board sold
+  const PPB_PROD = ['PROD','ENG','QA','PPIC'];
+  const kv = (K, m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
+  const yrTgt = (K, m) => { const a = kv(K, m, 0); if (a) return a; const v = MONTHS.map((_,i)=>kv(K, m, i+1)).filter(x=>x>0); return v.length===12 ? sum(v) : null; };
+  const lyActM = {}; (M?.rows||[]).forEach(r => (r.cells||[]).forEach(c => { const a = (lyActM[c.dept] ||= Array(12).fill(0)); c.act.forEach((v,i)=>a[i]+=v); }));
+  const ppb = depts.map(x => { const prod = PPB_PROD.includes(x.d.code), km = prod ? 'production_output' : 'volume_sold', v = prod ? vol.production_output : vol.volume_sold;
+    const b27 = v ? (v.target || v.run) : null, t26 = yrTgt(K0, prod ? 'production_target' : 'volume_target');
+    const ms = MONTHS.map((_,i)=>i+1).filter(mo => mo <= closed && kv(K0, km, mo) > 0), a = lyActM[x.d.id] || Array(12).fill(0);
+    const actB = sum(ms.map(mo=>kv(K0, km, mo))), actO = sum(ms.map(mo=>a[mo-1]));
+    return { d:x.d, basis:prod ? 'produced' : 'sold', cur:b27 ? x.opex/b27 : null, curTgt:!!v?.target, plan:t26 && x.lyBud ? x.lyBud/t26 : null, act:actB && actO ? actO/actB : null, actN:ms.length }; });
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
-    depts, lines, over, unb, ev, cxa, vol, wd1, per, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
 }
 
@@ -6411,6 +6421,19 @@ function prsDeckPlant(D){
     notes:() => deptsS.map(x=>`${x.d.name} ${short(x.opex+x.capex)} (${x.lyView?prsPct(x.opex,x.lyView):'new'})`).join('; '),
     pptx:(s, H) => { H.base(s, 'By department'); H.tbl(s, ['Department','Status',`OPEX ${Y}`,`${Y-1} view`,'Change',`CAPEX ${Y}`,'Total'], [...deptsS.map(x=>[{ text:x.d.name, options:{ bold:true } }, STATUS_LABEL[x.status]||'No budget', short(x.opex), x.lyView?short(x.lyView):'—', { text:x.lyView?prsPct(x.opex,x.lyView):'new', options:{ color:x.opex>x.lyView?'B42318':'2E7D6B' } }, x.capex?short(x.capex):'—', { text:short(x.opex+x.capex), options:{ bold:true } }]),
       [{ text:'Plant', options:{ bold:true } }, '', { text:short(D.opexT), options:{ bold:true } }, { text:short(D.lyView), options:{ bold:true } }, { text:prsPct(D.opexT,D.lyView), options:{ bold:true } }, { text:short(D.capexT), options:{ bold:true } }, { text:short(tot), options:{ bold:true } }]], 1.5, [2.6,2.2,1.5,1.5,1.3,1.6,1.6]); } });
+  if ((D.ppb||[]).some(x=>x.cur||x.plan||x.act)) { const P = D.ppb.slice().sort((a,b)=>(b.cur||0)-(a.cur||0)), pp = v => v==null ? '—' : peso(v,2), n = D.ppb.find(x=>x.actN)?.actN || 0;
+    const ch = x => x.cur!=null && x.act ? prsPct(x.cur, x.act) : '—', up = x => x.cur!=null && x.act && x.cur > x.act;
+    const pl = (D.per||[]).find(p=>p.budget), last = (D.per||[]).find(p=>p.y===Y-1);
+    const foot = `${Y}: ${Y} budget ÷ ${Y} boards (sold: ${D.vol.volume_sold?.target?'target':Y-1+' run rate'}; produced: ${D.vol.production_output?.target?'target':Y-1+' run rate'}). ${Y-1} plan: ${Y-1} budget ÷ ${Y-1} target. ${Y-1} actual: Accounting OPEX ÷ boards, ${n?thru(n):'months with both figures'}. Production, Engineering, QA/QC and PPIC per board produced; Warehouse, Logistics, Plant Admin and IT per board sold.`;
+    S_.push({ id:'pppb', title:'Peso per board by department', live:()=>go('perf'), html:() => `<h2>Peso per board by department</h2><table class="ps-tbl"><thead><tr><th>Department</th><th>Per board</th><th class="r">${Y} budget</th><th class="r">${Y-1} plan</th><th class="r">${Y-1} actual</th><th class="r">${Y} vs ${Y-1} actual</th></tr></thead><tbody>
+        ${P.map(x=>`<tr><td><b>${esc(x.d.name)}</b></td><td>${x.basis}</td><td class="r"><b>${pp(x.cur)}</b></td><td class="r">${pp(x.plan)}</td><td class="r">${pp(x.act)}</td><td class="r ${up(x)?'up':'down'}">${ch(x)}</td></tr>`).join('')}
+        ${pl?`<tr style="background:#f2f6f5"><td><b>Plant</b></td><td>produced</td><td class="r"><b>${pp(pl.prod)}</b></td><td class="r">—</td><td class="r">${pp(last?.prod)}</td><td class="r">${pl.prod&&last?.prod?prsPct(pl.prod,last.prod):'—'}</td></tr>
+        <tr style="background:#f2f6f5"><td><b>Plant</b></td><td>sold</td><td class="r"><b>${pp(pl.sold)}</b></td><td class="r">—</td><td class="r">${pp(last?.sold)}</td><td class="r">${pl.sold&&last?.sold?prsPct(pl.sold,last.sold):'—'}</td></tr>`:''}</tbody></table><p class="ps-foot">${foot}</p>`,
+      notes:() => P.filter(x=>x.cur!=null).map(x=>`${x.d.name} ${pp(x.cur)} per board ${x.basis}${x.act?` (${Y-1} actual ${pp(x.act)}, ${ch(x)})`:''}`).join('; '),
+      pptx:(s, H) => { H.base(s, 'Peso per board by department');
+        H.tbl(s, ['Department','Per board',`${Y} budget`,`${Y-1} plan`,`${Y-1} actual`,`${Y} vs ${Y-1} actual`], [...P.map(x=>[{ text:x.d.name, options:{ bold:true } }, x.basis, { text:pp(x.cur), options:{ bold:true } }, pp(x.plan), pp(x.act), { text:ch(x), options:{ color:up(x)?'B42318':'2E7D6B' } }]),
+          ...(pl?[[{ text:'Plant', options:{ bold:true } }, 'produced', { text:pp(pl.prod), options:{ bold:true } }, '—', pp(last?.prod), pl.prod&&last?.prod?prsPct(pl.prod,last.prod):'—'], [{ text:'Plant', options:{ bold:true } }, 'sold', { text:pp(pl.sold), options:{ bold:true } }, '—', pp(last?.sold), pl.sold&&last?.sold?prsPct(pl.sold,last.sold):'—']]:[])], 1.5, [2.6,1.5,2.0,2.0,2.0,2.2]);
+        s.addText(foot, { x:0.5, y:6.6, w:12.3, h:0.6, fontFace:'Arial', fontSize:9, color:'5B6B67' }); } }); }
   S_.push({ id:'plines', title:'By expense line', html:() => `<h2>By expense line <small>top 10, OPEX</small></h2>${prsBars(li.map(x=>({ label:prsLi(x.item), v:x.amt, v2:x.lyView||null, note:x.lyView?prsPct(x.amt,x.lyView):'new' })), Math.max(...li.map(x=>Math.max(x.amt,x.lyView)),1))}<p class="ps-foot">Bar = ${Y}; tick = ${Y-1} full-year view.</p>`,
     notes:() => li.slice(0,5).map(x=>`${prsLi(x.item)} ${short(x.amt)} (${x.lyView?prsPct(x.amt,x.lyView):'new'})`).join('; '),
     pptx:(s, H) => { H.base(s, 'By expense line', 'top 10, OPEX'); const r = li.slice().reverse(); s.addChart(H.P.ChartType.bar, [{ name:String(Y), labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.lyView)) }], { x:0.4, y:1.5, w:12.5, h:5.6, barDir:'bar', barGrouping:'clustered', chartColors:[H.T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9 }); } });

@@ -316,6 +316,21 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps.th-qa .ps-cover::before{border-color:rgba(20,35,31,.14)}
 .ps.th-qa .ps-cover .ps-eyebrow{color:var(--t)}.ps.th-qa .ps-cover .ps-sub{color:#33413d}.ps.th-qa .ps-cover .ps-meta{color:#33413d}
 .ps.th-qa .ps-finish{color:#5f6f6b}.ps.th-qa .ps-finish b{color:#14231f}
+.ps.th-plant{--t:#0f5a52;--t2:#052522;--t3:#1b8f80;--acc:#d4a63c;--eye:#e8cf8f}
+.ps.th-plant .ps-cover{background:linear-gradient(112deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.04) 26%,transparent 38%),repeating-linear-gradient(90deg,rgba(212,166,60,.07) 0 1px,transparent 1px 120px),radial-gradient(1100px 620px at 82% 18%,var(--t3) 0%,transparent 62%),linear-gradient(135deg,#0f5a52,#052522)}
+.ps.th-plant .ps-cover::before{border-color:rgba(212,166,60,.35)}
+.ps.th-plant .ps-finish b{color:#f3e2b3}
+.ps-swatches{position:absolute!important;right:92px;top:492px;display:flex;gap:10px;align-items:center}
+.ps-swatches i{width:30px;height:30px;transform:rotate(45deg);border-radius:4px;box-shadow:0 6px 14px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25)}
+.ps-swatches span{font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#e8cf8f;margin-left:10px}
+.sw-prod{background:repeating-linear-gradient(179deg,rgba(255,255,255,.08) 0 1px,transparent 1px 4px),linear-gradient(135deg,#7a4c2c,#3e2414)}
+.sw-wh{background:repeating-linear-gradient(179deg,rgba(255,255,255,.10) 0 1px,transparent 1px 4px),linear-gradient(135deg,#b48a52,#6a4d24)}
+.sw-eng{background:repeating-linear-gradient(0deg,rgba(255,255,255,.12) 0 1px,transparent 1px 2px),linear-gradient(135deg,#6b7c8c,#2b343d)}
+.sw-qa{background:linear-gradient(120deg,transparent 45%,rgba(110,110,125,.35) 46%,transparent 50%),linear-gradient(135deg,#faf8f4,#dcd7cd)}
+.sw-log{background:radial-gradient(rgba(255,255,255,.18) 1px,transparent 1.5px) 0 0/4px 4px,linear-gradient(135deg,#5b8090,#1c2f38)}
+.sw-admin{background:repeating-linear-gradient(0deg,rgba(255,255,255,.08) 0 1px,transparent 1px 3px),linear-gradient(135deg,#13756a,#0b3f3a)}
+.sw-it{background:repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 2px,transparent 2px 4px),linear-gradient(135deg,#3a4049,#121418)}
+.sw-ppic{background:linear-gradient(135deg,#c46a43,#6a2c16)}
 .ps.th-qa:has(.ps-cover) .ps-foot-bar{color:#5f6f6b;border-color:rgba(20,35,31,.15)}.ps.th-qa:has(.ps-cover) .ps-pg b{color:#14231f}
 .ps-cover h1{font-family:Archivo,sans-serif;font-stretch:75%;font-weight:800;font-size:96px;line-height:.95;margin:14px 0 14px;letter-spacing:-.01em;max-width:760px}
 .ps-eyebrow{font:600 16px 'IBM Plex Mono',monospace;color:var(--eye,#9fd3c9);text-transform:uppercase;letter-spacing:.14em}
@@ -6378,7 +6393,8 @@ const PRS_THEMES = {
   ADMIN:{ cls:'th-admin', finish:'Forest linen', why:'the company colour, finished in linen texture', t:'0F5A52', t2:'0B3F3A' },
   IT:{ cls:'th-it', finish:'Carbon matte', why:'the technology behind the plant', t:'2E333B', t2:'111317' },
   PPIC:{ cls:'th-ppic', finish:'Terracotta solid matte', why:'planning — warm, steady, on schedule', t:'9C4A2A', t2:'4F2010' } };
-const prsTheme = () => PRS.D?.kind==='plant' ? null : PRS_THEMES[(PRS.D?.dept?.code||'').toUpperCase()] || null;
+PRS_THEMES.PLANT = { cls:'th-plant', finish:'Signature emerald, high gloss', why:'the whole plant — every department finish in one', t:'0F5A52', t2:'052522' };
+const prsTheme = () => PRS.D?.kind==='plant' ? PRS_THEMES.PLANT : PRS_THEMES[(PRS.D?.dept?.code||'').toUpperCase()] || null;
 function prsFrame(s, k, n, extra=''){
   const lg = LOGOS[(PRS.D.company?.code||'').toUpperCase()], nn = String(k+1).padStart(2,'0');
   return `<div class="ps ps-s-${s.id} ${prsTheme()?.cls||''}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
@@ -6486,7 +6502,9 @@ async function prsPptx(){
   const tbl = (s, head, rows, y, colW, x) => s.addTable([head.map(h=>({ text:String(h).toUpperCase(), options:{ bold:true, color:'FFFFFF', fill:{ color:INK }, fontFace:'Consolas', fontSize:9 } })),
       ...rows.map((r,i)=>r.map(c=>{ const o = typeof c==='object' && c ? c : { text:String(c??'') }; return { text:o.text, options:{ ...(o.options||{}), fill:{ color:i%2?'F7F9F8':'FFFFFF' } } }; }))],
     { x:x ?? 0.6, y, w:x!=null ? colW.reduce((a,b)=>a+b,0) : 12.13, colW, fontFace:F, fontSize:10.5, color:INK, border:{ type:'solid', color:LINE, pt:0.5 }, autoPage:false, valign:'middle', margin:[4,6,4,6] });
-  const coverDeco = s => { s.background = { color:TH?.cls==='th-qa' ? 'EFECE6' : T2 }; if (TH) s.addText(`Cover finish: ${TH.finish}`, { x:8.4, y:6.55, w:4.4, h:0.3, fontFace:'Consolas', fontSize:10, color:TH.cls==='th-qa'?'5F6F6B':'C9D6D3', align:'right' }); s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
+  const coverDeco = s => { s.background = { color:TH?.cls==='th-qa' ? 'EFECE6' : T2 };
+    if (TH?.cls==='th-plant') { ['6B4226','8A6534','3D4A57','EFECE6','36525F','13756A','2E333B','9C4A2A'].forEach((c,i) => s.addShape(P.ShapeType.diamond, { x:8.55+i*0.42, y:5.15, w:0.36, h:0.36, fill:{ color:c }, line:{ color:'FFFFFF', transparency:70, width:0.5 } }));
+      s.addText('ONE PLANT · EIGHT DEPARTMENTS', { x:8.4, y:5.55, w:4.4, h:0.3, fontFace:'Consolas', fontSize:9, color:'E8CF8F', align:'right' }); } if (TH) s.addText(`Cover finish: ${TH.finish}`, { x:8.4, y:6.55, w:4.4, h:0.3, fontFace:'Consolas', fontSize:10, color:TH.cls==='th-qa'?'5F6F6B':'C9D6D3', align:'right' }); s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
     [['020303',8.75],['DC1F26',9.55],['FDAF19',10.33]].forEach(([c,x],i) => s.addShape(P.ShapeType.diamond, { x, y:2.35, w:2.2, h:2.2, fill:{ color:c }, line:i===0?{ color:'FFFFFF', transparency:50, width:0.75 }:{ type:'none' } })); /* the WCLI mark */ if (lg) { s.addShape(P.ShapeType.roundRect, { x:0.75, y:0.6, w:1.9, h:0.85, fill:{ color:'FFFFFF' }, line:{ type:'none' }, rectRadius:0.1 }); s.addImage({ data:lg, x:0.85, y:0.67, w:1.7, h:0.71, sizing:{ type:'contain', w:1.7, h:0.71 } }); } };
   const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl, coverDeco, ACC };
   for (const sl of prsVisible()) {
@@ -6650,7 +6668,7 @@ function prsDeckPlant(D){
   const kp = (arr, cls='') => `<div class="ps-kpis ${cls}">${arr.map(k=>`<div><span>${esc(k[0])}</span><b>${k[1]}</b>${k[2]?`<small>${esc(k[2])}</small>`:''}</div>`).join('')}</div>`;
   const S_ = [];
   S_.push({ id:'pcover', title:'Cover', html:() => `<div class="ps-cover"><div class="ps-eyebrow">${esc(co)} · ${esc(D.site?.name||'')}</div><h1>${Y} Plant Budget</h1><div class="ps-sub">For the Managing Director's approval</div>
-      <div class="ps-meta">Presented by <b>${esc(S.me.full_name||'')}</b>, Head of Plant Operations<br>${D.nBud} department budgets · ${done} approved by the Plant Head${waiting?` · ${waiting} still in the departments`:''}</div></div>`,
+      <div class="ps-meta">Presented by <b>${esc(S.me.full_name||'')}</b>, Head of Plant Operations<br>${D.nBud} department budgets · ${done} approved by the Plant Head${waiting?` · ${waiting} still in the departments`:''}</div><div class="ps-swatches">${['prod','wh','eng','qa','log','admin','it','ppic'].map(k=>`<i class="sw-${k}"></i>`).join('')}<span>One plant · eight departments</span></div><div class="ps-finish">Cover finish<b>Signature emerald, high gloss</b></div></div>`,
     notes:() => `${Y} plant budget: ${short(tot)} — ${short(D.opexT)} OPEX and ${short(D.capexT)} CAPEX across ${D.nBud} departments.`,
     pptx:(s, H) => { H.coverDeco(s);
       s.addText(`${co} · ${D.site?.name||''}`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:H.F, fontSize:16, color:'CFE3DF' }); s.addText(`${Y} Plant Budget`, { x:0.6, y:2.5, w:12, h:1.1, fontFace:H.F, fontSize:48, bold:true, color:'FFFFFF' });

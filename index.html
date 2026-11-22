@@ -1371,7 +1371,7 @@ const RV_WHO = { plant_head:'Head of Plant Operations', md:'MD', admin:'Admin' }
 const RV_SHORT = { plant_head:'Plant Head', md:'MD', admin:'Admin' };
 S.rv = []; S.rvc = [];
 const isLineReviewer = () => !S.preview && ['admin','plant_head','md'].includes(S.me?.role);
-const myRvRole = () => S.me.role==='md' ? 'md' : S.me.role==='plant_head' ? 'plant_head' : 'admin';
+const myRvRole = () => S.me.role==='md' ? 'md' : 'plant_head';   // admin reviews as the Head of Plant Operations (Rommel holds both)
 const rvFor = (kind, id) => (S.rv||[]).filter(r=>r.line_kind===kind && r.line_id===id);
 const isBudgetDept = b => !S.preview && ['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===b?.department_id;
 const canFixLine = (kind, id) => S.cycle.status==='open' && isBudgetDept(budgetById(S.budgetId)) && rvFor(kind, id).some(r=>r.decision==='revise' && r.status==='open');

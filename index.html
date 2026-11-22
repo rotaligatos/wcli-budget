@@ -2095,7 +2095,7 @@ function actItem(item){
       </tbody><tfoot><tr><td>Total</td><td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.actYTD)}</td><td class="r num">${peso(r.projFY)}</td></tr></tfoot></table>
       ${!dept && Object.keys(r.depts).length>1 ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Projected by department</h3>${Object.entries(r.depts).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(deptById(d)?.name||'Unassigned')}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
       ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>cfPayeeRow(Y, item, p, v)).join('')}
-        ${isReviewer()?`<p class="hint" style="margin:4px 0 0">${canManageData()?'Tag a payee you are not sure about, or keep it out of next year\'s basis. ':''}Ask Penny what a charge is.</p>`:''}` : ''}
+        ${isReviewer()?`<p class="hint" style="margin:4px 0 0">${canManageData()?'Use <b>Tag / Ask Penny</b> beside a payee to mark it questionable, keep it, leave it out of next year\'s budget, or ask Penny what it is.':'Use <b>Ask Penny</b> beside a payee to find out what a charge is.'}</p>`:''}` : ''}
       ${(()=>{ const ex = (S.act.lastD?.excl||[]).filter(a=>a.line_item===item && (!dept || a.department_id===dept)); if (!ex.length) return ''; const by = {}; ex.forEach(a=>by[a.partner||'—']=(by[a.partner||'—']||0)+Number(a.amount)); const rules = S.ex.rules||[];
         return `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Kept out of plant OPEX</h3>${Object.entries(by).map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}<p class="hint" style="margin:4px 0 0">Recorded by Accounting on this line but not included above: ${esc([...new Set(ex.map(a=>rules.find(r=>r.id===a.exclusion_id)?.category).filter(Boolean))].join(', ')||'excluded by rule')}.</p>`; })()}
       ${gapSection(item, r)}
@@ -2114,7 +2114,7 @@ const flagOf = (Y, item, partner, dept) => S.cf.year!==Y ? null : S.cf.rows.filt
 function cfPayeeRow(Y, item, p, v){
   const f = flagOf(Y, item, p, S.act.dept), a = JSON.stringify([item, p]).replace(/"/g,'&quot;');
   return `<div class="sumline" style="font-weight:400;align-items:center;gap:8px"><span style="flex:1">${esc(p)}${f?` <span class="chip" style="background:${CF[f.status].c};color:#fff;font-size:11px;padding:1px 7px">${CF[f.status].l}</span>${f.reason?`<div class="hint" style="margin:2px 0 0">${esc(f.reason)}</div>`:''}`:''}</span>
-    <span class="num">${peso(v)}</span>${isReviewer()?`<button class="btn ghost sm" title="Tag this charge or ask Penny" onclick='cfDialog(...${a})'>⋯</button>`:''}</div>`;
+    <span class="num">${peso(v)}</span>${isReviewer()?`<button class="btn sm" style="white-space:nowrap" title="Tag this charge or ask Penny what it is" onclick='cfDialog(...${a})'>${canManageData()?(f?'Edit tag':'Tag / Ask Penny'):'Ask Penny'}</button>`:''}</div>`;
 }
 function cfDialog(item, partner){
   const Y = S.act.year, dept = S.act.dept, f = flagOf(Y, item, partner, dept), man = canManageData();

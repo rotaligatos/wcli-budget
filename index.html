@@ -263,7 +263,7 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 #prsBack{position:fixed;right:20px;bottom:20px;z-index:9001;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .prs-ls{display:grid;gap:6px;margin:10px 0}.prs-ls label{display:flex;gap:8px;align-items:center}
 .prs-ex{display:grid;gap:8px;margin:10px 0}.prs-ex .btn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:10px 14px}.prs-ex small{font-weight:400;opacity:.8}
-.ps{--t:#0f5a52;--t2:#0b3f3a;--acc:#e0531f;--ink:#14231f;--mute:#5f6f6b;--line:#e3e8e5;--paper:#fbfaf6;position:relative;width:1280px;height:720px;padding:34px 64px 64px;box-sizing:border-box;font-family:'IBM Plex Sans',Inter,system-ui,Arial,sans-serif;color:var(--ink);overflow:hidden;background:var(--paper);isolation:isolate}
+.ps{--t:#0f5a52;--t2:#0b3f3a;--t3:#13756a;--acc:#e0531f;--ink:#14231f;--mute:#5f6f6b;--line:#e3e8e5;--paper:#fbfaf6;position:relative;width:1280px;height:720px;padding:34px 64px 64px;box-sizing:border-box;font-family:'IBM Plex Sans',Inter,system-ui,Arial,sans-serif;color:var(--ink);overflow:hidden;background:var(--paper);isolation:isolate}
 .ps-mark{position:absolute;right:-110px;top:-150px;width:340px;height:340px;transform:rotate(45deg);background:linear-gradient(135deg,rgba(15,90,82,.10),rgba(15,90,82,.02));border-radius:28px;pointer-events:none;z-index:-1}
 .ps-mark::after{content:'';position:absolute;left:150px;top:150px;width:120px;height:120px;border-radius:14px;background:rgba(224,83,31,.10)}
 .ps-logo{display:none}
@@ -284,19 +284,48 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps:has(.ps-cover) .ps-kick,.ps:has(.ps-cover) .ps-mark{display:none}
 .ps:has(.ps-cover) .ps-foot-bar{color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.15);z-index:2}.ps:has(.ps-cover) .ps-foot-bar img{display:none}.ps:has(.ps-cover) .ps-pg b{color:#fff}
 .ps:has(.ps-cover) .ps-logo{display:block;position:absolute;z-index:3;left:80px;top:64px;height:64px;width:auto;background:#fff;padding:10px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
-.ps-cover{position:absolute;inset:0;background:radial-gradient(1200px 600px at 85% 20%,#13756a 0%,transparent 60%),linear-gradient(135deg,#0f5a52,#082f2b);color:#fff;padding:190px 80px 0;overflow:hidden}
+.ps-cover{position:absolute;inset:0;background:radial-gradient(1200px 600px at 85% 20%,var(--t3) 0%,transparent 60%),linear-gradient(135deg,var(--t),var(--t2));color:#fff;padding:190px 80px 0;overflow:hidden}
 .ps-cover::before{content:'';position:absolute;right:-120px;top:120px;width:520px;height:520px;transform:rotate(45deg);border:2px solid rgba(255,255,255,.14);border-radius:40px}
 .ps-cover::after{content:'';position:absolute;right:150px;top:250px;width:230px;height:230px;transform:rotate(45deg);background:linear-gradient(135deg,var(--acc),#f08a3c);border-radius:22px;opacity:.9;box-shadow:0 30px 60px rgba(0,0,0,.3)}
 .ps-cover>*{position:relative;z-index:1}
+.ps-finish{position:absolute!important;right:80px;bottom:84px;font:600 12px 'IBM Plex Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);text-align:right}
+.ps-finish b{display:block;font:700 18px Archivo,sans-serif;letter-spacing:.02em;text-transform:none;color:#fff;margin-top:4px}
+/* woodgrain */
+.ps.th-prod,.ps.th-wh{--grain:repeating-radial-gradient(ellipse 2600px 140px at 18% 62%,rgba(255,255,255,.06) 0 3px,transparent 3px 14px,rgba(0,0,0,.08) 14px 16px,transparent 16px 34px),repeating-linear-gradient(179deg,rgba(255,255,255,.04) 0 1px,transparent 1px 6px,rgba(0,0,0,.05) 6px 7px,transparent 7px 13px),repeating-radial-gradient(ellipse 1800px 70px at 75% 25%,rgba(0,0,0,.07) 0 2px,transparent 2px 19px)}
+.ps.th-prod{--t:#6b4226;--t2:#38200f;--t3:#9a6440;--eye:#ecc9a2}
+.ps.th-wh{--t:#8a6534;--t2:#4a3416;--t3:#b48a52;--eye:#f1d7ae}
+.ps.th-prod .ps-cover,.ps.th-wh .ps-cover{background:var(--grain),radial-gradient(1200px 600px at 85% 20%,var(--t3) 0%,transparent 60%),linear-gradient(135deg,var(--t),var(--t2))}
+/* brushed metal */
+.ps.th-eng{--t:#3d4a57;--t2:#1b222a;--t3:#6b7c8c;--eye:#c9d3dc}
+.ps.th-eng .ps-cover{background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),linear-gradient(115deg,rgba(255,255,255,.10),transparent 45%),linear-gradient(135deg,var(--t),var(--t2))}
+/* carbon matte */
+.ps.th-it{--t:#2e333b;--t2:#111317;--t3:#4c5562;--eye:#c4cbd4}
+.ps.th-it .ps-cover{background:repeating-linear-gradient(45deg,rgba(255,255,255,.035) 0 6px,transparent 6px 12px),repeating-linear-gradient(-45deg,rgba(0,0,0,.28) 0 6px,transparent 6px 12px),linear-gradient(135deg,var(--t),var(--t2))}
+/* slate stone */
+.ps.th-log{--t:#36525f;--t2:#16262e;--t3:#5b8090;--eye:#bcd6e0}
+.ps.th-log .ps-cover{background:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1.6px) 0 0/7px 7px,radial-gradient(rgba(0,0,0,.22) 1px,transparent 1.7px) 3px 4px/11px 11px,radial-gradient(1100px 600px at 85% 20%,var(--t3) 0%,transparent 60%),linear-gradient(135deg,var(--t),var(--t2))}
+/* linen texture, brand green */
+.ps.th-admin .ps-cover{background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 4px),radial-gradient(1200px 600px at 85% 20%,var(--t3) 0%,transparent 60%),linear-gradient(135deg,var(--t),var(--t2))}
+/* terracotta solid matte */
+.ps.th-ppic{--t:#9c4a2a;--t2:#4f2010;--t3:#c46a43;--acc:#e3a63a;--eye:#f6cfae}
+.ps.th-ppic .ps-cover{background:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1.5px) 0 0/5px 5px,radial-gradient(1200px 600px at 85% 20%,var(--t3) 0%,transparent 60%),linear-gradient(135deg,var(--t),var(--t2))}
+/* white marble, high gloss — light cover with dark text */
+.ps.th-qa{--t:#2f5d8a;--t2:#1c3a57;--t3:#5486b8}
+.ps.th-qa:has(.ps-cover){background:#efece6}
+.ps.th-qa .ps-cover{color:#14231f;background:linear-gradient(118deg,transparent 38%,rgba(110,110,125,.20) 38.6%,transparent 40.2%),linear-gradient(152deg,transparent 58%,rgba(150,135,110,.18) 58.5%,transparent 60%),linear-gradient(104deg,transparent 70%,rgba(110,110,125,.12) 70.4%,transparent 71.4%),radial-gradient(900px 500px at 80% 15%,rgba(255,255,255,.95),transparent 60%),linear-gradient(135deg,#f7f5f1,#e4e0d8)}
+.ps.th-qa .ps-cover::before{border-color:rgba(20,35,31,.14)}
+.ps.th-qa .ps-cover .ps-eyebrow{color:var(--t)}.ps.th-qa .ps-cover .ps-sub{color:#33413d}.ps.th-qa .ps-cover .ps-meta{color:#33413d}
+.ps.th-qa .ps-finish{color:#5f6f6b}.ps.th-qa .ps-finish b{color:#14231f}
+.ps.th-qa:has(.ps-cover) .ps-foot-bar{color:#5f6f6b;border-color:rgba(20,35,31,.15)}.ps.th-qa:has(.ps-cover) .ps-pg b{color:#14231f}
 .ps-cover h1{font-family:Archivo,sans-serif;font-stretch:75%;font-weight:800;font-size:96px;line-height:.95;margin:14px 0 14px;letter-spacing:-.01em;max-width:760px}
-.ps-eyebrow{font:600 16px 'IBM Plex Mono',monospace;color:#9fd3c9;text-transform:uppercase;letter-spacing:.14em}
+.ps-eyebrow{font:600 16px 'IBM Plex Mono',monospace;color:var(--eye,#9fd3c9);text-transform:uppercase;letter-spacing:.14em}
 .ps-sub{font-size:28px;color:#e6f2ef;font-weight:300}
 .ps-meta{position:absolute;left:80px;bottom:80px;font-size:17px;color:#cfe3df;line-height:1.6;border-left:3px solid var(--acc);padding-left:16px}
 /* numbers */
 .ps-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
 .ps-kpis>div{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px 14px;box-shadow:0 1px 2px rgba(16,40,35,.05),0 8px 24px -12px rgba(16,40,35,.18);overflow:hidden}
 .ps-kpis>div::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--t)}
-.ps-kpis>div:first-child{background:linear-gradient(140deg,#0f5a52,#0b3f3a);border-color:transparent;color:#fff}.ps-kpis>div:first-child::before{background:var(--acc)}
+.ps-kpis>div:first-child{background:linear-gradient(140deg,var(--t),var(--t2));border-color:transparent;color:#fff}.ps-kpis>div:first-child::before{background:var(--acc)}
 .ps-kpis>div:first-child span,.ps-kpis>div:first-child small{color:#bfe0d9}.ps-kpis>div:first-child b{color:#fff}
 .ps-kpis span{display:block;font:600 11.5px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
 .ps-kpis b{display:block;font-family:Archivo,sans-serif;font-stretch:85%;font-weight:800;font-size:38px;margin:8px 0 2px;font-variant-numeric:tabular-nums;color:var(--ink)}
@@ -309,7 +338,7 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps-2col{display:grid;grid-template-columns:1fr 1fr;gap:40px}
 /* bars */
 .pb{display:grid;gap:10px}.pb-r{display:grid;grid-template-columns:240px 1fr 110px;gap:12px;align-items:center;font-size:14px}.pb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
-.pb-t{position:relative;height:18px;background:#eef2f0;border-radius:9px}.pb-b{height:100%;background:linear-gradient(90deg,#0b3f3a,#1f8a7a);border-radius:9px}
+.pb-t{position:relative;height:18px;background:#eef2f0;border-radius:9px}.pb-b{height:100%;background:linear-gradient(90deg,var(--t2),var(--t3));border-radius:9px}
 .pb-m{position:absolute;top:-4px;bottom:-4px;width:3px;border-radius:2px;background:var(--acc)}
 .pb-v{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px}.pb-v small{display:block;font-family:'IBM Plex Sans',sans-serif;font-weight:500;color:var(--mute);font-size:11.5px}
 .ps-foot{font-size:12.5px;color:var(--mute);margin:8px 0 0}.ps-flag{margin-top:16px;background:#fef3f2;color:#b42318;border-radius:8px;padding:10px 12px;font-size:15px}
@@ -330,10 +359,10 @@ body.prs-on .toast,body.prs-on #toast{z-index:9600!important}
 .ps-dec{font-size:22px;line-height:1.45;padding:0;list-style:none;counter-reset:d}
 .ps-dec li{counter-increment:d;position:relative;padding:12px 16px 12px 66px;margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:12px}
 .ps-dec li::before{content:counter(d);position:absolute;left:16px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:var(--t);color:#fff;font:700 17px Archivo,sans-serif;display:grid;place-items:center}
-.ps-sum{position:absolute;left:64px;right:64px;bottom:58px;background:linear-gradient(120deg,#0b3f3a,#0f5a52 60%,#13756a);color:#fff;font-size:24px;text-align:center;padding:18px;border-radius:14px;box-shadow:0 12px 30px -10px rgba(11,63,58,.6)}
+.ps-sum{position:absolute;left:64px;right:64px;bottom:58px;background:linear-gradient(120deg,var(--t2),var(--t) 60%,var(--t3));color:#fff;font-size:24px;text-align:center;padding:18px;border-radius:14px;box-shadow:0 12px 30px -10px rgba(11,63,58,.6)}
 .ps-sum b{font-family:Archivo,sans-serif;font-stretch:85%;font-size:28px;color:#fff}
 .pm{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end}.pm-c{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-.pm-b{width:68%;background:linear-gradient(180deg,#1f8a7a,#0b3f3a);border-radius:5px 5px 0 0}.pm-v{font:500 10.5px 'IBM Plex Mono',monospace;color:var(--mute);margin-bottom:3px;white-space:nowrap}
+.pm-b{width:68%;background:linear-gradient(180deg,var(--t3),var(--t2));border-radius:5px 5px 0 0}.pm-v{font:500 10.5px 'IBM Plex Mono',monospace;color:var(--mute);margin-bottom:3px;white-space:nowrap}
 .pm-l{font-size:11.5px;color:var(--mute);margin-top:4px;border-top:1px solid #cfd8d5;width:100%;text-align:center;padding-top:3px}
 .ps-chk small{color:var(--mute)}.ps-chk .ps-pri{margin-right:4px}
 #prsPrint{display:none}
@@ -6262,7 +6291,8 @@ function prsDeckDept(D){
     ...D.preqs.slice(0,2).map(r=>`Set the board price for ${r.item}`)];
   const S_ = [];
   S_.push({ id:'cover', title:'Cover', html:() => `<div class="ps-cover"><div class="ps-eyebrow">${esc(D.company?.name||'')} · ${Y} budget</div><h1>${esc(dn)}</h1><div class="ps-sub">Department budget review</div>
-      <div class="ps-meta">${D.by?`Presented by <b>${esc(D.by)}</b>`:''}${D.head?` · Department head <b>${esc(D.head)}</b>`:''}<br>Status: <b>${esc(STATUS_LABEL[D.budget.status]||D.budget.status)}</b> · Version ${D.budget.version}</div></div>`,
+      <div class="ps-meta">${D.by?`Presented by <b>${esc(D.by)}</b>`:''}${D.head?` · Department head <b>${esc(D.head)}</b>`:''}<br>Status: <b>${esc(STATUS_LABEL[D.budget.status]||D.budget.status)}</b> · Version ${D.budget.version}</div>
+      ${(()=>{ const th = PRS_THEMES[(D.dept?.code||'').toUpperCase()]; return th ? `<div class="ps-finish">Cover finish<b>${esc(th.finish)}</b></div>` : ''; })()}</div>`,
     notes:() => `Introduce the ${dn} ${Y} budget: ${short(tot)} in total (${short(D.opexT)} OPEX, ${short(D.capexT)} CAPEX). Status: ${STATUS_LABEL[D.budget.status]||D.budget.status}.` });
   S_.push({ id:'ask', title:'The ask', live:()=>{ S.tab='opex'; go('budget', D.budget.id); }, html:() => `<h2>The ask — ${Y}</h2>
       <div class="ps-kpis sm"><div><span>OPEX ${Y}</span><b>${short(D.opexT)}</b><small>${D.opex.length} lines</small></div><div><span>CAPEX ${Y}</span><b>${short(D.capexT)}</b><small>${D.capex.length} item${D.capex.length===1?'':'s'}</small></div>
@@ -6339,9 +6369,19 @@ function prsOpen(D, deck, meta){
   document.body.classList.add('prs-on'); prsShow(); prsFit();
 }
 // the slide frame: brand mark, kicker (number + deck), body, footer with logo
+const PRS_THEMES = {
+  PROD:{ cls:'th-prod', finish:'Walnut woodgrain', why:'warm wood — the boards the presses make', t:'6B4226', t2:'38200F' },
+  ENG:{ cls:'th-eng', finish:'Brushed graphite metal', why:'machines and maintenance', t:'3D4A57', t2:'1B222A' },
+  QA:{ cls:'th-qa', finish:'White marble, high gloss', why:'a flawless surface — what QA/QC checks for', t:'2F5D8A', t2:'1C3A57' },
+  WH:{ cls:'th-wh', finish:'Natural oak woodgrain', why:'stacks of boards in storage', t:'8A6534', t2:'4A3416' },
+  LOG:{ cls:'th-log', finish:'Slate stone', why:'built for the road', t:'36525F', t2:'16262E' },
+  ADMIN:{ cls:'th-admin', finish:'Forest linen', why:'the company colour, finished in linen texture', t:'0F5A52', t2:'0B3F3A' },
+  IT:{ cls:'th-it', finish:'Carbon matte', why:'the technology behind the plant', t:'2E333B', t2:'111317' },
+  PPIC:{ cls:'th-ppic', finish:'Terracotta solid matte', why:'planning — warm, steady, on schedule', t:'9C4A2A', t2:'4F2010' } };
+const prsTheme = () => PRS.D?.kind==='plant' ? null : PRS_THEMES[(PRS.D?.dept?.code||'').toUpperCase()] || null;
 function prsFrame(s, k, n, extra=''){
   const lg = LOGOS[(PRS.D.company?.code||'').toUpperCase()], nn = String(k+1).padStart(2,'0');
-  return `<div class="ps ps-s-${s.id}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
+  return `<div class="ps ps-s-${s.id} ${prsTheme()?.cls||''}">${lg?`<img class="ps-logo" src="${lg}" alt="">`:''}<i class="ps-mark"></i><div class="ps-kick"><b>${nn}</b>${esc(PRS.meta.label)}</div>
     <div class="ps-in">${s.html()}</div><div class="ps-foot-bar"><span>${lg?`<img src="${lg}" alt="">`:''}${esc(PRS.meta.label)}${esc(extra)}</span><span class="ps-pg"><b>${nn}</b> / ${String(n).padStart(2,'0')}</span></div></div>`;
 }
 const prsVisible = () => PRS.deck.filter(s=>!PRS.hidden.has(s.id));
@@ -6423,7 +6463,7 @@ async function prsPptx(){
   toast('Building the PowerPoint…');
   try { await prsLoadPptx(); } catch(e){ return fail(e); }
   const D = PRS.D, Y = D.Y, P = new PptxGenJS(); P.layout = 'LAYOUT_WIDE'; P.author = S.me.full_name || ''; P.company = D.company?.name || ''; P.title = PRS.meta.file;
-  const T = '0F5A52', INK = '1D2939', MUTE = '667085', F = 'Arial', lg = LOGOS[(D.company?.code||'').toUpperCase()];
+  const TH = prsTheme(), T = TH?.t || '0F5A52', T2 = TH?.t2 || '0B3F3A', INK = '1D2939', MUTE = '667085', F = 'Arial', lg = LOGOS[(D.company?.code||'').toUpperCase()];
   const asof = `Figures as of ${D.at.toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`;
   const ACC = 'E0531F', PAPER = 'FBFAF6', LINE = 'E3E8E5'; let pno = 0; const nTot = prsVisible().length;
   const deco = s => { s.addShape(P.ShapeType.roundRect, { x:11.9, y:-1.1, w:2.2, h:2.2, rotate:45, fill:{ color:T, transparency:94 }, line:{ type:'none' }, rectRadius:0.2 });
@@ -6446,18 +6486,18 @@ async function prsPptx(){
   const tbl = (s, head, rows, y, colW, x) => s.addTable([head.map(h=>({ text:String(h).toUpperCase(), options:{ bold:true, color:'FFFFFF', fill:{ color:INK }, fontFace:'Consolas', fontSize:9 } })),
       ...rows.map((r,i)=>r.map(c=>{ const o = typeof c==='object' && c ? c : { text:String(c??'') }; return { text:o.text, options:{ ...(o.options||{}), fill:{ color:i%2?'F7F9F8':'FFFFFF' } } }; }))],
     { x:x ?? 0.6, y, w:x!=null ? colW.reduce((a,b)=>a+b,0) : 12.13, colW, fontFace:F, fontSize:10.5, color:INK, border:{ type:'solid', color:LINE, pt:0.5 }, autoPage:false, valign:'middle', margin:[4,6,4,6] });
-  const coverDeco = s => { s.background = { color:'0B3F3A' }; s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
+  const coverDeco = s => { s.background = { color:TH?.cls==='th-qa' ? 'EFECE6' : T2 }; if (TH) s.addText(`Cover finish: ${TH.finish}`, { x:8.4, y:6.55, w:4.4, h:0.3, fontFace:'Consolas', fontSize:10, color:TH.cls==='th-qa'?'5F6F6B':'C9D6D3', align:'right' }); s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
     s.addShape(P.ShapeType.roundRect, { x:9.7, y:2.4, w:2.3, h:2.3, rotate:45, fill:{ color:ACC }, line:{ type:'none' }, rectRadius:0.2 }); if (lg) { s.addShape(P.ShapeType.roundRect, { x:0.75, y:0.6, w:1.9, h:0.85, fill:{ color:'FFFFFF' }, line:{ type:'none' }, rectRadius:0.1 }); s.addImage({ data:lg, x:0.85, y:0.67, w:1.7, h:0.71, sizing:{ type:'contain', w:1.7, h:0.71 } }); } };
   const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl, coverDeco, ACC };
   for (const sl of prsVisible()) {
     pno++; const s = P.addSlide(); s.addNotes([sl.notes?sl.notes():'', prsMyNote(sl.id)].filter(Boolean).join('\n\n'));
     if (sl.pptx) { sl.pptx(s, H); continue; }
     const tot = D.opexT + D.capexT;
-    if (sl.id==='cover') { coverDeco(s);
-      s.addText(`${D.company?.name||''} · ${Y} budget`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:F, fontSize:16, color:'CFE3DF' });
-      s.addText(D.dept.name, { x:0.6, y:2.5, w:12, h:1.1, fontFace:F, fontSize:48, bold:true, color:'FFFFFF' });
-      s.addText('Department budget review', { x:0.6, y:3.6, w:12, h:0.5, fontFace:F, fontSize:22, color:'FFFFFF' });
-      s.addText(`${D.by?'Presented by '+D.by:''}${D.head?'  ·  Department head '+D.head:''}\n${STATUS_LABEL[D.budget.status]||D.budget.status} · Version ${D.budget.version} · ${asof}`, { x:0.6, y:5.3, w:12, h:0.9, fontFace:F, fontSize:14, color:'CFE3DF' }); continue; }
+    if (sl.id==='cover') { coverDeco(s); const lt = TH?.cls==='th-qa', cA = lt?'33413D':'CFE3DF', cB = lt?'14231F':'FFFFFF';
+      s.addText(`${D.company?.name||''} · ${Y} budget`, { x:0.6, y:2.0, w:12, h:0.4, fontFace:F, fontSize:16, color:cA });
+      s.addText(D.dept.name, { x:0.6, y:2.5, w:12, h:1.1, fontFace:F, fontSize:48, bold:true, color:cB });
+      s.addText('Department budget review', { x:0.6, y:3.6, w:12, h:0.5, fontFace:F, fontSize:22, color:cB });
+      s.addText(`${D.by?'Presented by '+D.by:''}${D.head?'  ·  Department head '+D.head:''}\n${STATUS_LABEL[D.budget.status]||D.budget.status} · Version ${D.budget.version} · ${asof}`, { x:0.6, y:5.3, w:12, h:0.9, fontFace:F, fontSize:14, color:cA }); continue; }
     if (sl.id==='ask') { base(s, `The ask — ${Y}`);
       kpis(s, [[`OPEX ${Y}`, short(D.opexT), `${D.opex.length} lines`], [`CAPEX ${Y}`, short(D.capexT), `${D.capex.length} items`], [`${Y-1} budget (OPEX)`, D.lyBud?short(D.lyBud):'—', D.lyBud?prsPct(D.opexT,D.lyBud)+' vs this':''], [`${Y-1} full-year view`, D.lyView?short(D.lyView):'—', D.lyClosed?`actuals Jan–${MONTHS[D.lyClosed-1]} + projection`:'']]);
       s.addText(D.lyView?`OPEX is ${prsPct(D.opexT, D.lyView)} (${D.opexT>=D.lyView?'+':'−'}${short(Math.abs(D.opexT-D.lyView))}) against what ${D.dept.name} is on track to spend in ${Y-1}.`:`No ${Y-1} actuals to compare with.`, { x:0.5, y:3.0, w:12.3, h:0.7, fontFace:F, fontSize:20, color:D.lyView&&D.opexT>D.lyView?'B42318':INK });
@@ -6689,8 +6729,8 @@ function prsDeckPlant(D){
   const ppbBehind = (k, w) => { const R = ppbRows(k); return R.length ? `<table class="ps-tbl" style="margin-top:10px;font-size:13px"><thead><tr><th></th><th class="r">OPEX</th><th class="r">Boards ${w}</th><th class="r">Per board</th></tr></thead><tbody>${R.map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td><td class="r"><b>${r[3]}</b></td></tr>`).join('')}</tbody></table>` : ''; };
   const ppbMoved = D.lyView && vP?.fy0 && vS?.fy0 ? `${Y} vs ${Y-1} full year: OPEX ${prsPct(D.opexT, D.lyView)} (${short(D.lyView)} → ${short(D.opexT)}) · boards produced ${prsPct(vN(vP), vP.fy0)} (${prsNum(vP.fy0)} → ${prsNum(vN(vP))}) · boards sold ${prsPct(vN(vS), vS.fy0)} (${prsNum(vS.fy0)} → ${prsNum(vN(vS))}). Cost per board rises when OPEX grows faster than volume.` : '';
   if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
-      <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}${ppbBehind('prodX', 'produced')}</div>
-      <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}${ppbBehind('soldX', 'sold')}</div></div>
+      <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'var(--t)':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}${ppbBehind('prodX', 'produced')}</div>
+      <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'var(--t)':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}${ppbBehind('soldX', 'sold')}</div></div>
       ${ppbMoved ? `<p class="ps-big" style="font-size:17px;margin-top:14px">${ppbMoved}</p>` : ''}
       <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${[['produced',vP],['sold',vS]].map(([k,v])=>`boards ${k} ${v?`(${prsNum(vN(v))}, ${vL(v, Y)})`:''}`).join('; ')}.</p>`,
     notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),

@@ -6262,9 +6262,9 @@ async function prsPptx(){
     s.addText(String(k[0]).toUpperCase(), { x:x+0.2, y:y+0.1, w:2.6, h:0.3, fontFace:'Consolas', fontSize:9, color:hero?'BFE0D9':MUTE, charSpacing:1 });
     s.addText(k[1], { x:x+0.2, y:y+0.42, w:2.6, h:0.55, fontFace:F, fontSize:26, bold:true, color:hero?'FFFFFF':INK });
     if (k[2]) s.addText(k[2], { x:x+0.2, y:y+0.98, w:2.6, h:0.35, fontFace:F, fontSize:9.5, color:hero?'BFE0D9':MUTE }); });
-  const tbl = (s, head, rows, y, colW) => s.addTable([head.map(h=>({ text:String(h).toUpperCase(), options:{ bold:true, color:'FFFFFF', fill:{ color:INK }, fontFace:'Consolas', fontSize:9 } })),
+  const tbl = (s, head, rows, y, colW, x) => s.addTable([head.map(h=>({ text:String(h).toUpperCase(), options:{ bold:true, color:'FFFFFF', fill:{ color:INK }, fontFace:'Consolas', fontSize:9 } })),
       ...rows.map((r,i)=>r.map(c=>{ const o = typeof c==='object' && c ? c : { text:String(c??'') }; return { text:o.text, options:{ ...(o.options||{}), fill:{ color:i%2?'F7F9F8':'FFFFFF' } } }; }))],
-    { x:0.6, y, w:12.13, colW, fontFace:F, fontSize:10.5, color:INK, border:{ type:'solid', color:LINE, pt:0.5 }, autoPage:false, valign:'middle', margin:[4,6,4,6] });
+    { x:x ?? 0.6, y, w:x!=null ? colW.reduce((a,b)=>a+b,0) : 12.13, colW, fontFace:F, fontSize:10.5, color:INK, border:{ type:'solid', color:LINE, pt:0.5 }, autoPage:false, valign:'middle', margin:[4,6,4,6] });
   const coverDeco = s => { s.background = { color:'0B3F3A' }; s.addShape(P.ShapeType.roundRect, { x:8.6, y:1.2, w:5.2, h:5.2, rotate:45, fill:{ color:'FFFFFF', transparency:100 }, line:{ color:'FFFFFF', transparency:80, width:1.5 }, rectRadius:0.4 });
     s.addShape(P.ShapeType.roundRect, { x:9.7, y:2.4, w:2.3, h:2.3, rotate:45, fill:{ color:ACC }, line:{ type:'none' }, rectRadius:0.2 }); if (lg) { s.addShape(P.ShapeType.roundRect, { x:0.75, y:0.6, w:1.9, h:0.85, fill:{ color:'FFFFFF' }, line:{ type:'none' }, rectRadius:0.1 }); s.addImage({ data:lg, x:0.85, y:0.67, w:1.7, h:0.71, sizing:{ type:'contain', w:1.7, h:0.71 } }); } };
   const H = { P, T, INK, MUTE, F, lg, asof, base, kpis, tbl, coverDeco, ACC };
@@ -6367,10 +6367,14 @@ async function prsGatherPlant(){
   const perY = await Promise.all([Y-3, Y-2, Y-1].map(async y => { try {
       const [ac, K] = await Promise.all([fetchAll(()=>sb.from('bgt_actuals').select('month,amount').eq('year', y).eq('kind','opex').eq('excluded', false)), loadKpis(y).catch(()=>[])]); if (!ac.length) return null;
       const g = (m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
-      const f = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)>0 && ac.some(a=>a.month===mo)); return ms.length ? sum(ac.filter(a=>ms.includes(a.month)).map(a=>Number(a.amount)))/sum(ms.map(mo=>g(m,mo))) : null; };
-      return { y, prod:f('production_output'), sold:f('volume_sold') }; } catch(e){ return null; } }));
+      // OPEX and boards over the months that have both, kept so the slide can show what the per-board figure is made of
+      const fx = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)>0 && ac.some(a=>a.month===mo)); if (!ms.length) return null;
+        const o = sum(ac.filter(a=>ms.includes(a.month)).map(a=>Number(a.amount))), b = sum(ms.map(mo=>g(m,mo))); return { v:o/b, opex:o, boards:b, n:ms.length, last:Math.max(...ms) }; };
+      const P = fx('production_output'), Sx = fx('volume_sold');
+      return { y, prod:P?.v ?? null, sold:Sx?.v ?? null, prodX:P, soldX:Sx }; } catch(e){ return null; } }));
   per.push(...perY.filter(Boolean));
-  per.push({ y:Y, prod:vol.production_output?.run ? opexT/vN(vol.production_output) : null, sold:vol.volume_sold?.run ? opexT/vN(vol.volume_sold) : null, budget:true });
+  { const bp = vol.production_output?.run ? vN(vol.production_output) : null, bs = vol.volume_sold?.run ? vN(vol.volume_sold) : null;
+    per.push({ y:Y, prod:bp ? opexT/bp : null, sold:bs ? opexT/bs : null, prodX:bp ? { opex:opexT, boards:bp, n:12 } : null, soldX:bs ? { opex:opexT, boards:bs, n:12 } : null, budget:true }); }
   // the cost outlook: standard prices and indicators
   const [{ data:std }, { data:asm }, { data:rep }] = await Promise.all([
     sb.from('bgt_price_items').select('item,unit,unit_price,source_type,notes').eq('budget_year', Y).eq('active', true),
@@ -6468,13 +6472,25 @@ function prsDeckPlant(D){
   S_.push({ id:'plines', title:'By expense line', html:() => `<h2>By expense line <small>top 10, OPEX</small></h2>${prsBars(li.map(x=>({ label:prsLi(x.item), v:x.amt, v2:x.lyView||null, note:x.lyView?prsPct(x.amt,x.lyView):'new' })), Math.max(...li.map(x=>Math.max(x.amt,x.lyView)),1))}<p class="ps-foot">Bar = ${Y}; tick = ${Y-1} full-year view.</p>`,
     notes:() => li.slice(0,5).map(x=>`${prsLi(x.item)} ${short(x.amt)} (${x.lyView?prsPct(x.amt,x.lyView):'new'})`).join('; '),
     pptx:(s, H) => { H.base(s, 'By expense line', 'top 10, OPEX'); const r = li.slice().reverse(); s.addChart(H.P.ChartType.bar, [{ name:String(Y), labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.amt)) }, { name:`${Y-1} full-year view`, labels:r.map(x=>prsLi(x.item)), values:r.map(x=>Math.round(x.lyView)) }], { x:0.4, y:1.5, w:12.5, h:5.6, barDir:'bar', barGrouping:'clustered', chartColors:[H.T,'B8C9C5'], catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', showLegend:true, legendPos:'b', legendFontSize:9 }); } });
+  // what each per-board figure is made of, and what moved vs last year's full year (OPEX vs boards)
+  const ppbRows = k => D.per.filter(p=>p[k]).map(p=>[p.budget?`${p.y} budget`:`${p.y}${p[k].n<12?' ('+thru(p[k].last)+')':''}`, short(p[k].opex), prsNum(p[k].boards), peso(p[k].v ?? p[k].opex/p[k].boards, 0)]);
+  const ppbBehind = (k, w) => { const R = ppbRows(k); return R.length ? `<table class="ps-tbl" style="margin-top:10px;font-size:13px"><thead><tr><th></th><th class="r">OPEX</th><th class="r">Boards ${w}</th><th class="r">Per board</th></tr></thead><tbody>${R.map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td><td class="r"><b>${r[3]}</b></td></tr>`).join('')}</tbody></table>` : ''; };
+  const ppbMoved = D.lyView && vP?.fy0 && vS?.fy0 ? `${Y} vs ${Y-1} full year: OPEX ${prsPct(D.opexT, D.lyView)} (${short(D.lyView)} → ${short(D.opexT)}) · boards produced ${prsPct(vN(vP), vP.fy0)} (${prsNum(vP.fy0)} → ${prsNum(vN(vP))}) · boards sold ${prsPct(vN(vS), vS.fy0)} (${prsNum(vS.fy0)} → ${prsNum(vN(vS))}). Cost per board rises when OPEX grows faster than volume.` : '';
   if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
-      <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}</div>
-      <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}</div></div>
+      <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}${ppbBehind('prodX', 'produced')}</div>
+      <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}${ppbBehind('soldX', 'sold')}</div></div>
+      ${ppbMoved ? `<p class="ps-big" style="font-size:17px;margin-top:14px">${ppbMoved}</p>` : ''}
       <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${[['produced',vP],['sold',vS]].map(([k,v])=>`boards ${k} ${v?`(${prsNum(vN(v))}, ${vL(v, Y)})`:''}`).join('; ')}.</p>`,
     notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),
     pptx:(s, H) => { H.base(s, 'Plant OPEX per board'); const P2 = D.per.filter(p=>p.prod||p.sold);
       s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.5, w:12.3, h:5.3, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });
+  { const sl = S_.find(x=>x.id==='punit'); if (sl) sl.pptx = (s, H) => { H.base(s, 'Plant OPEX per board');
+      const P2 = D.per.filter(p=>p.prod||p.sold), lab = P2.map(p=>p.budget?`${p.y} budget`:String(p.y));
+      s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:lab, values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:lab, values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.4, w:5.6, h:4.6, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:9, valAxisHidden:true, showLegend:true, legendPos:'b' });
+      const pr = ppbRows('prodX'), so = ppbRows('soldX');
+      if (pr.length) H.tbl(s, ['Produced','OPEX','Boards','Per board'], pr, 1.4, [1.9,1.4,1.4,1.2], 6.5);
+      if (so.length) H.tbl(s, ['Sold','OPEX','Boards','Per board'], so, 1.4 + 0.4*(pr.length+2), [1.9,1.4,1.4,1.2], 6.5);
+      if (ppbMoved) s.addText(ppbMoved, { x:0.5, y:6.2, w:12.3, h:0.8, fontFace:'Arial', fontSize:12, bold:true, color:'1F2A27' }); }; }
   if (D.elec) { const E = D.elec; S_.push({ id:'pelec', title:'Electricity', live:()=>{ S.rc.kind='utility'; S.rc.uRes='Electricity'; S.rc.uDept=''; S.rc.uSec=''; S.rc.year=E.y; go('records'); }, html:() => `<h2>Electricity <small>${E.y}, ${E.months} months of bills</small></h2>
       ${kp([['Meralco main bill', short(E.gridA), `${prsNum(E.gridQ)} kWh · ${E.rate?peso(E.rate,2)+'/kWh':''}`], ...E.shared.map(x=>[`Charged to ${x.c}`, short(x.a), `${prsNum(x.q)} kWh`]), ["WCLI's own cost", short(E.own), 'main bill − shared'], ['Solar generated', E.solarQ?prsNum(E.solarQ)+' kWh':'—', E.avoided?`${short(E.avoided)} grid cost avoided`:'not recorded yet']].slice(0,4))}
       <p class="ps-big">${E.solarQ?`Solar covered <b>${Math.round(100*E.solarQ/(E.gridQ+E.solarQ))}%</b> of the plant's electricity and saved about <b>${short(E.avoided)}</b> at the Meralco rate.`:`Electricity for ${Y} is priced at the standard rate from the outlook${stdOf(/electric/i)?` (${peso(stdOf(/electric/i).unit_price,2)}/kWh)`:''}.`}</p>`,

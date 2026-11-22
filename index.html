@@ -2819,13 +2819,24 @@ const KPI_DEFS = [
   ['oee_press1_pct','OEE — Press 1','%','pct'],['oee_press2_pct','OEE — Press 2','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;
+// who enters which measure — the same rule is enforced in the database (bgt_kpi_can_edit)
+const KPI_EDIT = {
+  PROD: k => ['production_output','yield_actual_pct','reject_pct','production_required'].includes(k) || k.startsWith('fi_'),
+  ENG: k => ['oee_press1_pct','oee_press2_pct'].includes(k),
+  WH: k => ['volume_imported','raw_boards_imported'].includes(k), PPIC: k => ['volume_imported','raw_boards_imported'].includes(k), LOG: k => ['volume_imported','raw_boards_imported'].includes(k),
+  ADMIN: k => ['sales_target','sales_actual','volume_target','volume_sold'].includes(k) };
+const myKpiDept = () => S.preview || !['preparer','dept_manager'].includes(S.me?.role) ? null : (deptById(S.me.department_id)?.code || null);
+const canEditKpi = k => !S.preview && (canManageData() || !!(KPI_EDIT[myKpiDept()] && KPI_EDIT[myKpiDept()](k)));
+const anyKpiEdit = () => KPI_DEFS.some(d => canEditKpi(d[0]));
+const canRemarkKpi = () => !S.preview && (canManageData() || !!KPI_EDIT[myKpiDept()]);
 S.pf = { year:null };
 async function loadKpis(year){ const k = 'k'+year; if (S.ol.cache[k]) return S.ol.cache[k]; const { data, error } = await sb.from('bgt_kpis').select('*').eq('year', year); if (error) throw error; return (S.ol.cache[k] = data||[]); }
 async function renderPerf(){
   mainLoading('Loading performance…');
   try {
     if (!S.pf.year) S.pf.year = S.act.year || new Date().getFullYear();
-    const Y = S.pf.year, K = await loadKpis(Y), ed = canManageData(), rv = isReviewer();
+    const Y = S.pf.year, K = await loadKpis(Y), ed = anyKpiEdit(), rv = isReviewer(), mine = KPI_DEFS.filter(d=>canEditKpi(d[0]) && d[0]!=='production_required').map(d=>d[1]);
+    const RM = await loadKpiRemarks(Y);
     const D = await loadYearData(Y, null).catch(()=>null), M = D ? actModel(D,'budget') : null;
     const g = (m, mo) => { const r = K.find(x=>x.metric===m && x.month===mo); return r ? Number(r.value) : null; };
     const tot = m => { const a = g(m,0); if (a!=null) return a; const v = MONTHS.map((_,i)=>g(m,i+1)).filter(x=>x!=null); return v.length ? ((ALL_KPI().find(d=>d[0]===m)||[])[3]==='pct' ? sum(v)/v.length : sum(v)) : null; };
@@ -2833,7 +2844,7 @@ async function renderPerf(){
     const fmt = (t, v) => v==null ? '' : t==='money' ? peso(v) : t==='pct' ? v.toFixed(1)+'%' : Number(v).toLocaleString('en-PH');
     const ph = (k,t) => { const v = tot(k); return v==null ? '' : t==='pct' ? v.toFixed(2) : Math.round(v); };
     const kRow = ([k,l,u,t]) => `<tr><td class="act" style="white-space:nowrap">${l}<div class="item" style="text-transform:none">${u}</div></td>${[...MONTHS.map((_,i)=>i+1),0].map(mo=>{ const v = g(k,mo);
-        return `<td class="r">${ed&&k!=='production_required'?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${ph(k,t)}"`:''}>`:`<span class="num">${t==='pct'&&(mo===0?tot(k):v)!=null?(mo===0?tot(k):v).toFixed(2)+'%':fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`;
+        return `<td class="r">${canEditKpi(k)&&k!=='production_required'?`<input class="inp num kv" data-k="${k}" data-m="${mo}" type="number" step="any" value="${v??''}" ${mo===0?`placeholder="${ph(k,t)}"`:''}>`:`<span class="num">${t==='pct'&&(mo===0?tot(k):v)!=null?(mo===0?tot(k):v).toFixed(2)+'%':fmt(t, mo===0?tot(k):v)}</span>`}</td>`; }).join('')}</tr>`;
     const ytd = m => { const v = MONTHS.map((_,i)=>i<closed?g(m,i+1):null).filter(x=>x!=null); return v.length ? sum(v) : null; };
     // sales and volume: every month entered; OPEX ratios: only months that have both OPEX actuals and the figure
     const avail = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)!=null); return ms.length ? { sum:sum(ms.map(mo=>g(m,mo))), last:Math.max(...ms), n:ms.length, ms } : null; };
@@ -2849,7 +2860,7 @@ async function renderPerf(){
       <div class="sub">Sales targets and results, production volume and plant measures, set against plant OPEX. Fill in what is available — every figure helps size volume-driven costs.</div></div>
       <div class="actions">${ed?'<button class="btn" onclick="importKpiDialog()">Import Excel</button>':''}<button class="btn ghost" onclick="exportKpiTemplate()">Download ${ed?'template / ':''}data</button></div></div>
     <div class="toolbar card" style="margin-bottom:16px;border-radius:var(--r)"><div class="field" style="margin:0"><label for="pfYear">Year</label><select class="inp" id="pfYear" onchange="S.pf.year=Number(this.value);renderPerf()">${years.map(y=>`<option ${y===Y?'selected':''}>${y}</option>`).join('')}</select></div>
-      <span class="grow"></span><span class="hint">${ed?'Type values directly in the table, then Save. Use the Year column for annual targets.':'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
+      <span class="grow"></span><span class="hint">${canManageData()?'Type values directly in the table, then Save. Use the Year column for annual targets.':ed?`You enter: ${mine.join(', ')}. Type them in the table, then Save. Other figures are kept by the Head of Plant Operations.`:'Read only — the Head of Plant Operations maintains these figures.'}</span></div>
     <div class="stats">
       ${!rv?'':`<div class="stat"><div class="eyebrow">Sales ${sA?thru(sA.last):''}</div><div class="v">${sA?short(sA.sum):'—'}</div><div class="s">${sT?`Target same months ${short(sT)} · ${Math.round(100*sA.sum/sT)}% reached`:tot('sales_target')!=null?`Target ${Y}: ${short(tot('sales_target'))}`:'No target entered'}</div></div>`}
       <div class="stat"><div class="eyebrow">Boards sold ${vA?thru(vA.last):''}</div><div class="v">${vA?Math.round(vA.sum).toLocaleString('en-PH'):'—'}</div><div class="s">${vT?`Target same months ${Math.round(vT).toLocaleString('en-PH')} · ${Math.round(100*vA.sum/vT)}% reached`:sA&&vA?`Average ${peso(sA.sum/vA.sum)} per board`:''}${pA?` · produced ${Math.round(pA.sum).toLocaleString('en-PH')}`:''}</div></div>
@@ -2859,7 +2870,7 @@ async function renderPerf(){
     ${perfYieldStrip(Y, g, tot)}
     ${!closed && (sA||vA) ? `<div class="banner blue">Sales and volume for ${Y} are recorded. Plant OPEX per board and OPEX as % of sales need ${Y} expense actuals${canManageData()?' — upload them on the Actuals page':''}.</div>` : ''}
     <div class="card"><h3>Monthly figures</h3><div class="tbl-wrap"><table class="ledger kpi" style="min-width:1200px"><thead><tr><th>Measure</th>${MONTHS.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">Year</th></tr></thead><tbody>
-      ${KPI_DEFS.filter(d=>rv||!d[0].startsWith('sales_')).map(kRow).join('')}
+      ${KPI_DEFS.filter(d=>rv||!d[0].startsWith('sales_')||canEditKpi(d[0])).map(kRow).join('')}
       <tr class="calc"><td class="act">${OPX()} OPEX actual<div class="item" style="text-transform:none">from Odoo actuals</div></td>${opexM.map((v,i)=>`<td class="r num">${i<closed?short(v):''}</td>`).join('')}<td class="r num">${closed?short(opexY):''}</td></tr>
       <tr class="calc"><td class="act">OPEX per board ${perLbl}</td>${opexM.map((v,i)=>{ const p = g(pP?'production_output':'volume_sold',i+1); return `<td class="r num">${i<closed&&p?peso(v/p,2):''}</td>`; }).join('')}<td class="r num">${pB?peso(pB.opex/pB.k,2):''}</td></tr>
       ${perfTradeRows(g)}
@@ -2868,6 +2879,7 @@ async function renderPerf(){
       ${!rv?'':`<tr class="calc"><td class="act">OPEX as % of sales</td>${opexM.map((v,i)=>{ const s = g('sales_actual',i+1); return `<td class="r num">${i<closed&&s?(100*v/s).toFixed(1)+'%':''}</td>`; }).join('')}<td class="r num">${pS?(100*pS.opex/pS.k).toFixed(1)+'%':''}</td></tr>`}
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
+    ${kpiRemarksCard(Y, RM)}
     <div id="pfProj"></div>
     <div class="card" style="margin-top:16px"><h3>Yield, reject rate and OEE — year by year</h3>
       <div id="fiYears" style="padding:4px 14px 12px"><span class="hint">Loading…</span></div></div>
@@ -2990,7 +3002,7 @@ async function saveKpis(Y){
   try {
     if (ups.length) { const r = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (r.error) throw r.error; }
     if (dels.length) { const r = await sb.from('bgt_kpis').delete().in('id', dels); if (r.error) throw r.error; }
-    await fillRequired(Y); delete S.ol.cache['k'+Y]; toast(ups.length+dels.length ? 'Figures saved' : 'No changes'); renderPerf();
+    if (canEditKpi('production_required')) await fillRequired(Y); delete S.ol.cache['k'+Y]; toast(ups.length+dels.length ? 'Figures saved' : 'No changes'); renderPerf();
   } catch(e){ fail(e); }
 }
 async function exportKpiTemplate(){
@@ -3000,6 +3012,29 @@ async function exportKpiTemplate(){
   ws.getColumn(1).width = 34; ws.getColumn(2).width = 18; for (let i=3;i<=15;i++){ ws.getColumn(i).width = 14; ws.getColumn(i).numFmt = '#,##0.##'; }
   ws.addRow([]); ws.addRow(['Keep the Code column. "Year" is for annual targets or totals.']);
   download(await wb.xlsx.writeBuffer(), `${Y} Sales and plant performance - ${S.company.code}.xlsx`); toast('Downloaded');
+}
+/* monthly remarks: why a month's figures moved (extended hours, job changes, holidays…) — one per department per month; Penny and the analysis read them */
+async function loadKpiRemarks(Y){ try { const { data, error } = await sb.from('bgt_kpi_remarks').select('*').eq('year', Y).order('month'); if (error) throw error; return data||[]; } catch(e){ console.warn('remarks', e); return []; } }
+function kpiRemarksCard(Y, RM){
+  const can = canRemarkKpi(), own = canManageData() ? null : S.me.department_id, who = d => d ? (deptById(d)?.name||'Department') : 'Head of Plant Operations';
+  const mineOf = m => RM.find(r=>r.month===m && (r.department_id||null)===own);
+  const months = MONTHS.map((mm,i)=>i+1).filter(m => can || RM.some(r=>r.month===m));
+  if (!months.length) return '';
+  return `<div class="card" style="margin-top:16px"><h3>Monthly remarks</h3><p class="hint" style="padding:0 14px;margin:0 0 8px">Why a month's figures moved — extended hours, job changes, holidays, a machine down. Penny and the analysis read these before judging a figure.${can?` You write as <b>${esc(who(own))}</b>.`:''}</p>
+    <div class="tbl-wrap"><table class="ledger"><tbody>${months.map(m=>{ const others = RM.filter(r=>r.month===m && (!can || (r.department_id||null)!==own));
+      return `<tr><td class="act" style="width:70px;vertical-align:top">${MONTHS[m-1]}</td><td>${others.map(r=>`<div style="font-size:13px;margin-bottom:4px"><b>${esc(who(r.department_id))}:</b> ${esc(r.body)}</div>`).join('')}
+        ${can?`<textarea class="inp kr" data-m="${m}" rows="1" style="min-height:34px" placeholder="Remark for ${MONTHS[m-1]} ${Y} (optional)">${esc(mineOf(m)?.body||'')}</textarea>`:''}</td></tr>`; }).join('')}</tbody></table></div>
+    ${can?`<div style="padding:12px 14px;text-align:right"><button class="btn" onclick="saveKpiRemarks(${Y})">Save remarks</button></div>`:''}</div>`;
+}
+async function saveKpiRemarks(Y){
+  const own = canManageData() ? null : S.me.department_id, RM = await loadKpiRemarks(Y), now = new Date().toISOString();
+  try {
+    for (const e of document.querySelectorAll('.kr')) { const m = Number(e.dataset.m), v = e.value.trim(), ex = RM.find(r=>r.month===m && (r.department_id||null)===own);
+      if (ex && !v) { const r = await sb.from('bgt_kpi_remarks').delete().eq('id', ex.id); if (r.error) throw r.error; }
+      else if (ex && v !== ex.body) { const r = await sb.from('bgt_kpi_remarks').update({ body:v, updated_by:S.me.id, updated_at:now }).eq('id', ex.id); if (r.error) throw r.error; }
+      else if (!ex && v) { const r = await sb.from('bgt_kpi_remarks').insert({ company_id:S.company.id, year:Y, month:m, department_id:own, body:v, updated_by:S.me.id }); if (r.error) throw r.error; } }
+    toast('Remarks saved'); renderPerf();
+  } catch(e){ fail(e); }
 }
 function importKpiDialog(){
   modal(`<h3>Import performance figures</h3><p>Use the file from "Download template / data" (columns Code, Jan–Dec, Year). Values replace what is there for the same measure and month.</p>
@@ -3012,14 +3047,14 @@ function importKpiDialog(){
       const cv = v => (v && typeof v==='object' && 'result' in v) ? v.result : v;
       const head = ws.getRow(1).values.map(v=>String(cv(v)||'').trim().toLowerCase()), ci = head.indexOf('code');
       if (ci<1) { $('#kfMsg').textContent = 'No "Code" column found in the first row.'; return; }
-      const codes = ALL_KPI().map(d=>d[0]), ups = [];
-      for (let r=2; r<=ws.rowCount; r++) { const row = ws.getRow(r), code = String(cv(row.getCell(ci).value)||'').trim(); if (!codes.includes(code)) continue;
+      const codes = ALL_KPI().map(d=>d[0]), ups = []; let skipped = 0;
+      for (let r=2; r<=ws.rowCount; r++) { const row = ws.getRow(r), code = String(cv(row.getCell(ci).value)||'').trim(); if (!codes.includes(code)) continue; if (!canEditKpi(code)) { skipped++; continue; }
         for (let m=0; m<=12; m++) { const col = m===0 ? head.indexOf('year') : head.indexOf(MONTHS[m-1].toLowerCase()); if (col<1) continue;
           const v = cv(row.getCell(col).value); if (v==null || v==='' || isNaN(Number(v))) continue;
           ups.push({ company_id:S.company.id, year:Y, month:m, metric:code, value:Number(v), updated_by:S.me.id }); } }
       if (!ups.length) { $('#kfMsg').textContent = 'No figures found.'; return; }
       const res = await sb.from('bgt_kpis').upsert(ups, { onConflict:'company_id,year,month,metric' }); if (res.error) throw res.error;
-      await fillRequired(Y); delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported`); renderPerf();
+      if (canEditKpi('production_required')) await fillRequired(Y); delete S.ol.cache['k'+Y]; closeModal(); toast(`${ups.length} figures imported${skipped?` — ${skipped} measure${skipped>1?'s':''} skipped (entered by another department)`:''}`); renderPerf();
     } catch(e){ fail(e); }
   };
 }
@@ -6363,7 +6398,7 @@ function prsDeckPlant(D){
   const infl = D.asm.filter(x=>/inflation|wage|minimum/i.test(x.key+' '+x.label)).slice(0,3).map(x=>[x.label, `${x.value??''}${x.unit&&x.unit!=='%'?' '+x.unit:x.unit==='%'?'%':''}`]);
   S_.push({ id:'assume', title:'Assumptions', live:()=>go('outlook'), html:() => `<h2>Assumptions behind the numbers</h2><div class="ps-2col">
       <div><h3>Volume</h3>${kp([[`Boards sold ${Y-1}`, vS?prsNum(vS.fy0):'—', 'actual + projection'], [`Boards sold ${Y}`, vS?prsNum(vS.target||vS.run):'—', vS?.target?'target':'at the run rate'], [`Boards produced ${Y-1}`, vP?prsNum(vP.fy0):'—'], [`Boards produced ${Y}`, vP?prsNum(vP.target||vP.run):'—', vP?.target?'target':'at the run rate']], 'two')}
-        <p class="ps-foot">${sum(D.wd1)} working days in ${Y} (Mon–Sat, closed after Dec 23 to Jan 4)${D.vol.trade!=null?` · trade boards ≈ ${Math.round(100*D.vol.trade)}% of boards sold`:''}.</p></div>
+        <p class="ps-foot">${sum(D.wd1)} working days in ${Y} (Mon–${S.cal?.sat===false?'Fri':'Sat'}, closed after ${calTxt((S.cal||CAL_DEF).last)} to ${calTxt((S.cal||CAL_DEF).resume)}${(S.cal?.off||[]).filter(d=>d.startsWith(String(Y))).length?`, less ${(S.cal.off||[]).filter(d=>d.startsWith(String(Y))).length} holiday${(S.cal.off||[]).filter(d=>d.startsWith(String(Y))).length>1?'s':''}`:''})${D.vol.trade!=null?` · trade boards ≈ ${Math.round(100*D.vol.trade)}% of boards sold`:''}.</p></div>
       <div><h3>Cost outlook — standard prices for ${Y}</h3><table class="ps-tbl"><tbody>${[...outl, ...boards, ...infl].map(r=>`<tr><td>${esc(r[0])}</td><td class="r"><b>${esc(r[1])}</b></td></tr>`).join('') || '<tr><td>No standard prices set yet.</td></tr>'}</tbody></table>
         <p class="ps-foot">Fuel, the dollar and electricity are computed from the market outlook and what WCLI actually pays; board prices are set by the Head of Plant Operations.</p></div></div>`,
     notes:() => `Volume: boards sold ${vS?prsNum(vS.target||vS.run):'n/a'}, produced ${vP?prsNum(vP.target||vP.run):'n/a'}. ${outl.length?'Prices: '+outl.map(r=>r.join(' ')).join('; ')+'.':''}`,

@@ -161,7 +161,9 @@ ${(oi || []).map((x: any) => `- [item_id ${x.id}] ${x.kind} · ${x.status}: ${x.
     const d = deptOf(c, a.department);
     if (d) { const { data } = await c.db.from('bgt_reports').select('content,created_at').eq('year', c.Y).eq('kind', 'dept_analysis').eq('department_id', d.id).order('created_at', { ascending:false }).limit(1);
       const r = data?.[0]?.content; if (r) rep += `\n${d.name.toUpperCase()} ANALYSIS: ${r.headline}\nPLANT DIRECTION: ${(r.plant_context || []).map((x: any) => `${x.point} (${x.evidence})`).join('; ')}\nACTIONS: ${(r.recommendations || []).join(' | ')}`; }
-    return `MANAGEMENT NOTES: ${typeof bn?.value === 'string' ? bn.value.slice(0, 2500) : '(none)'}\nPLANT FIGURES (boards, %):\n${kp || '(none)'}\n${rep || '(no analysis report saved yet)'}`;
+    const { data:rm } = await c.svc.from('bgt_kpi_remarks').select('year,month,department_id,body').gte('year', c.Y - 2).order('year').order('month');
+    const rmk = (rm || []).map((x: any) => `- ${M[x.month - 1]} ${x.year}, ${x.department_id ? (c.depts.find(d => d.id === x.department_id)?.name || 'department') : 'Head of Plant Operations'}: ${x.body}`).join('\n');
+    return `MANAGEMENT NOTES: ${typeof bn?.value === 'string' ? bn.value.slice(0, 6000) : '(none)'}\nPLANT FIGURES (boards, %):\n${kp || '(none)'}\nMONTHLY REMARKS ON THE PLANT FIGURES (why a month moved — use them before judging a figure):\n${rmk || '(none)'}\n${rep || '(no analysis report saved yet)'}`;
   }
   if (name === 'list_department_budgets') {
     if (!c.rev) return 'Only reviewers can see other departments.';
@@ -240,7 +242,7 @@ CAPEX ENDORSEMENTS: ${(cx || []).map((x: any) => `${x.snapshot?.asset || 'item'}
 
 const SYSTEM = (c: Ctx, notes: string) => `You are Penny, the budget assistant inside Costline (WCLI's plant cost app — "From budget line to bottom line"). Every peso counts. You talk with ${c.me.full_name || c.me.email}, ${c.rev ? 'a reviewer who can see the whole plant' : `the ${c.depts.find(d => d.id === c.me.department_id)?.name || ''} department ${c.me.role === 'preparer' ? 'preparer' : 'manager'}`}. Budget year ${c.Y}. Today ${new Date().toISOString().slice(0, 10)}.
 Company: World Class Laminate, Inc. (WCLI), Pasig Plant, Philippines — laminated boards (melamine on MDF, PB, plywood) plus imported trade boards. Accounting (Odoo) is the official record. Salaries and benefits are budgeted by HR, not here.
-Management notes: ${notes.slice(0, 2000) || '(none)'}
+Management notes: ${notes.slice(0, 6000) || '(none)'}
 On screen: ${JSON.stringify(c.page || {}).slice(0, 400)}
 
 FINANCE RULES FOR ${c.Y} (from Finance's Budget Preparation Guide — enforce them):

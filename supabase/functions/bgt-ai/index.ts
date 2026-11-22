@@ -91,7 +91,10 @@ async function kpiText(db: SupabaseClient, year: number) {
   if (!data?.length) return 'No sales or production figures entered yet.';
   const by: Record<string, number[]> = {};
   data.forEach((k: any) => { (by[`${k.year} ${k.metric}${k.month === 0 ? ' (annual)' : ''}`] ||= []).push(Number(k.value)); });
-  return Object.entries(by).map(([k, v]) => `- ${k}: ${k.includes('annual') ? v[0] : sum(v) + ` over ${v.length} months`}`).join('\n');
+  const { data:rm } = await db.from('bgt_kpi_remarks').select('year,month,department_id,body').in('year', [year, year - 1]).order('year').order('month');
+  const rmk = (rm || []).map((x: any) => `- ${M[x.month - 1]} ${x.year}${x.department_id ? '' : ' (Head of Plant Operations)'}: ${x.body}`).join('\n');
+  return Object.entries(by).map(([k, v]) => `- ${k}: ${k.includes('annual') ? v[0] : sum(v) + ` over ${v.length} months`}`).join('\n')
+    + (rmk ? `\nMonthly remarks on these figures (why a month moved — take them into account):\n${rmk}` : '');
 }
 async function prices(db: SupabaseClient, deptId?: string) {
   const { data } = await db.from('bgt_price_items').select('item,category,unit,unit_price,supplier,quote_ref,valid_until,source_type,department_id,budget_year').eq('active', true).limit(300);
@@ -688,7 +691,7 @@ Deno.serve(async (req) => {
   if (!IS_REV) aq = me.department_id ? aq.eq('department_id', me.department_id) : aq.eq('department_id', '00000000-0000-0000-0000-000000000000');
   const { data:ans } = await aq.order('answered_at', { ascending:false }).limit(40);
   const ansTxt = (ans || []).map((a: any) => `- Q: ${String(a.question).slice(0, 300)} → A: ${String(a.answer).slice(0, 600)}`).join('\n').slice(0, 5000);
-  COMPANY = BASE_COMPANY + (notes ? `\nBusiness notes from management (follow these): ${notes.slice(0, 3000)}` : '') + (ansTxt ? `\nManagement's answers to earlier open questions (treat as facts; do not ask these again):\n${ansTxt}` : '');
+  COMPANY = BASE_COMPANY + (notes ? `\nBusiness notes from management (follow these): ${notes.slice(0, 6000)}` : '') + (ansTxt ? `\nManagement's answers to earlier open questions (treat as facts; do not ask these again):\n${ansTxt}` : '');
   const mode = body.mode;
   let result: any = null, err = '';
   try {

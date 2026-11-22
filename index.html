@@ -3996,10 +3996,10 @@ const CXA = {
   hold:{ l:'Hold for now', s:'Hold', c:'#b88a00', o:3 }, defer:{ l:'Defer to next year', s:'Defer', c:'#667085', o:4 },
   opex:{ l:'Move to OPEX', s:'OPEX', c:'#3b6fb6', o:5 }, incomplete:{ l:'No amount yet', s:'No amount', c:'#98a2b3', o:6 } };
 // words in an asset that tie it to an expense line an event raises
+// matched against the ASSET NAME only, and only clear energy / water savers (Rommel 2026-11-22: generic words like pump, cooling, exhaust gave nonsense)
 const CXA_EV = [
-  { line:'UTILITIES - ELECTRICITY', re:/solar|inverter|\bled\b|vfd|variable.?speed|capacitor|power.?factor|energy.?(sav|eff)|genset|generator|aircon|air.?con|cooling|chiller|ventilat|exhaust fan|insulat/i, why:'cuts electricity use or keeps the plant running' },
-  { line:'UTILITIES - WATER', re:/water|tank|cistern|rain.?water|deep.?well|pump/i, why:'secures water supply' },
-  { line:'REPAIRS AND MAINTENANCE - MACHINERY & EQUIPMENT', re:/cooling|chiller|ventilat|exhaust|overhaul|replace(ment)? .*motor|compressor/i, why:'reduces heat-related breakdowns' } ];
+  { line:'UTILITIES - ELECTRICITY', re:/solar|photovoltaic|\bpv\b|inverter|\bled\b|\bvfd\b|variable.?speed|capacitor bank|power.?factor|energy.?(saving|efficien)|insulation(?!\s*test)|genset|generator/i, why:'cuts electricity use or keeps the plant running in an outage' },
+  { line:'UTILITIES - WATER', re:/water (tank|storage|recycl|reuse|catchment)|rain.?water|cistern|deep.?well/i, why:'secures water supply' } ];
 const CXA_VOL = /truck|forklift|side.?loader|press\b|line \d|new line|additional line|capacity|expansion|second shift|conveyor/i;
 async function cxaContext(){
   const Y = S.cycle.year, o = await loadOutlook(Y), th = Number(S.cycle.capex_threshold)||20000;
@@ -4017,12 +4017,13 @@ function cxaAdvise(l, C){
   if (/import|usd|\$|china|japan|taiwan|germany|korea|italy/i.test(txt) && C.fx) notes.push(`Priced in dollars — peso at ${fmtVal(C.fx)}; quote at ₱62–63/$ plus freight and duties.`);
   if (!l.quote_amount && amt >= 500000) notes.push('No quotation on file yet — get one before approval.');
   const r = (rec, why) => ({ rec, why, notes, amt, m1 });
+  if (l.cxa_override && CXA[l.cxa_override]) return { ...r(l.cxa_override, `Set by the Head of Plant Operations${l.cxa_reason?`: ${l.cxa_reason}`:''}`), set:true };
   if (!amt) return r('incomplete', 'No amount yet — add the quantity and unit cost, or a quotation.');
   if (uc && uc < C.th) return r('opex', `Unit cost ${peso(uc)} is below the ₱${C.th.toLocaleString()} CAPEX threshold — budget it as OPEX (supplies, tools or IT under OPEX).`);
   if (l.useful_life_months && Number(l.useful_life_months) <= 12) return r('opex', 'Useful life of a year or less — it is an expense, not an asset.');
   // events: does this asset protect against one?
   for (const e of C.ev) for (const g of CXA_EV) {
-    const im = (e.impacts||[]).find(i=>i.line===g.line); if (!im || !g.re.test(txt)) continue;
+    const im = (e.impacts||[]).find(i=>i.line===g.line); if (!im || !g.re.test(l.asset||'')) continue;
     const first = Math.min(...(e.months||[1])), late = m1 && m1 >= first;
     return r('push', `${e.title} raises ${prsLiPlain(g.line)} +${im.likely}–${im.worst}% in ${evMonthsText(e.months)}; this ${g.why}.${late ? (first<=1 ? ` Schedule it as early as possible (Jan–Feb) instead of ${MONTHS[m1-1]}.` : ` Pay/install before ${MONTHS[first-1]} instead of ${MONTHS[m1-1]}.`) : ' Keep it early in the year.'}`);
   }
@@ -4034,7 +4035,20 @@ function cxaAdvise(l, C){
   return r('proceed', 'High priority — keep as planned.' + (pct >= 10 ? ` Prices +${pct}% expected — buy early.` : ''));
 }
 const prsLiPlain = s => String(s||'').replace(/^UTILITIES - /,'').replace(/^REPAIRS AND MAINTENANCE - /,'repairs — ').toLowerCase();
-const cxaChip = a => a ? `<span class="cxa-chip" style="--c:${CXA[a.rec].c}" title="${esc(a.why)}">${CXA[a.rec].s}</span>` : '';
+const cxaChip = a => a ? `<span class="cxa-chip" style="--c:${CXA[a.rec].c}" title="${esc(a.why)}">${CXA[a.rec].s}${a.set?' ✓':''}</span>` : '';
+// Head of Plant Operations sets the advice on an item himself (the app's own advice is shown next to it)
+function cxaSet(id){
+  const x = (S._cxa?.A||[]).find(v=>v.l.id===id); if (!x) return; const l = x.l, auto = cxaAdvise({ ...l, cxa_override:null }, S._cxa.C);
+  modal2(`<h3>${esc(l.asset||'CAPEX item')}</h3><p class="hint" style="margin-top:-6px">${esc(deptById(x.d)?.name||'')} · ${peso(x.a.amt)} · app's advice: <b>${CXA[auto.rec].l}</b> — ${esc(auto.why)}</p>
+    <div class="field"><label>Your call</label>${['push','proceed','hold','defer','opex'].map(k=>`<label style="display:block;margin:4px 0"><input type="radio" name="cxS" value="${k}" ${l.cxa_override===k?'checked':''}> ${CXA[k].l}</label>`).join('')}
+      <label style="display:block;margin:4px 0"><input type="radio" name="cxS" value="" ${!l.cxa_override?'checked':''}> Use the app's advice</label></div>
+    <div class="field"><label for="cxR">Reason (shown with the item and in the presentation)</label><textarea class="inp" id="cxR" rows="3">${esc(l.cxa_reason||'')}</textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="cxGo">Save</button></div>`);
+  $('#cxGo').onclick = async () => { const v = document.querySelector('input[name=cxS]:checked')?.value || null, why = $('#cxR').value.trim();
+    if (v && !why) { toast('Write the reason — it shows in the presentation.', true); return; }
+    const r = await sb.from('bgt_capex_lines').update({ cxa_override:v, cxa_reason:v?why:null, cxa_by:S.me.id, cxa_at:new Date().toISOString() }).eq('id', id); if (r.error) return fail(r.error);
+    closeModal2(); toast(v ? `Set: ${CXA[v].l}` : 'Back to the app\'s advice'); go(S.view, S.budgetId); };
+}
 // event actions that look like CAPEX (install, tank, solar…) — suggested items not yet in any budget
 function cxaFromEvents(C, lines){
   const have = (lines||[]).map(l=>`${l.asset||''} ${l.description||''}`.toLowerCase()).join(' | ');
@@ -4051,11 +4065,11 @@ async function cxaPanelHtml(){
   const tot = k => sum(A.filter(x=>x.a.rec===k).map(x=>x.a.amt)), sug = cxaFromEvents(C, L);
   S._cxa = { A, C };
   return `<div class="card cxa"><h3>${open.year} CAPEX — what to push, keep, hold or defer</h3>
-    <p class="hint" style="padding:0 14px;margin:0 0 8px">Worked out from priority, the CAPEX threshold, the cost outlook for each category, the events in the outlook${C.util!=null?` and plant loading (about ${Math.round(C.util*100)}% of capacity in ${open.year-1})`:''}. Departments see the same advice on each item.</p>
+    <p class="hint" style="padding:0 14px;margin:0 0 8px">${canManageData()?'Use <b>Set my call</b> on any item to decide it yourself (✓ = your call; it is used in the presentation). ':''}Otherwise worked out from priority, the CAPEX threshold, the cost outlook for each category, the events in the outlook${C.util!=null?` and plant loading (about ${Math.round(C.util*100)}% of capacity in ${open.year-1})`:''}. Departments see the same advice on each item.</p>
     <div class="cxa-sum">${Object.entries(CXA).map(([k,v])=>A.some(x=>x.a.rec===k)?`<div style="--c:${v.c}"><span>${v.l}</span><b>${short(tot(k))}</b><small>${A.filter(x=>x.a.rec===k).length} item${A.filter(x=>x.a.rec===k).length>1?'s':''}</small></div>`:'').join('')}</div>
     <div class="tbl-wrap"><table class="ledger" style="min-width:820px"><thead><tr><th>Advice</th><th>Department</th><th>Asset / project</th><th>Priority</th><th class="r">Amount</th><th>Why</th></tr></thead><tbody>
     ${A.map(x=>`<tr><td>${cxaChip(x.a)}</td><td>${esc(deptById(x.d)?.name||'')}</td><td><div class="item">${esc(x.l.category||'')}</div><div class="act">${esc(x.l.asset||'')}</div></td><td>${priPill(x.l.priority)}</td><td class="r num">${peso(x.a.amt)}</td>
-      <td style="font-size:12.5px;max-width:420px">${esc(x.a.why)}${x.a.notes.map(n=>`<div class="hint">${esc(n)}</div>`).join('')}</td></tr>`).join('')}</tbody></table></div>
+      <td style="font-size:12.5px;max-width:420px">${esc(x.a.why)}${x.a.notes.map(n=>`<div class="hint">${esc(n)}</div>`).join('')}${canManageData()?`<div style="margin-top:4px"><button class="btn sm" onclick="cxaSet('${x.l.id}')">${x.a.set?'Change my call':'Set my call'}</button></div>`:''}</td></tr>`).join('')}</tbody></table></div>
     ${sug.length?`<div style="padding:10px 14px 4px"><b>Suggested by the events</b> <span class="hint">— actions in the outlook that may need CAPEX and are not in any budget yet</span><ul style="margin:6px 0 4px 18px;font-size:13px">${sug.map(x=>`<li>${esc(x.a.action)} <span class="hint">· ${esc(x.e.title)}${x.a.owner?` · ${esc(x.a.owner)}`:''}${x.a.cost?` · about ${short(x.a.cost)}`:''}</span></li>`).join('')}</ul></div>`:''}
     <p class="hint" style="padding:6px 14px 12px;margin:0">Advice only — nothing changes until the department or the Head of Plant Operations edits the item. To move an item to the department that should own it, open it in that budget and use <b>Transfer to another department</b>.</p></div>`;
 }

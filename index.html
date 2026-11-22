@@ -6393,6 +6393,12 @@ async function prsGatherPlant(){
   let cxa = null; try { const C = await cxaContext(); cxa = capex.map(l=>({ l, a:cxaAdvise(l, C) })).sort((x,y)=>CXA[x.a.rec].o-CXA[y.a.rec].o || y.a.amt-x.a.amt); } catch(e){ console.error(e); }
   let ev = null; try { const o = await loadOutlook(Y); if ((o.E||[]).some(e=>e.status!=='closed')) ev = evReserve(o, opex); } catch(e){}
   const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
+  // last year's costs kept out of plant OPEX (value-added resale etc.), by rule — shown so the MD sees what was left out and why
+  let excl = null; try { const ex = (ly?.excl||[]).filter(a=>a.kind!=='capex');
+    if (ex.length) { const rules = await loadExclRules().catch(()=>[]), by = {};
+      ex.forEach(a => { const k = a.exclusion_id||'?', r = rules.find(x=>x.id===k), b = (by[k] ||= { partner:new Set(), cat:r?.category||'Kept out', note:r?.note||'', lines:new Set(), depts:new Set(), amt:0 });
+        b.partner.add(a.partner||'—'); b.lines.add(a.line_item); if (a.department_id) b.depts.add(deptById(a.department_id)?.name||''); b.amt += Number(a.amount)||0; });
+      excl = { tot:sum(ex.map(a=>Number(a.amount)||0)), last:Math.max(...ex.map(a=>a.month)), rows:Object.values(by).sort((a,b)=>b.amt-a.amt).map(b=>({ ...b, partner:[...b.partner].join(', '), lines:[...b.lines].join(', '), depts:[...b.depts].filter(Boolean).join(', ') })) }; } } catch(e){ console.warn('excl', e); }
   // peso per board by department — each department ÷ the boards it handles (PPB_DRIVERS, set with Rommel 2026-11-22)
   const kv = (K, m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
   const yrTgt = (K, m) => { const a = kv(K, m, 0); if (a) return a; const v = MONTHS.map((_,i)=>kv(K, m, i+1)).filter(x=>x>0); return v.length===12 ? sum(v) : null; };
@@ -6403,7 +6409,7 @@ async function prsGatherPlant(){
     const b1 = dr.boards(m => vol1[m]||0), b0 = vol0 ? dr.boards(m => vol0[m]||0) : 0;
     return { d:x.d, basis:dr.short, cur:b1 ? x.opex/b1 : null, b1, plan:b0 && x.lyBud ? x.lyBud/b0 : null, act:actB && actO ? actO/actB : null, actN:ms.length }; });
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
-    depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, excl, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
 }
 
@@ -6441,6 +6447,16 @@ function prsDeckPlant(D){
     notes:() => `${Y-1}: actual ${short(D.lyAct)} vs budget ${short(D.lyBudYTD)} for Jan–${MONTHS[D.closed-1]}. Over: ${D.over.map(r=>prsLi(r.item)).join(', ')||'none'}. Unbudgeted: ${D.unb.map(r=>prsLi(r.item)).join(', ')||'none'}.`,
     pptx:(s, H) => { H.base(s, `${Y-1} in review`, `Accounting, Jan–${MONTHS[D.closed-1]}`); H.kpis(s, [[`Budget Jan–${MONTHS[D.closed-1]}`, short(D.lyBudYTD)], [`Actual Jan–${MONTHS[D.closed-1]}`, short(D.lyAct), D.lyBudYTD?`${Math.round(100*D.lyAct/D.lyBudYTD)}% of budget`:''], [`${Y-1} full-year view`, short(D.lyView)], [`${Y-1} budget`, short(D.lyBud)]]);
       H.tbl(s, ['Expense line','Budget so far','Actual so far','Difference'], [...D.over.map(r=>[prsLi(r.item), short(r.budYTD), short(r.actYTD), { text:'+'+short(r.actYTD-r.budYTD), options:{ color:'B42318', bold:true } }]), ...D.unb.map(r=>[prsLi(r.item)+' (no budget)', '—', short(r.actYTD), { text:'+'+short(r.actYTD), options:{ color:'B42318', bold:true } }])].slice(0,9), 3.1, [6.3,2,2,2]); } });
+  if (D.excl) { const X = D.excl, per = thru(X.last) + ' ' + (Y-1);
+    const foot = `Recorded by Accounting under OPEX lines but not plant operations. Left out of the ${Y-1} actuals and full-year view, every per-board figure, and the basis for the ${Y} budget. With them, Accounting's ${Y-1} OPEX for ${thru(D.closed)} would be ${short(D.lyAct + X.tot)} instead of ${short(D.lyAct)}.`;
+    S_.push({ id:'pexcl', title:'Kept out of plant OPEX', live:()=>go('actuals'), html:() => `<h2>Kept out of plant OPEX — ${short(X.tot)} <small>${per}</small></h2>
+      <table class="ps-tbl"><thead><tr><th>Paid to</th><th>Treated as</th><th>Accounting line</th><th>Department charged</th><th class="r">Amount</th></tr></thead><tbody>
+      ${X.rows.map(r=>`<tr><td><b>${esc(r.partner)}</b>${r.note?`<div style="font-size:12px;color:#5b6b67;margin-top:2px">${esc(r.note)}</div>`:''}</td><td>${esc(r.cat)}</td><td>${esc(r.lines)}</td><td>${esc(r.depts)}</td><td class="r"><b>${short(r.amt)}</b></td></tr>`).join('')}
+      <tr style="background:#f2f6f5"><td colspan="4"><b>Total kept out</b></td><td class="r"><b>${short(X.tot)}</b></td></tr></tbody></table><p class="ps-foot">${foot}</p>`,
+      notes:() => `${short(X.tot)} of ${Y-1} Accounting OPEX (${per}) is kept out of plant OPEX: ${X.rows.map(r=>`${r.partner} ${short(r.amt)} (${r.cat})`).join('; ')}. ${foot}`,
+      pptx:(s, H) => { H.base(s, `Kept out of plant OPEX — ${short(X.tot)}`, per);
+        H.tbl(s, ['Paid to','Treated as','Accounting line','Department','Amount'], [...X.rows.map(r=>[`${r.partner}${r.note?'\n'+r.note.slice(0,180):''}`, r.cat, r.lines, r.depts, { text:short(r.amt), options:{ bold:true } }]), [{ text:'Total kept out', options:{ bold:true } }, '', '', '', { text:short(X.tot), options:{ bold:true } }]], 1.5, [5.6,2.0,1.8,1.5,1.2]);
+        s.addText(foot, { x:0.5, y:6.4, w:12.3, h:0.7, fontFace:'Arial', fontSize:10, color:'5B6B67' }); } }); }
   const vS = D.vol.volume_sold, vP = D.vol.production_output, stdOf = re => D.std.find(p=>re.test(p.item)), a = k => D.asm.find(x=>x.key===k);
   const outl = [[/diesel/i,'Diesel'],[/gasoline/i,'Gasoline'],[/us dollar|usd|exchange/i,'US dollar'],[/electric/i,'Electricity']].map(([re,l])=>{ const p = stdOf(re); return p ? [l, `${peso(p.unit_price,2)}/${p.unit||''}`] : null; }).filter(Boolean);
   const boards = D.std.filter(p=>isPlantSet?.(p.item)).slice(0,3).map(p=>[p.item, `${peso(p.unit_price,2)}/${p.unit||''}`]);

@@ -1836,7 +1836,9 @@ async function renderAdmin(){
     <div style="text-align:right;margin-top:8px"><button class="btn primary" onclick="saveAiNotes()">Save</button></div></div></div>
   <div class="card" style="margin-top:16px"><h3>Costs kept out of plant OPEX</h3><div style="padding:14px">
     <p class="hint" style="margin:0 0 8px">For costs Accounting books under OPEX that are not plant operations — e.g. products and services bought from Steintek or MSSI and resold to customers at a mark-up. Matching actuals stay on record with the reason, and are netted out of plant OPEX totals, per-board figures and assistant drafts.</p>
-    <div id="exclAdmin"><span class="hint">Loading…</span></div></div></div>
+    <div id="exclAdmin"><span class="hint">Loading…</span></div>
+    <h3 style="margin-top:18px">Tagged charges</h3><p class="hint" style="margin:0 0 8px">Questionable, kept, or left out of next year's basis — tagged from each line's "Paid to". Left-out charges stay in the actuals but are not used for the next budget.</p>
+    <div id="cfAdmin"><span class="hint">Loading…</span></div></div></div>
   <div class="card" style="margin-top:16px"><h3>Start a new budget year</h3><div style="padding:14px">
     <p style="margin:0 0 12px;color:var(--muted)">Creates a draft budget for every department. Earlier years stay available in the Budget year selector. Lock a year once Finance has accepted it.</p>
     <div class="row-flex">
@@ -1847,7 +1849,7 @@ async function renderAdmin(){
     <div class="field" style="margin-top:10px"><label style="font-weight:500;color:var(--ink)"><input type="checkbox" id="nyCopy" checked> Copy <b>Recurring / Contractual</b> OPEX lines from <select id="nyFrom" class="inp" style="display:inline-block;width:auto;padding:2px 6px">${S.cycles.map(c=>`<option value="${c.id}">${c.year}</option>`).join('')}</select> as a starting point</label>
       <span class="hint">Copied lines keep their amounts and are marked "Copied from previous year — confirm rate" in Remarks. Activity-based, project and one-time items start empty, per Finance's zero-based approach.</span></div>
     <button class="btn primary" onclick="startYear()">Start budget year</button></div></div>`;
-  loadAiNotes(); exclAdmin();
+  loadAiNotes(); exclAdmin(); cfAdmin();
 }
 async function startYear(){
   const year = Number($('#nyYear').value);
@@ -2019,7 +2021,7 @@ async function renderActuals(){
       S.act.year = (data && data[0]?.year) || new Date().getFullYear();
     }
     const years = [...new Set([...S.cycles.map(c=>c.year), S.act.year])].sort((a,b)=>b-a);
-    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv); S.act.lastD = D;
+    const Y = S.act.year, D = await loadYearData(Y, S.act.dept), drv = await loadDrivers(Y+1), M = actModel(D, S.act.method, drv); S.act.lastD = D; await loadFlags(Y);
     S.act.model = M; S.act.data = D; await loadGaps(Y);
     const { data:imps } = await sb.from('bgt_imports').select('*').eq('year', Y).order('created_at', { ascending:false });
     const dname = S.act.dept ? deptById(S.act.dept)?.name : 'Whole plant';
@@ -2092,7 +2094,8 @@ function actItem(item){
         <td class="r">${closed ? '<span style="color:var(--faint);font-size:12px">closed</span>' : ed ? `<input class="inp num pj" data-m="${i+1}" type="number" step="any" style="max-width:130px;margin-left:auto" value="${c && c.ov[i]!=null ? c.ov[i] : ''}" placeholder="${Math.round(c?c.proj[i]:r.proj[i])}">` : `<span class="num">${peso(r.proj[i])}</span>`}</td></tr>`; }).join('')}
       </tbody><tfoot><tr><td>Total</td><td class="r num">${peso(r.budFY)}</td><td class="r num">${peso(r.actYTD)}</td><td class="r num">${peso(r.projFY)}</td></tr></tfoot></table>
       ${!dept && Object.keys(r.depts).length>1 ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Projected by department</h3>${Object.entries(r.depts).sort((a,b)=>b[1]-a[1]).map(([d,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(deptById(d)?.name||'Unassigned')}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
-      ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}` : ''}
+      ${partners.length ? `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Paid to (actual ${thru(M.closed)})</h3>${partners.map(([p,v])=>cfPayeeRow(Y, item, p, v)).join('')}
+        ${isReviewer()?`<p class="hint" style="margin:4px 0 0">${canManageData()?'Tag a payee you are not sure about, or keep it out of next year\'s basis. ':''}Ask Penny what a charge is.</p>`:''}` : ''}
       ${(()=>{ const ex = (S.act.lastD?.excl||[]).filter(a=>a.line_item===item && (!dept || a.department_id===dept)); if (!ex.length) return ''; const by = {}; ex.forEach(a=>by[a.partner||'—']=(by[a.partner||'—']||0)+Number(a.amount)); const rules = S.ex.rules||[];
         return `<h3 style="font-size:16px;font-stretch:85%;margin:16px 0 6px">Kept out of plant OPEX</h3>${Object.entries(by).map(([p,v])=>`<div class="sumline" style="font-weight:400"><span>${esc(p)}</span><span class="num">${peso(v)}</span></div>`).join('')}<p class="hint" style="margin:4px 0 0">Recorded by Accounting on this line but not included above: ${esc([...new Set(ex.map(a=>rules.find(r=>r.id===a.exclusion_id)?.category).filter(Boolean))].join(', ')||'excluded by rule')}.</p>`; })()}
       ${gapSection(item, r)}
@@ -2100,6 +2103,57 @@ function actItem(item){
     <footer><span></span><div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveProjection(${JSON.stringify(item).replace(/"/g,'&quot;')})">Save forecast</button>`:''}</div></footer>
   </div>`;
 }
+/* ---------- questionable charges: tagged per payee on a line, from the line itself ----------
+   questionable = look into it · keep = checked, it belongs · leave_out = stays in the actual (Accounting is official) but is not a basis for next year.
+   "Not plant OPEX" opens the exclusion rule, pre-filled — that takes it out of plant OPEX altogether. */
+const CF = { questionable:{ l:'Questionable', c:'#b88a00' }, keep:{ l:'Keep', c:'#2e7d6b' }, leave_out:{ l:'Left out of next budget', c:'#b42318' } };
+S.cf = { year:null, rows:[] };
+async function loadFlags(Y, force){ if (S.cf.year===Y && !force) return S.cf.rows; try { const { data, error } = await sb.from('bgt_charge_flags').select('*').eq('year', Y); if (error) throw error; S.cf = { year:Y, rows:data||[] }; } catch(e){ console.warn('flags', e); S.cf = { year:Y, rows:[] }; } return S.cf.rows; }
+const normP = p => String(p||'').trim().replace(/\s+/g,' ').toLowerCase();
+const flagOf = (Y, item, partner, dept) => S.cf.year!==Y ? null : S.cf.rows.filter(f=>f.line_item===item && normP(f.partner)===normP(partner) && (!f.department_id || !dept || f.department_id===dept)).sort((a,b)=>(a.department_id?0:1)-(b.department_id?0:1))[0] || null;
+function cfPayeeRow(Y, item, p, v){
+  const f = flagOf(Y, item, p, S.act.dept), a = JSON.stringify([item, p]).replace(/"/g,'&quot;');
+  return `<div class="sumline" style="font-weight:400;align-items:center;gap:8px"><span style="flex:1">${esc(p)}${f?` <span class="chip" style="background:${CF[f.status].c};color:#fff;font-size:11px;padding:1px 7px">${CF[f.status].l}</span>${f.reason?`<div class="hint" style="margin:2px 0 0">${esc(f.reason)}</div>`:''}`:''}</span>
+    <span class="num">${peso(v)}</span>${isReviewer()?`<button class="btn ghost sm" title="Tag this charge or ask Penny" onclick='cfDialog(...${a})'>⋯</button>`:''}</div>`;
+}
+function cfDialog(item, partner){
+  const Y = S.act.year, dept = S.act.dept, f = flagOf(Y, item, partner, dept), man = canManageData();
+  const amt = S.act.model?.rows.find(x=>x.item===item)?.partners?.[partner] || 0;
+  modal2(`<h3>${esc(partner)}</h3><p class="hint" style="margin-top:-6px">${esc(item)} · ${Y} · ${peso(amt)} so far${dept?` · ${esc(deptById(dept)?.name||'')}`:''}</p>
+    ${man ? `<div class="field"><label>What should happen with this charge?</label>
+      ${[['questionable','Questionable — look into it'],['keep','Keep — checked, it belongs'],['leave_out','Leave out of next budget — stays in the actual, not a basis for '+(Y+1)],['','No tag']].map(([k,l])=>`<label style="display:block;margin:4px 0"><input type="radio" name="cfS" value="${k}" ${(f?.status||'')===k?'checked':''}> ${l}</label>`).join('')}</div>
+      <div class="field"><label for="cfR">Reason</label><textarea class="inp" id="cfR" rows="3" placeholder="e.g. Not familiar with this supplier — check with Accounting / head office cost, not plant">${esc(f?.reason||'')}</textarea></div>` : (f ? `<p><b>${CF[f.status].l}</b>${f.reason?` — ${esc(f.reason)}`:''}</p>` : '')}
+    ${f?.ai_note ? `<div class="box" style="font-size:13px"><b>Penny:</b> ${esc(f.ai_note)}</div>` : ''}
+    <div class="actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="actions"><button class="btn" id="cfAsk">Ask Penny what this is</button>${man?`<button class="btn ghost" id="cfOut" title="Takes it out of plant OPEX altogether, like value-added resale">Not plant OPEX…</button>`:''}</div>
+      <div class="actions"><button class="btn ghost" onclick="closeModal2()">Close</button>${man?'<button class="btn primary" id="cfGo">Save</button>':''}</div></div>`);
+  $('#cfAsk').onclick = () => { closeModal2(); closeDrawer(); pennyToggle(true);
+    pennyAsk(`What is the charge from "${partner}" under ${item} in ${Y} (${peso(amt)} so far${dept?`, ${deptById(dept)?.name}`:''})? Look up the transactions behind it, say what it most likely is, whether it belongs to plant operations and under this line, and what I should check.`); };
+  if (man) {
+    $('#cfOut').onclick = () => { closeModal2(); editExclRule(null, { partner_pattern:partner, line_items:[item], category:'Other — see note', note:'' }); };
+    $('#cfGo').onclick = async () => {
+      const st = document.querySelector('input[name=cfS]:checked')?.value ?? '', reason = $('#cfR').value.trim();
+      if (st && st!=='keep' && !reason) { toast('Write the reason — it shows wherever the charge appears.', true); return; }
+      try {
+        if (!st) { if (f) { const r = await sb.from('bgt_charge_flags').delete().eq('id', f.id); if (r.error) throw r.error; } }
+        else if (f) { const r = await sb.from('bgt_charge_flags').update({ status:st, reason:reason||null, updated_by:S.me.id, updated_at:new Date().toISOString() }).eq('id', f.id); if (r.error) throw r.error; }
+        else { const r = await sb.from('bgt_charge_flags').insert({ company_id:S.company.id, year:Y, line_item:item, partner, department_id:dept||null, status:st, reason:reason||null, created_by:S.me.id, updated_by:S.me.id }); if (r.error) throw r.error; }
+        await loadFlags(Y, true); S.act.cache = {}; closeModal2(); toast(st ? `Tagged: ${CF[st].l}` : 'Tag removed'); actItem(item);
+      } catch(e){ fail(e); }
+    };
+  }
+}
+/* Users and settings: every tagged charge, to review or undo */
+async function cfAdmin(){
+  const el = $('#cfAdmin'); if (!el) return;
+  try { const { data, error } = await sb.from('bgt_charge_flags').select('*').order('year', { ascending:false }).order('status'); if (error) throw error;
+    const { data:am } = await sb.from('bgt_actuals').select('flag_id,amount').not('flag_id', 'is', null); const t = {}; (am||[]).forEach(a=>t[a.flag_id]=(t[a.flag_id]||0)+Number(a.amount));
+    el.innerHTML = (data||[]).length ? `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Payee · line</th><th>Year</th><th>Tag</th><th>Reason</th><th class="r">Amount</th><th></th></tr></thead><tbody>
+      ${data.map(f=>`<tr><td><b>${esc(f.partner)}</b><div class="item" style="text-transform:none">${esc(f.line_item)}${f.department_id?' · '+esc(deptById(f.department_id)?.name||''):''}</div></td><td>${f.year}</td><td><span class="chip" style="background:${CF[f.status].c};color:#fff">${CF[f.status].l}</span></td><td style="font-size:12.5px;max-width:360px">${esc(f.reason||'')}</td><td class="r num">${t[f.id]?peso(t[f.id]):''}</td><td><button class="btn ghost sm" onclick="cfUntag('${f.id}')">Remove tag</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="hint" style="margin:0">No charges tagged yet. Tag them from Actuals and projection → open a line → Paid to.</p>';
+  } catch(e){ el.innerHTML = `<p class="hint">Could not load tagged charges: ${esc(e.message||e)}</p>`; }
+}
+async function cfUntag(id){ const r = await sb.from('bgt_charge_flags').delete().eq('id', id); if (r.error) return fail(r.error); S.cf.year = null; S.act.cache = {}; toast('Tag removed'); cfAdmin(); }
 async function saveProjection(item){
   const dept = S.act.dept, Y = S.act.year, ups = [], dels = [];
   document.querySelectorAll('.pj').forEach(e => { const m = Number(e.dataset.m); if (e.value.trim()==='') dels.push(m); else ups.push({ company_id:S.company.id, department_id:dept, year:Y, line_item:item, month:m, amount:Number(e.value)||0, updated_by:S.me.id }); });
@@ -2154,11 +2208,14 @@ function importActualsDialog(){
     try {
       $('#iaGo').disabled = true; $('#iaMsg').insertAdjacentHTML('beforeend','<p>Loading…</p>');
       if ($('#iaReplace').checked) { const months = []; for (let m=p.from;m<=p.to;m++) months.push(m);
-        const r = await sb.from('bgt_actuals').delete().eq('year', p.year).eq('kind','opex').in('department_id', Object.keys(p.byDept)).in('month', months); if (r.error) throw r.error; }
+        const r = await sb.from('bgt_actuals').delete().eq('year', p.year).eq('kind','opex').in('department_id', Object.keys(p.byDept)).in('month', months); if (r.error) throw r.error;
+        const t = await sb.from('bgt_actual_txns').delete().eq('year', p.year).in('department_id', Object.keys(p.byDept)).in('month', months); if (t.error) console.warn('txns', t.error); }
       const { data:imp, error } = await sb.from('bgt_imports').insert({ company_id:S.company.id, kind:'opex', year:p.year, file_name:p.files.join(', '), rows:p.txn, total:p.total, month_from:p.from, month_to:p.to, note:`${Object.keys(p.byDept).length} departments`, created_by:S.me.id }).select().single();
       if (error) throw error;
       const rows = p.rows.map(r => ({ ...r, company_id:S.company.id, import_id:imp.id }));
       for (let i=0;i<rows.length;i+=500) { const r = await sb.from('bgt_actuals').insert(rows.slice(i,i+500)); if (r.error) throw r.error; }
+      const tx = (p.txns||[]).map(t => ({ ...t, company_id:S.company.id, import_id:imp.id }));
+      for (let i=0;i<tx.length;i+=500) { const r = await sb.from('bgt_actual_txns').insert(tx.slice(i,i+500)); if (r.error) { console.warn('txns', r.error); break; } }
       S.act.cache = {}; S.act.year = p.year; closeModal(); toast(`Loaded ${p.txn} transactions (${short(p.total)})`); renderActuals();
     } catch(e){ $('#iaGo').disabled = false; fail(e); }
   };
@@ -2170,7 +2227,7 @@ async function parseOdooFiles(files, year){
   const itemMap = Object.fromEntries((im||[]).filter(x=>x.scheme==='odoo_item').map(x=>[String(x.source_value).toUpperCase(), nameById[x.line_item_id]]));
   const analytic = {}; S.depts.forEach(d => (d.odoo_analytic||[]).forEach(a => analytic[String(a).trim().toUpperCase()] = d.id));
   const cv = v => { if (v==null) return null; if (typeof v==='object' && !(v instanceof Date)) { if ('result' in v) return v.result; if (v.richText) return v.richText.map(x=>x.text).join(''); if (v.text) return v.text; } return v; };
-  const agg = {}, out = { year, files:[], rows:[], txn:0, total:0, byDept:{}, skipDept:0, badAnalytic:new Set(), otherYear:0, unmapped:new Set(), from:12, to:1 };
+  const agg = {}, out = { year, files:[], rows:[], txns:[], txn:0, total:0, byDept:{}, skipDept:0, badAnalytic:new Set(), otherYear:0, unmapped:new Set(), from:12, to:1 };
   const mapItem = (src, partner, label) => {
     const up = String(src||'').trim().toUpperCase(); if (!up) return '(NO ITEM)';
     if (up === 'UTILITIES') { const t = (partner+' '+label).toUpperCase(); return /MERALCO|LIGHT|POWER|ELECTRIC/.test(t) ? 'UTILITIES - ELECTRICITY' : /WATER|MAYNILAD/.test(t) ? 'UTILITIES - WATER' : 'UTILITIES - OTHERS'; }
@@ -2184,7 +2241,8 @@ async function parseOdooFiles(files, year){
       let hr = 0, col = {};
       for (let r=1; r<=Math.min(6, ws.rowCount); r++) { const vals = ws.getRow(r).values.map(v=>String(cv(v)||'').trim().toLowerCase());
         if (vals.includes('date') && vals.some(v=>v.startsWith('budget expense')) && vals.includes('total')) { hr = r;
-          vals.forEach((v,i)=>{ if (v==='date') col.date=i; else if (v.startsWith('budget expense')) col.item=i; else if (v.startsWith('analytic')) col.an=i; else if (v==='total') col.tot=i; else if (v==='partner') col.par=i; else if (v==='label') col.lab=i; }); break; } }
+          vals.forEach((v,i)=>{ if (v==='date') col.date=i; else if (v.startsWith('budget expense')) col.item=i; else if (v.startsWith('analytic')) col.an=i; else if (v==='total') col.tot=i; else if (v==='partner') col.par=i; else if (v==='label') col.lab=i;
+            else if (!col.ref && /^(reference|ref|number|journal entry|entry|move)$/.test(v)) col.ref=i; else if (!col.jr && v==='journal') col.jr=i; else if (!col.acc && /^account/.test(v)) col.acc=i; }); break; } }
       if (!hr) return;
       for (let r=hr+1; r<=ws.rowCount; r++) {
         const row = ws.getRow(r), g = i => i ? cv(row.getCell(i).value) : null;
@@ -2198,6 +2256,8 @@ async function parseOdooFiles(files, year){
         const k = [dept, month, item, partner].join('|');
         const a = agg[k] ||= { department_id:dept, year, month, kind:'opex', line_item:item, source_item:src.toUpperCase(), partner, amount:0, txn_count:0 };
         a.amount += amt; a.txn_count++; out.txn++; out.total += amt; out.byDept[dept] = (out.byDept[dept]||0) + amt;
+        // the transaction itself, so Penny can say what a charge is
+        out.txns.push({ department_id:dept, year, month, txn_date:d.toISOString().slice(0,10), line_item:item, source_item:src.toUpperCase(), partner, label:String(g(col.lab)||'').trim().slice(0,500)||null, ref:String(g(col.ref)||'').trim().slice(0,120)||null, journal:String(g(col.jr)||'').trim().slice(0,120)||null, account:String(g(col.acc)||'').trim().slice(0,200)||null, amount:Math.round(amt*100)/100 });
         out.from = Math.min(out.from, month); out.to = Math.max(out.to, month);
       }
     });
@@ -2377,6 +2437,8 @@ function pickPrice(kind, id){
 }
 
 /* ================= LAST-YEAR REFERENCE (line drawer) ================= */
+// next year's basis: last year's actuals without the charges tagged "leave out of next budget"
+const basisData = D => ({ ...D, act:D.act.filter(a=>!a.left_out) });
 async function refreshRef(){
   const box = $('#refPanel'); if (!box) return;
   const item = $('#f_line_item')?.value; const b = budgetById(S.budgetId), dept = b.department_id, Y = S.cycle.year;
@@ -2386,7 +2448,8 @@ async function refreshRef(){
     const years = [Y-1, Y-2, Y-3].filter(y => y >= 2023);
     const res = [];
     for (const y of years) { const D = await loadYearData(y, dept), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===item);
-      res.push({ y, closed:M.closed, bud:r?.budFY||0, act:r?.actYTD||0, proj:r?.projFY||0, hasAct:M.closed>0, basis:S.cycles.find(c=>c.year===y)?.basis }); }
+      const lo = sum(D.act.filter(a=>a.left_out && a.line_item===item).map(a=>Number(a.amount)||0)), rB = lo ? actModel(basisData(D), 'budget').rows.find(x=>x.item===item) : r;
+      res.push({ y, closed:M.closed, bud:r?.budFY||0, act:r?.actYTD||0, proj:r?.projFY||0, projB:rB?.projFY||0, leftOut:lo, hasAct:M.closed>0, basis:S.cycles.find(c=>c.year===y)?.basis }); }
     if ($('#f_line_item')?.value !== item) return;
     box.innerHTML = `<table class="ref"><thead><tr><th>${esc(deptById(dept)?.name)} · ${esc(item)}</th><th class="r">Budget</th><th class="r">Actual</th><th class="r">Full-year view</th></tr></thead><tbody>
       ${res.map(r=>`<tr><td>${r.y}${r.basis&&r.basis!=='approved'?` <small>${r.basis==='submitted'?'(submitted, not approved)':''}</small>`:''}</td><td class="r num">${r.bud?peso(r.bud):'—'}</td>
@@ -2756,7 +2819,7 @@ async function renderConsider(item, prev, dept){
     const Y = S.cycle.year, o = await loadOutlook(Y);
     if ($('#f_line_item')?.value !== item) return;
     const d = o.D.find(x=>x.line_item===item), pct = drvPct(o, item, 'next'), drivers = (d?.driver_keys||[]).map(k=>assumpByKey(o,k)).filter(Boolean);
-    const base = prev && prev.hasAct ? prev.proj : prev?.bud || 0, sug = Math.round(base * (1+pct/100));
+    const base = prev && prev.hasAct ? (prev.projB ?? prev.proj) : prev?.bud || 0, sug = Math.round(base * (1+pct/100));
     const others = sum(S.opex.filter(l=>l.line_item===item && l.id!==S._editingId).map(annual));
     const K1 = await loadKpis(Y-1).catch(()=>[]), K2 = await loadKpis(Y).catch(()=>[]);
     const ann = (rows, m) => { const a = rows.find(r=>r.metric===m && r.month===0); if (a) return Number(a.value); const v = rows.filter(r=>r.metric===m && r.month>0); return v.length ? sum(v.map(r=>r.value))*12/v.length : null; };
@@ -2772,7 +2835,7 @@ async function renderConsider(item, prev, dept){
         ${(()=>{ const x = evLines(o)[item]; if (!x) return ''; return x.ev.map(v=>`<div class="ci ev-ci"><b>${esc(v.e.title)} — ${evMonthsText(v.ms)}:</b> ${v.e.status==='active'?`likely +${v.im.likely}% in those months (+${Math.round(v.im.likely*v.sh*10)/10}% for the year, included in the suggestion below); worst case +${v.im.worst}% is covered by the plant reserve held by the MD.`:`being watched (${v.e.probability}% likely, up to +${v.im.worst}%) — not in your budget; covered by the plant reserve.`}${(v.e.actions||[]).filter(a=>!a.lines?.length||a.lines.includes(item)).slice(0,2).map(a=>`<br>Consider: ${esc(a.action)}`).join('')}</div>`).join(''); })()}
         ${volItem && pT!=null && pA ? `<div class="ci"><b>Production plan ${Y}: ${pT>=pA?'+':''}${Math.round(100*(pT-pA)/pA)}% vs ${Y-1}.</b> This cost moves with volume — scale it accordingly.</div>` : ''}
         ${prices.length ? `<div class="ci"><b>Price list:</b> ${prices.map(p=>`${esc(p.item)} ${peso(p.unit_price,2)}/${esc(p.unit||'unit')}${p.source_type==='market'?' (market)':''}`).join(' · ')}</div>` : ''}
-        ${base ? `<div class="sug"><div><b>Suggested ${Y} for ${esc(deptById(dept)?.name)} · ${esc(item)}: ${peso(sug)}</b><br><small>${Y-1} ${prev.hasAct?'full-year view':'budget'} ${peso(base)} × ${pct>=0?'+':''}${pct}%. Other ${Y} lines on this item: ${peso(others)}.</small></div>
+        ${base ? `<div class="sug"><div><b>Suggested ${Y} for ${esc(deptById(dept)?.name)} · ${esc(item)}: ${peso(sug)}</b><br><small>${Y-1} ${prev.hasAct?'full-year view':'budget'} ${peso(base)}${prev.leftOut?` (without ${peso(prev.leftOut)} tagged "leave out of next budget")`:''} × ${pct>=0?'+':''}${pct}%. Other ${Y} lines on this item: ${peso(others)}.</small></div>
           ${canEdit(budgetById(S.budgetId)) ? `<button type="button" class="btn" onclick="applySuggestion()">Use for this line</button>` : ''}</div>` : ''}
       </div>`;
   } catch(e){ console.error(e); box.innerHTML = ''; }
@@ -2800,7 +2863,7 @@ async function applySuggestion(){
   const s = S._sug; if (!s) return;
   const amt = Math.max(0, s.sug - s.others);
   if (!amt) { toast('Other lines already cover the suggested amount.', true); return; }
-  const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(D, 'budget'), r = M.rows.find(x=>x.item===s.item);
+  const b = budgetById(S.budgetId), D = await loadYearData(s.Y-1, b.department_id), M = actModel(basisData(D), 'budget'), r = M.rows.find(x=>x.item===s.item);
   // plant records (bills/meters, usage) for the same line and department — a check on Accounting's skipped months, not the basis
   const recs = (await loadRecords(s.Y-1, b.department_id).catch(()=>[])).filter(x => x.line_item===s.item && x.status!=='Cancelled');
   const used = recs.length ? Array.from({length:12}, (_,i) => recs.some(x => (Number(x.month) || new Date(x.rec_date).getMonth()+1)===i+1 && (recAmt(x)>0 || Number(x.qty)>0))) : null;
@@ -4632,8 +4695,8 @@ async function exclAdmin(){
     <div style="text-align:right;margin-top:10px"><button class="btn primary" onclick="editExclRule()">Add a rule</button></div>`;
   } catch(e){ el.innerHTML = `<p class="hint">Could not load the rules: ${esc(e.message||e)}</p>`; }
 }
-function editExclRule(id){
-  const r = id ? (S.ex.rules||[]).find(x=>x.id===id) : { partner_pattern:'', line_items:['OUTSIDE SERVICES'], category:'Value-added resale (cost of sales)', note:'', active:true };
+function editExclRule(id, preset){
+  const r = id ? (S.ex.rules||[]).find(x=>x.id===id) : { partner_pattern:'', line_items:['OUTSIDE SERVICES'], category:'Value-added resale (cost of sales)', note:'', active:true, ...(preset||{}) };
   const cats = ['Value-added resale (cost of sales)','Pass-through charged to customer','Other company / related party','Head office cost, not plant','Other — see note'];
   modal(`<h3>${id?'Edit':'Add'} a rule</h3><p>Accounting actuals whose partner name contains the text below are kept out of plant OPEX but stay on record, with this note.</p>
     <div class="field"><label for="xrP">Partner name contains</label><input class="inp" id="xrP" value="${esc(r.partner_pattern)}" placeholder="e.g. STEINTEK"></div>
@@ -6399,6 +6462,11 @@ async function prsGatherPlant(){
       ex.forEach(a => { const k = a.exclusion_id||'?', r = rules.find(x=>x.id===k), b = (by[k] ||= { partner:new Set(), cat:r?.category||'Kept out', note:r?.note||'', lines:new Set(), depts:new Set(), amt:0 });
         b.partner.add(a.partner||'—'); b.lines.add(a.line_item); if (a.department_id) b.depts.add(deptById(a.department_id)?.name||''); b.amt += Number(a.amount)||0; });
       excl = { tot:sum(ex.map(a=>Number(a.amount)||0)), last:Math.max(...ex.map(a=>a.month)), rows:Object.values(by).sort((a,b)=>b.amt-a.amt).map(b=>({ ...b, partner:[...b.partner].join(', '), lines:[...b.lines].join(', '), depts:[...b.depts].filter(Boolean).join(', ') })) }; } } catch(e){ console.warn('excl', e); }
+  // charges tagged "leave out of next budget": in last year's actuals, but not a basis for this budget
+  let leftOut = null; try { const lo = (ly?.act||[]).filter(a=>a.left_out && a.kind!=='capex');
+    if (lo.length) { const fl = await loadFlags(Y-1, true), by = {};
+      lo.forEach(a => { const f = fl.find(x=>x.id===a.flag_id), k = a.flag_id||'?', b = (by[k] ||= { partner:a.partner||'—', line:a.line_item, reason:f?.reason||'', depts:new Set(), amt:0 }); if (a.department_id) b.depts.add(deptById(a.department_id)?.name||''); b.amt += Number(a.amount)||0; });
+      leftOut = { tot:sum(lo.map(a=>Number(a.amount)||0)), rows:Object.values(by).sort((a,b)=>b.amt-a.amt).map(b=>({ ...b, depts:[...b.depts].filter(Boolean).join(', ') })) }; } } catch(e){ console.warn('leftOut', e); }
   // peso per board by department — each department ÷ the boards it handles (PPB_DRIVERS, set with Rommel 2026-11-22)
   const kv = (K, m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
   const yrTgt = (K, m) => { const a = kv(K, m, 0); if (a) return a; const v = MONTHS.map((_,i)=>kv(K, m, i+1)).filter(x=>x>0); return v.length===12 ? sum(v) : null; };
@@ -6409,7 +6477,7 @@ async function prsGatherPlant(){
     const b1 = dr.boards(m => vol1[m]||0), b0 = vol0 ? dr.boards(m => vol0[m]||0) : 0;
     return { d:x.d, basis:dr.short, cur:b1 ? x.opex/b1 : null, b1, plan:b0 && x.lyBud ? x.lyBud/b0 : null, act:actB && actO ? actO/actB : null, actN:ms.length }; });
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
-    depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, excl, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
+    depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, excl, leftOut, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
 }
 
@@ -6447,16 +6515,22 @@ function prsDeckPlant(D){
     notes:() => `${Y-1}: actual ${short(D.lyAct)} vs budget ${short(D.lyBudYTD)} for Jan–${MONTHS[D.closed-1]}. Over: ${D.over.map(r=>prsLi(r.item)).join(', ')||'none'}. Unbudgeted: ${D.unb.map(r=>prsLi(r.item)).join(', ')||'none'}.`,
     pptx:(s, H) => { H.base(s, `${Y-1} in review`, `Accounting, Jan–${MONTHS[D.closed-1]}`); H.kpis(s, [[`Budget Jan–${MONTHS[D.closed-1]}`, short(D.lyBudYTD)], [`Actual Jan–${MONTHS[D.closed-1]}`, short(D.lyAct), D.lyBudYTD?`${Math.round(100*D.lyAct/D.lyBudYTD)}% of budget`:''], [`${Y-1} full-year view`, short(D.lyView)], [`${Y-1} budget`, short(D.lyBud)]]);
       H.tbl(s, ['Expense line','Budget so far','Actual so far','Difference'], [...D.over.map(r=>[prsLi(r.item), short(r.budYTD), short(r.actYTD), { text:'+'+short(r.actYTD-r.budYTD), options:{ color:'B42318', bold:true } }]), ...D.unb.map(r=>[prsLi(r.item)+' (no budget)', '—', short(r.actYTD), { text:'+'+short(r.actYTD), options:{ color:'B42318', bold:true } }])].slice(0,9), 3.1, [6.3,2,2,2]); } });
-  if (D.excl) { const X = D.excl, per = thru(X.last) + ' ' + (Y-1);
-    const foot = `Recorded by Accounting under OPEX lines but not plant operations. Left out of the ${Y-1} actuals and full-year view, every per-board figure, and the basis for the ${Y} budget. With them, Accounting's ${Y-1} OPEX for ${thru(D.closed)} would be ${short(D.lyAct + X.tot)} instead of ${short(D.lyAct)}.`;
-    S_.push({ id:'pexcl', title:'Kept out of plant OPEX', live:()=>go('actuals'), html:() => `<h2>Kept out of plant OPEX — ${short(X.tot)} <small>${per}</small></h2>
+  if (D.excl || D.leftOut) { const X = D.excl || { tot:0, rows:[], last:D.closed||1 }, L = D.leftOut, per = thru(X.last||D.closed) + ' ' + (Y-1);
+    const foot = `${X.rows.length?`Kept out: recorded by Accounting under OPEX lines but not plant operations — left out of the ${Y-1} actuals and full-year view, every per-board figure, and the basis for the ${Y} budget. With them, Accounting's ${Y-1} OPEX for ${thru(D.closed)} would be ${short(D.lyAct + X.tot)} instead of ${short(D.lyAct)}. `:''}${L?`Left out of the ${Y} budget: charges questioned by the Head of Plant Operations — still in the ${Y-1} actuals (Accounting is the official record), but not used as a basis for ${Y}.`:''}`;
+    const lRows = L ? L.rows.map(r=>`<tr><td><b>${esc(r.partner)}</b>${r.reason?`<div style="font-size:12px;color:#5b6b67;margin-top:2px">${esc(r.reason)}</div>`:''}</td><td>Left out of the ${Y} budget</td><td>${esc(r.line)}</td><td>${esc(r.depts)}</td><td class="r"><b>${short(r.amt)}</b></td></tr>`).join('') : '';
+    S_.push({ id:'pexcl', title:'Kept out of plant OPEX', live:()=>go('actuals'), html:() => `<h2>Kept out of plant OPEX — ${short(X.tot + (L?.tot||0))} <small>${per}</small></h2>
       <table class="ps-tbl"><thead><tr><th>Paid to</th><th>Treated as</th><th>Accounting line</th><th>Department charged</th><th class="r">Amount</th></tr></thead><tbody>
       ${X.rows.map(r=>`<tr><td><b>${esc(r.partner)}</b>${r.note?`<div style="font-size:12px;color:#5b6b67;margin-top:2px">${esc(r.note)}</div>`:''}</td><td>${esc(r.cat)}</td><td>${esc(r.lines)}</td><td>${esc(r.depts)}</td><td class="r"><b>${short(r.amt)}</b></td></tr>`).join('')}
-      <tr style="background:#f2f6f5"><td colspan="4"><b>Total kept out</b></td><td class="r"><b>${short(X.tot)}</b></td></tr></tbody></table><p class="ps-foot">${foot}</p>`,
-      notes:() => `${short(X.tot)} of ${Y-1} Accounting OPEX (${per}) is kept out of plant OPEX: ${X.rows.map(r=>`${r.partner} ${short(r.amt)} (${r.cat})`).join('; ')}. ${foot}`,
-      pptx:(s, H) => { H.base(s, `Kept out of plant OPEX — ${short(X.tot)}`, per);
-        H.tbl(s, ['Paid to','Treated as','Accounting line','Department','Amount'], [...X.rows.map(r=>[`${r.partner}${r.note?'\n'+r.note.slice(0,180):''}`, r.cat, r.lines, r.depts, { text:short(r.amt), options:{ bold:true } }]), [{ text:'Total kept out', options:{ bold:true } }, '', '', '', { text:short(X.tot), options:{ bold:true } }]], 1.5, [5.6,2.0,1.8,1.5,1.2]);
-        s.addText(foot, { x:0.5, y:6.4, w:12.3, h:0.7, fontFace:'Arial', fontSize:10, color:'5B6B67' }); } }); }
+      ${X.rows.length?`<tr style="background:#f2f6f5"><td colspan="4"><b>Kept out of plant OPEX</b></td><td class="r"><b>${short(X.tot)}</b></td></tr>`:''}
+      ${lRows}${L?`<tr style="background:#f2f6f5"><td colspan="4"><b>Left out of the ${Y} budget basis</b></td><td class="r"><b>${short(L.tot)}</b></td></tr>`:''}</tbody></table><p class="ps-foot">${foot}</p>`,
+      notes:() => `${X.rows.length?`${short(X.tot)} kept out of plant OPEX: ${X.rows.map(r=>`${r.partner} ${short(r.amt)} (${r.cat})`).join('; ')}. `:''}${L?`${short(L.tot)} left out of the ${Y} budget basis: ${L.rows.map(r=>`${r.partner} ${short(r.amt)}${r.reason?' — '+r.reason:''}`).join('; ')}. `:''}${foot}`,
+      pptx:(s, H) => { H.base(s, `Kept out of plant OPEX — ${short(X.tot + (L?.tot||0))}`, per);
+        const rows = [...X.rows.map(r=>[`${r.partner}${r.note?'\n'+r.note.slice(0,160):''}`, r.cat, r.lines, r.depts, { text:short(r.amt), options:{ bold:true } }]),
+          ...(X.rows.length?[[{ text:'Kept out of plant OPEX', options:{ bold:true } }, '', '', '', { text:short(X.tot), options:{ bold:true } }]]:[]),
+          ...(L?L.rows.map(r=>[`${r.partner}${r.reason?'\n'+r.reason.slice(0,160):''}`, `Left out of the ${Y} budget`, r.line, r.depts, { text:short(r.amt), options:{ bold:true } }]):[]),
+          ...(L?[[{ text:`Left out of the ${Y} budget basis`, options:{ bold:true } }, '', '', '', { text:short(L.tot), options:{ bold:true } }]]:[])];
+        H.tbl(s, ['Paid to','Treated as','Accounting line','Department','Amount'], rows.slice(0,12), 1.5, [5.6,2.0,1.8,1.5,1.2]);
+        s.addText(foot, { x:0.5, y:6.3, w:12.3, h:0.8, fontFace:'Arial', fontSize:9.5, color:'5B6B67' }); } }); }
   const vS = D.vol.volume_sold, vP = D.vol.production_output, stdOf = re => D.std.find(p=>re.test(p.item)), a = k => D.asm.find(x=>x.key===k);
   const outl = [[/diesel/i,'Diesel'],[/gasoline/i,'Gasoline'],[/us dollar|usd|exchange/i,'US dollar'],[/electric/i,'Electricity']].map(([re,l])=>{ const p = stdOf(re); return p ? [l, `${peso(p.unit_price,2)}/${p.unit||''}`] : null; }).filter(Boolean);
   const boards = D.std.filter(p=>isPlantSet?.(p.item)).slice(0,3).map(p=>[p.item, `${peso(p.unit_price,2)}/${p.unit||''}`]);

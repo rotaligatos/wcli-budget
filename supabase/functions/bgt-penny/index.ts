@@ -55,6 +55,7 @@ const ITEM = { type:'object', properties:{ name:{ type:'string' }, unit:{ type:'
   src:{ type:'string', enum:['price_list','stores','po','quotation','contract','estimate'] }, adj:{ type:'number', description:'Outlook allowance %; 0 for standard prices/quotations/contracts' },
   freq:{ type:'string', enum:['monthly','quarterly','semi','once','months'] }, m:{ type:'integer', minimum:1, maximum:12 }, ms:{ type:'array', items:{ type:'integer' } } }, required:['name','qty','price','freq'] };
 const TOOLS = [
+  { name:'get_charge_detail', description:'What is behind one charge: the monthly amounts a payee was charged under an expense line (by department), how the Head of Plant Operations tagged it (questionable / keep / left out of next budget, with the reason), any exclusion rule, and the individual Accounting transactions (date, label, reference, journal, account) when they were imported. Use whenever someone asks what a charge or payee is.', input_schema:S({ partner:{ type:'string', description:'Payee name, or part of it' }, line_item:{ type:'string', description:'Expense line, if known' }, year:{ type:'integer' } }, ['partner']) },
   { name:'get_budget', description:'The department budget for the budget year: status, OPEX lines with their items, CAPEX, totals by priority and open issues. Managers can only see their own department.', input_schema:S({ department:{ type:'string', description:'Department name (reviewers only); default = the one on screen or the user\'s own' } }) },
   { name:'get_actuals', description:'Accounting (Odoo) actual spending vs budget by expense line for a year, plus lines with spending but no budget. Accounting is the official record.', input_schema:S({ department:{ type:'string' }, year:{ type:'integer' } }) },
   { name:'get_item_usage', description:'What the department actually drew from stores and bought on PO per item in the last 12 months (quantities and latest prices).', input_schema:S({ department:{ type:'string' }, line_item:{ type:'string' } }) },
@@ -116,10 +117,31 @@ OPEN ISSUES: ${issues.join('; ') || 'none'}
 TO CONFIRM (questions and data gaps from the assistant draft; answered on the budget page under "To confirm" or via record_answer):
 ${(oi || []).map((x: any) => `- [item_id ${x.id}] ${x.kind} · ${x.status}: ${x.body}${x.answer ? ` → answer: ${x.answer}` : ''}`).join('\n') || '(none)'}`;
   }
+  if (name === 'get_charge_detail') {
+    if (!c.rev && !c.me.department_id) return 'Not available.';
+    const y = Number(a.year) || c.Y - 1, pat = String(a.partner || '').trim(); if (pat.length < 3) return 'Give at least 3 letters of the payee name.';
+    let q = c.db.from('bgt_actuals').select('department_id,line_item,month,amount,partner,excluded,left_out').eq('year', y).ilike('partner', `%${pat}%`);
+    if (a.line_item) q = q.eq('line_item', a.line_item);
+    const { data:ac } = await q; if (!ac?.length) return `No ${y} Accounting charges found for a payee like "${pat}"${a.line_item ? ' under ' + a.line_item : ''}.`;
+    const dn = (id: string) => c.depts.find(d => d.id === id)?.name || 'no department';
+    const by: Record<string, number[]> = {}; ac.forEach((x: any) => { const k = `${x.partner} · ${x.line_item} · ${dn(x.department_id)}${x.excluded ? ' [KEPT OUT OF PLANT OPEX]' : ''}${x.left_out ? ' [LEFT OUT OF NEXT BUDGET]' : ''}`; (by[k] ||= Array(12).fill(0))[x.month - 1] += Number(x.amount); });
+    let tx = 'Individual transactions: not imported for this period (they are saved from the next Accounting import).';
+    { let tq = c.db.from('bgt_actual_txns').select('txn_date,line_item,partner,label,ref,journal,account,amount,department_id').eq('year', y).ilike('partner', `%${pat}%`).order('txn_date').limit(60);
+      if (a.line_item) tq = tq.eq('line_item', a.line_item);
+      const { data:t } = await tq; if (t?.length) tx = `Individual transactions (${t.length}${t.length === 60 ? '+' : ''}):\n` + t.map((r: any) => `- ${r.txn_date} ${peso(Number(r.amount))} ${r.line_item}${r.label ? ' — ' + r.label : ''}${r.ref ? ' (ref ' + r.ref + ')' : ''}${r.journal ? ' [' + r.journal + ']' : ''}${r.account ? ' acct ' + r.account : ''}`).join('\n'); }
+    const { data:fl } = await c.svc.from('bgt_charge_flags').select('line_item,partner,status,reason,department_id').eq('year', y).ilike('partner', `%${pat}%`);
+    const { data:rl } = await c.svc.from('bgt_cost_exclusions').select('partner_pattern,line_items,category,note,active').eq('active', true);
+    const rules = (rl || []).filter((r: any) => pat.toLowerCase().includes(String(r.partner_pattern).toLowerCase()) || String(r.partner_pattern).toLowerCase().includes(pat.toLowerCase()));
+    return `${y} charges for payees like "${pat}" (Accounting, monthly):\n` + Object.entries(by).map(([k, v]) => `- ${k}: total ${peso(sum(v))}; ${v.map((x, i) => x ? `${M[i]} ${peso(x)}` : '').filter(Boolean).join(', ')}`).join('\n')
+      + `\nTags: ${(fl || []).map((f: any) => `${f.partner} · ${f.line_item}: ${f.status}${f.reason ? ' — ' + f.reason : ''}`).join('; ') || 'none'}`
+      + `\nExclusion rules: ${rules.map((r: any) => `${r.partner_pattern} (${r.category}): ${r.note || ''}`).join('; ') || 'none'}\n${tx}`
+      + `\nWhen you explain it: say what the payee most likely is and what the charges look like (regular monthly fee, one-off, growing), whether it fits plant operations and this expense line, and what to check with Accounting. Do not guess beyond the data — say plainly what is unknown.`;
+  }
   if (name === 'get_actuals') {
     const d = deptOf(c, a.department); if (!d) return 'No department found.';
     const y = Number(a.year) || c.Y - 1;
-    const ac: any[] = []; for (let f = 0; ; f += 1000) { const { data } = await c.db.from('bgt_actuals').select('line_item,month,amount,partner').eq('year', y).eq('department_id', d.id).eq('kind', 'opex').eq('excluded', false).range(f, f + 999); ac.push(...(data || [])); if (!data || data.length < 1000) break; }
+    const ac: any[] = []; for (let f = 0; ; f += 1000) { const { data } = await c.db.from('bgt_actuals').select('line_item,month,amount,partner,left_out').eq('year', y).eq('department_id', d.id).eq('kind', 'opex').eq('excluded', false).range(f, f + 999); ac.push(...(data || [])); if (!data || data.length < 1000) break; }
+    const lo = ac.filter((x: any) => x.left_out), loTxt = lo.length ? `\nLEFT OUT OF NEXT BUDGET (tagged by the Head of Plant Operations — included in the actuals above, but do not use them as a basis or propose them again): ` + Object.entries(lo.reduce((m: any, x: any) => { const k = `${x.partner} · ${x.line_item}`; m[k] = (m[k] || 0) + Number(x.amount); return m; }, {})).map(([k, v]) => `${k} ${peso(v as number)}`).join('; ') : '';
     const { data:cy } = await c.db.from('bgt_cycles').select('id').eq('year', y).maybeSingle();
     const bud: Record<string, number[]> = {};
     if (cy) { const { data:b } = await c.db.from('bgt_dept_budgets').select('id').eq('cycle_id', cy.id).eq('department_id', d.id).maybeSingle();
@@ -130,7 +152,7 @@ ${(oi || []).map((x: any) => `- [item_id ${x.id}] ${x.kind} · ${x.status}: ${x.
     const items = [...new Set([...Object.keys(act), ...Object.keys(bud)])];
     return `${d.name} ${y}, Accounting actuals Jan–${M[cl - 1]} vs budget same months:\n` + items.map(i => { const bY = sum((bud[i] || []).slice(0, cl)), aY = act[i] || 0;
       const top = Object.entries(pay[i] || {}).sort((x, z) => z[1] - x[1]).slice(0, 3).map(([p, v]) => `${p} ${peso(v)}`).join(', ');
-      return `- ${i}: budget ${peso(bY)}, actual ${peso(aY)}${!bY && aY ? ' [SPENT WITH NO BUDGET]' : bY && !aY ? ' [BUDGETED, NOTHING BOOKED]' : ''}; full-year pace ${peso(aY / cl * 12)}${top ? `; paid to ${top}` : ''}`; }).join('\n');
+      return `- ${i}: budget ${peso(bY)}, actual ${peso(aY)}${!bY && aY ? ' [SPENT WITH NO BUDGET]' : bY && !aY ? ' [BUDGETED, NOTHING BOOKED]' : ''}; full-year pace ${peso(aY / cl * 12)}${top ? `; paid to ${top}` : ''}`; }).join('\n') + loTxt;
   }
   if (name === 'get_item_usage') {
     const d = deptOf(c, a.department); if (!d) return 'No department found.';

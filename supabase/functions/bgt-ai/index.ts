@@ -60,6 +60,7 @@ async function deptHistory(db: SupabaseClient, deptId: string, year: number, nYe
   // previous budgets + actuals per line item for this department
   const out: any = {};
   for (const y of Array.from({ length:nYears }, (_, i) => year - 1 - i)) {
+    let leftOutNote = '';
     const { data:cy } = await db.from('bgt_cycles').select('id,basis,budget_months').eq('year', y).maybeSingle();
     let bud: Record<string, number> = {};
     if (cy) {
@@ -67,13 +68,15 @@ async function deptHistory(db: SupabaseClient, deptId: string, year: number, nYe
       if (b) { const { data:ol } = await db.from('bgt_opex_lines').select('line_item,annual').eq('budget_id', b.id);
         (ol || []).forEach((l: any) => bud[l.line_item || '(none)'] = (bud[l.line_item || '(none)'] || 0) + Number(l.annual)); }
     }
-    const { data:ac } = await db.from('bgt_actuals').select('line_item,month,amount,partner,kind').eq('year', y).eq('department_id', deptId).eq('excluded', false);
+    const { data:ac0 } = await db.from('bgt_actuals').select('line_item,month,amount,partner,kind,left_out').eq('year', y).eq('department_id', deptId).eq('excluded', false);
+    const ac = (ac0 || []).filter((a: any) => !a.left_out), lo = (ac0 || []).filter((a: any) => a.left_out);
+    if (lo.length) leftOutNote = `LEFT OUT OF NEXT BUDGET by the Head of Plant Operations (not in the history below; do not propose them): ` + Object.entries(lo.reduce((m: any, x: any) => { const k = `${x.partner} · ${x.line_item}`; m[k] = (m[k] || 0) + Number(x.amount); return m; }, {})).map(([k, v]) => `${k} ${peso(v as number)}`).join('; ');
     const opa = (ac || []).filter((a: any) => a.kind !== 'capex');
     const closed = opa.length ? Math.max(...opa.map((a: any) => a.month)) : 0;
     const act: Record<string, number> = {}, partners: Record<string, Record<string, number>> = {};
     opa.forEach((a: any) => { act[a.line_item] = (act[a.line_item] || 0) + Number(a.amount); const p = (partners[a.line_item] ||= {}); p[a.partner || '—'] = (p[a.partner || '—'] || 0) + Number(a.amount); });
     const monthly: Record<string, number[]> = {}; opa.forEach((a: any) => { (monthly[a.line_item] ||= Array(12).fill(0))[a.month - 1] += Number(a.amount); });
-    out[y] = { basis:cy?.basis, budgetMonths:cy?.budget_months || null, closed, bud, act, partners, monthly };
+    out[y] = { basis:cy?.basis, budgetMonths:cy?.budget_months || null, closed, bud, act, partners, monthly, leftOutNote };
   }
   return out;
 }
@@ -83,7 +86,7 @@ function historyText(h: any, only?: string) {
     if (!items.length) return `${y}: no data${only ? ' for this line item' : ''}.`;
     return `${y} (budget ${v.basis === 'approved' ? 'approved' : 'submitted, not formally approved'}${v.budgetMonths ? `; NOTE: several departments budgeted only Jan–${M[v.budgetMonths - 1]} that year, so a low budget figure may cover only part of the year` : ''}; actuals ${v.closed ? 'Jan–' + M[v.closed - 1] : 'not loaded'}):\n` +
       items.map(i => { const top = Object.entries(v.partners[i] || {}).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([p, a]: any) => `${p} ${peso(a)}`).join(', ');
-        return `- ${i}: budget ${peso(v.bud[i] || 0)}; actual ${peso(v.act[i] || 0)}${v.closed && v.closed < 12 && v.act[i] ? ` (full-year rate ${peso(v.act[i] / v.closed * 12)})` : ''}${top ? `; paid to ${top}` : ''}`; }).join('\n');
+        return `- ${i}: budget ${peso(v.bud[i] || 0)}; actual ${peso(v.act[i] || 0)}${v.closed && v.closed < 12 && v.act[i] ? ` (full-year rate ${peso(v.act[i] / v.closed * 12)})` : ''}${top ? `; paid to ${top}` : ''}`; }).join('\n') + (v.leftOutNote ? `\n${v.leftOutNote}` : '');
   }).join('\n\n');
 }
 async function kpiText(db: SupabaseClient, year: number) {

@@ -106,6 +106,12 @@ async function runTool(c: Ctx, name: string, a: any): Promise<string> {
       if (!Number(l.annual)) issues.push(`${nm(l)} has no payment month/amount`); if (l.similar_dept && !l.similar_note) issues.push(`${nm(l)} is similar to a ${l.similar_dept} proposal with no explanation`); });
     const crit = sum([...r.ol, ...r.cl].filter((l: any) => l.priority === 'Critical / Mandatory').map((l: any) => Number(l.annual))), all = sum([...r.ol, ...r.cl].map((l: any) => Number(l.annual)));
     if (all && crit / all > 0.6) issues.push(`${Math.round(100 * crit / all)}% of the amount is Critical / Mandatory — not everything can be critical`);
+    // reviewer tags on lines (Head of Plant Operations / MD): Revise lines need the department's attention first
+    { const ids = [...r.ol, ...r.cl].map((l: any) => l.id); const { data:rv } = ids.length ? await c.db.from('bgt_line_reviews').select('line_kind,line_id,reviewer_role,decision,comment,status,reply').in('line_id', ids) : { data:[] };
+      const W: Record<string, string> = { plant_head:'Head of Plant Operations', md:'MD', admin:'Admin' }, lname = (x: any) => nm([...r.ol, ...r.cl].find((l: any) => l.id === x.line_id) || {});
+      (rv || []).filter((x: any) => x.decision === 'revise' && x.status === 'open').forEach((x: any) => issues.unshift(`${lname(x)}: ${W[x.reviewer_role]} tagged it REVISE — "${x.comment || ''}" (MUST FIX: open the line, change it, then mark it fixed)`));
+      (rv || []).filter((x: any) => x.decision === 'revise' && x.status === 'done').forEach((x: any) => issues.push(`${lname(x)}: fixed by the department ("${x.reply || ''}"), waiting for ${W[x.reviewer_role]} to accept`));
+      (rv || []).filter((x: any) => x.decision === 'defer').forEach((x: any) => issues.push(`${lname(x)}: ${W[x.reviewer_role]} tagged it DEFER${x.comment ? ' — ' + x.comment : ''}`)); }
     const { data:oi } = await c.db.from('bgt_open_items').select('id,kind,body,answer,status').eq('budget_id', r.b.id).order('created_at');
     return `${d.name} ${c.Y} budget — status ${r.b.status}, version ${r.b.version}. Due to the MD ${c.due || 'n/a'}; CAPEX threshold ₱${thr.toLocaleString('en-PH')} per unit. OPEX ${peso(sum(r.ol.map((l: any) => Number(l.annual))))}, CAPEX ${peso(sum(r.cl.map((l: any) => Number(l.annual))))}.
 By priority: ${Object.entries(pr).map(([k, v]) => `${k} ${peso(v)}`).join('; ')}

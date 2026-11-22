@@ -1038,7 +1038,7 @@ async function loadMaster(){
 async function loadBudgets(){
   const { data, error } = await sb.from('bgt_dept_budgets').select('*').eq('cycle_id', S.cycle.id); if (error) throw error;
   S.budgets = data.sort((a,b)=> (deptById(a.department_id)?.sort||0) - (deptById(b.department_id)?.sort||0));
-  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{}), loadEndorse(), loadPlantSet()]);
+  await Promise.all([loadPriceReqs(), loadPrices().catch(()=>{}), loadEndorse(), loadPlantSet(), loadRvCounts()]);
   renderNav();
 }
 const deptById = id => S.depts.find(d=>d.id===id);
@@ -1119,7 +1119,7 @@ const NAV_ICON = {
 function renderNav(){
   const N = navModel(), on = v => S.view===v ? 'on' : '';
   const link = ([v,l]) => `<a class="${on(v)}" onclick="go('${v}')">${l}</a>`;
-  const dlink = b => `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}"><span>${esc(deptById(b.department_id)?.name)}</span><span class="dot st-${b.status}"></span></a>`;
+  const dlink = b => { const n = rvBadge(b); return `<a class="${S.view==='budget'&&S.budgetId===b.id?'on':''}" onclick="go('budget','${b.id}')" title="${STATUS_LABEL[b.status]}${n?` · ${n} line${n>1?'s':''} need${n>1?'':'s'} attention`:''}"><span>${esc(deptById(b.department_id)?.name)}</span>${n?`<span class="nbadge" style="margin-left:auto;margin-right:6px">${n}</span>`:''}<span class="dot st-${b.status}"></span></a>`; };
   S.navOpen = S.navOpen || {};
   $('#navMain').innerHTML = N.groups.map(g => g.depts
     ? (N.R ? `<details class="ngrp" ${S.navOpen[g.t]!==false?'open':''} ontoggle="S.navOpen['${g.t}']=this.open"><summary>${g.t} <span style="margin-left:auto;margin-right:6px;font-family:var(--mono);letter-spacing:0">${g.depts.length}</span></summary><nav class="nav sub" id="navDepts">${g.depts.map(dlink).join('')}</nav></details>`
@@ -1251,6 +1251,7 @@ async function openBudget(id){
       sb.from('bgt_capex_lines').select('*').eq('budget_id', id).order('sort').order('created_at'),
       sb.from('bgt_comments').select('*').eq('budget_id', id).order('created_at'),
       sb.from('bgt_events').select('*').eq('budget_id', id).order('created_at'),
+      sb.from('bgt_line_reviews').select('*').eq('budget_id', id).then(r => { S.rv = r.data||[]; return r; }),
       loadOpenItems(id),
       loadLyRef(id),
       loadOutlook(S.cycle.year).catch(()=>null)
@@ -1291,7 +1292,7 @@ function renderBudget(){
     return `<div class="${cls}"><b>${s[0]}</b><small>${done ? (b[s[1]] ? fmtDate(b[s[1]]) : 'Done') : (i===curIdx ? (b.status==='returned'?'Returned — needs changes':'In progress') : s[2])}</small></div>`; }).join('')}</div>
   ${lockedBanner()}${S.cycle.status==='open'?'<div id="olStrip"></div>':''}
   ${b.status==='returned' && lastReturn ? `<div class="banner red"><b>Returned by ${esc(userName(lastReturn.actor_id))}:</b> ${esc(lastReturn.note)}</div>` : ''}
-  ${myPreqStrip(b)}${cxeBanner(b)}${openItemsHtml(b)}
+  ${myPreqStrip(b)}${cxeBanner(b)}${rvBanner(b)}${openItemsHtml(b)}
   <div class="stats">
     <div class="stat opex"><div class="eyebrow">OPEX</div><div class="v">${short(opexT)}</div><div class="s">${S.opex.length} line${S.opex.length===1?'':'s'} · ${peso(opexT)}</div></div>
     <div class="stat capex"><div class="eyebrow">CAPEX</div><div class="v">${short(capexT)}</div><div class="s">${S.capex.length} item${S.capex.length===1?'':'s'} · ${peso(capexT)}</div></div>
@@ -1332,13 +1333,13 @@ function opexTableHtml(checks){
   const list = filterLines(S.opex, ['line_item','activity','description','priority','basis']);
   return `<div class="tbl-wrap"><table class="ledger"><thead><tr><th>Line item / activity</th><th>Type</th><th>Priority</th><th>Basis of estimate</th><th>Timing Jan–Dec</th><th class="r">Annual</th><th></th></tr></thead><tbody>
   ${list.map(l=>`<tr class="row" tabindex="0" onclick="editLine('opex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('opex','${l.id}')">
-    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div><div style="font-size:11.5px;color:${(l.items||[]).length?'var(--muted)':'var(--red)'}">${(l.items||[]).length ? `${l.items.length} item${l.items.length>1?'s':''}: ${esc(l.items.slice(0,3).map(x=>x.name).join(', '))}${l.items.length>3?'…':''}` : 'No items yet — list what this covers'}</div>${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}</td>
+    <td><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div>${rvCell('opex', l)}<div style="font-size:11.5px;color:${(l.items||[]).length?'var(--muted)':'var(--red)'}">${(l.items||[]).length ? `${l.items.length} item${l.items.length>1?'s':''}: ${esc(l.items.slice(0,3).map(x=>x.name).join(', '))}${l.items.length>3?'…':''}` : 'No items yet — list what this covers'}</div>${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}</td>
     <td>${esc(l.expense_type||'')}</td><td>${priPill(l.priority)}</td><td>${esc(l.basis||'')}</td>
     <td>${ply(l)}</td><td class="r num">${peso(annual(l))}</td><td>${flagFor(checks,'opex',l.id)}</td></tr>`).join('')}
   </tbody><tfoot><tr><td colspan="5">Total OPEX${S.search?' (filtered)':''}</td><td class="r num">${peso(sum(list.map(annual)))}</td><td></td></tr></tfoot></table></div>
   <div class="line-cards">${list.map(l=>`<button class="lcard" onclick="editLine('opex','${l.id}')">
     <div class="lc-top"><div><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div></div><div class="lc-amt num">${peso(annual(l))}</div></div>
-    <div class="lc-meta">${priPill(l.priority)}${l.expense_type?`<span>${esc(l.expense_type)}</span>`:''}${flagFor(checks,'opex',l.id)}</div>
+    <div class="lc-meta">${priPill(l.priority)}${l.expense_type?`<span>${esc(l.expense_type)}</span>`:''}${flagFor(checks,'opex',l.id)}</div>${rvCell('opex', l)}
     <div class="lc-items ${(l.items||[]).length?'':'none'}">${(l.items||[]).length ? `${l.items.length} item${l.items.length>1?'s':''}: ${esc(l.items.slice(0,3).map(x=>x.name).join(', '))}${l.items.length>3?'…':''}` : 'No items yet — tap to list what this covers'}</div>
     ${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}
     <div class="lc-ply">${ply(l)}</div></button>`).join('')}
@@ -1354,12 +1355,79 @@ function renderCapexTable(ed, checks){
   if (!S._cxaC && !S._cxaLoading) { S._cxaLoading = true; cxaContext().then(c=>{ S._cxaC = c; S._cxaLoading = false; if (S.tab==='capex') renderBudget(); }).catch(()=>{ S._cxaLoading = false; }); }
   return tb + `<div id="capexCarry"></div><div class="tbl-wrap"><table class="ledger"><thead><tr><th>Category / asset</th><th class="r">Qty</th><th class="r">Unit cost</th><th>Priority</th><th>Payment timing</th><th class="r">Annual</th><th class="r" title="Straight-line depreciation, from the month after purchase">Depreciation<br>${S.cycle.year} / full year</th>${locked?'<th>Status</th>':''}<th></th></tr></thead><tbody>
   ${list.map(l=>{ const d = dp(l); return `<tr class="row" tabindex="0" onclick="editLine('capex','${l.id}')" onkeydown="if(event.key==='Enter')editLine('capex','${l.id}')">
-    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${canEndorse(b) && !cxePendingFor(l.id) && !locked ? `<a class="cxa-tr" onclick="event.stopPropagation();endorseLine('${l.id}')">Transfer to another department…</a>` : ''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}${cxeRowNote(l)}</td>
+    <td><div class="item">${esc(l.category||'No category')}</div><div class="act">${esc(l.asset||'Untitled asset')}</div>${rvCell('capex', l)}${l.carried_from?'<div class="hint" style="font-size:11.5px">Carried over from an earlier year</div>':''}${canEndorse(b) && !cxePendingFor(l.id) && !locked ? `<a class="cxa-tr" onclick="event.stopPropagation();endorseLine('${l.id}')">Transfer to another department…</a>` : ''}${l.similar_dept?`<div style="font-size:11.5px;color:var(--amber)" title="${esc(l.similar_note||'')}">Similar to a ${esc(l.similar_dept)} proposal — ${l.similar_note?'difference explained':'not yet explained'}</div>`:''}${cxeRowNote(l)}</td>
     <td class="r num">${l.qty??''}</td><td class="r num">${l.unit_cost!=null?peso(l.unit_cost):''}</td><td>${priPill(l.priority)}${S._cxaC?`<div style="margin-top:4px">${cxaChip(cxaAdvise(l, S._cxaC))}</div>`:''}</td>
     <td>${plyCapex(l)}</td><td class="r num">${peso(annual(l))}</td><td class="r num" style="font-size:12.5px">${d?(d.life?`${short(d.inYear)} / ${short(d.yr)}`:'<span class="hint">not depreciated</span>'):''}</td>
     ${locked?`<td onclick="event.stopPropagation()">${capexChip(l.impl_status)}${canSt?` <a class="hint" style="cursor:pointer;color:var(--teal)" onclick="S.cx.cache={};capexStatusDialog('${l.id}')">Update</a>`:''}</td>`:''}<td>${flagFor(checks,'capex',l.id)}</td></tr>`; }).join('')}
   </tbody><tfoot><tr><td colspan="5">Total CAPEX</td><td class="r num">${peso(sum(list.map(annual)))}</td><td class="r num" style="font-size:12.5px">${AC?`${short(dT)} / ${short(dY)}`:''}</td>${locked?'<td></td>':''}<td></td></tr></tfoot></table></div>
   <p class="hint" style="padding:8px 14px;margin:0">Depreciation is a non-cash cost that the CAPEX adds to plant operating cost each year it is in use. ${AC?`These items add about ${short(dT)} in ${S.cycle.year} and ${short(dY)} in each full year after.`:''}</p>`;
+}
+
+/* ================= LINE REVIEW: the Head of Plant Operations and the MD tag each line =================
+   OPEX: Agree / Revise · CAPEX: Proceed / Defer / Revise. Revise stays with the reviewer: the department can edit only that line,
+   marks it fixed with a reply, and the reviewer accepts it. The department sees a badge and a list at the top of its budget. */
+const RV = { agree:{ l:'Agree', c:'#2e7d6b' }, proceed:{ l:'Proceed', c:'#2e7d6b' }, defer:{ l:'Defer', c:'#667085' }, revise:{ l:'Revise', c:'#b42318' } };
+const RV_WHO = { plant_head:'Head of Plant Operations', md:'MD', admin:'Admin' };
+const RV_SHORT = { plant_head:'Plant Head', md:'MD', admin:'Admin' };
+S.rv = []; S.rvc = [];
+const isLineReviewer = () => !S.preview && ['admin','plant_head','md'].includes(S.me?.role);
+const myRvRole = () => S.me.role==='md' ? 'md' : S.me.role==='plant_head' ? 'plant_head' : 'admin';
+const rvFor = (kind, id) => (S.rv||[]).filter(r=>r.line_kind===kind && r.line_id===id);
+const isBudgetDept = b => !S.preview && ['preparer','dept_manager'].includes(S.me?.role) && S.me.department_id===b?.department_id;
+const canFixLine = (kind, id) => S.cycle.status==='open' && isBudgetDept(budgetById(S.budgetId)) && rvFor(kind, id).some(r=>r.decision==='revise' && r.status==='open');
+async function loadRvCounts(){ try { const ids = (S.budgets||[]).map(b=>b.id); if (!ids.length) { S.rvc = []; return; } const { data } = await sb.from('bgt_line_reviews').select('budget_id,decision,status').in('budget_id', ids); S.rvc = data||[]; } catch(e){ S.rvc = []; } }
+// nav badge: the department sees its open Revise lines; reviewers see lines fixed and waiting for them
+function rvBadge(b){ const r = (S.rvc||[]).filter(x=>x.budget_id===b.id && x.decision==='revise'); return isBudgetDept(b) ? r.filter(x=>x.status==='open').length : isLineReviewer() ? r.filter(x=>x.status==='done').length : 0; }
+function rvCell(kind, l){
+  const R = rvFor(kind, l.id), mine = R.find(r=>r.reviewer_role===myRvRole());
+  const chips = R.map(r=>`<span class="chip" style="background:${RV[r.decision].c};color:#fff;font-size:10.5px;padding:1px 7px" title="${esc(r.comment||'')}">${RV_SHORT[r.reviewer_role]}: ${RV[r.decision].l}${r.decision==='revise'?(r.status==='done'?' — fixed, to check':r.status==='resolved'?' — done':''):''}</span>`).join(' ');
+  const opts = kind==='opex' ? ['agree','revise'] : ['proceed','defer','revise'];
+  const btns = isLineReviewer() && budgetById(S.budgetId)?.status!=='draft' ? opts.map(k=>`<button class="btn sm ${mine?.decision===k?'primary':'ghost'}" style="padding:1px 8px;font-size:11.5px" onclick="event.stopPropagation();rvSet('${kind}','${l.id}','${k}')">${RV[k].l}</button>`).join('') : '';
+  return chips || btns ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:4px" onclick="event.stopPropagation()">${chips}${btns}</div>` : '';
+}
+function rvSet(kind, id, dec){
+  const mine = rvFor(kind, id).find(r=>r.reviewer_role===myRvRole()), l = (kind==='opex'?S.opex:S.capex).find(x=>x.id===id), name = kind==='opex' ? (l?.activity||l?.line_item) : (l?.asset||l?.category);
+  modal2(`<h3>${RV[dec].l}: ${esc(name||'')}</h3><p class="hint" style="margin-top:-6px">${kind.toUpperCase()} · ${peso(annual(l||{}))} · your call as ${RV_WHO[myRvRole()]}</p>
+    <div class="field"><label for="rvC">${dec==='revise'?'What needs to change (the department sees this)':'Comment (optional)'}</label><textarea class="inp" id="rvC" rows="3" placeholder="${dec==='revise'?'e.g. Use the standard diesel price; spread it to the months it is actually needed':dec==='defer'?'e.g. Move to 2028 unless sales orders need it':''}">${esc(mine?.decision===dec?mine.comment||'':'')}</textarea></div>
+    <div class="actions" style="justify-content:space-between"><div>${mine?'<button class="btn ghost" id="rvX">Clear my call</button>':''}</div><div class="actions"><button class="btn ghost" onclick="closeModal2()">Cancel</button><button class="btn primary" id="rvGo">Save</button></div></div>`);
+  if (mine) $('#rvX').onclick = async () => { const r = await sb.from('bgt_line_reviews').delete().eq('id', mine.id); if (r.error) return fail(r.error); closeModal2(); await rvReload(); toast('Cleared'); };
+  $('#rvGo').onclick = async () => { const c = $('#rvC').value.trim(); if (dec==='revise' && !c) { toast('Say what needs to change — the department sees it.', true); return; }
+    const row = { budget_id:S.budgetId, line_kind:kind, line_id:id, reviewer_role:myRvRole(), reviewer_id:S.me.id, decision:dec, comment:c||null, status:dec==='revise'?'open':'resolved', updated_at:new Date().toISOString(), reply:null, replied_by:null, replied_at:null, seen_at:null };
+    const r = await sb.from('bgt_line_reviews').upsert(row, { onConflict:'line_kind,line_id,reviewer_role' }); if (r.error) return fail(r.error);
+    closeModal2(); await rvReload(); toast(dec==='revise' ? 'Tagged Revise — the department will see it on its budget' : `Tagged ${RV[dec].l}`); };
+}
+async function rvReload(){ const { data } = await sb.from('bgt_line_reviews').select('*').eq('budget_id', S.budgetId); S.rv = data||[]; await loadRvCounts(); renderNav(); renderBudget(); }
+// department: mark a revised line fixed (with a reply); reviewer: accept it or send it back for more changes
+function rvDone(kind, id, afterSave){
+  const R = rvFor(kind, id).filter(r=>r.decision==='revise' && r.status==='open'); if (!R.length) return;
+  modal2(`<h3>${afterSave?'Line saved — mark it fixed?':'Mark this line fixed'}</h3>${R.map(r=>`<p style="font-size:13px"><b>${RV_WHO[r.reviewer_role]}:</b> ${esc(r.comment||'')}</p>`).join('')}
+    <div class="field"><label for="rvR">Your reply (what you changed)</label><textarea class="inp" id="rvR" rows="3"></textarea></div>
+    <div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal2()">Not yet</button><button class="btn primary" id="rvGo">Mark fixed</button></div>`);
+  $('#rvGo').onclick = async () => { const rep = $('#rvR').value.trim(); if (!rep) { toast('Say what you changed.', true); return; }
+    for (const r of R) { const x = await sb.from('bgt_line_reviews').update({ status:'done', reply:rep, replied_by:S.me.id, replied_at:new Date().toISOString() }).eq('id', r.id); if (x.error) return fail(x.error); }
+    closeModal2(); await rvReload(); toast('Marked fixed — the reviewer will see it'); };
+}
+async function rvAccept(rid, ok){
+  const x = await sb.from('bgt_line_reviews').update(ok ? { status:'resolved', updated_at:new Date().toISOString() } : { status:'open', updated_at:new Date().toISOString() }).eq('id', rid); if (x.error) return fail(x.error);
+  closeDrawer(); await rvReload(); toast(ok ? 'Accepted' : 'Sent back to the department for more changes');
+}
+function rvDrawerHtml(kind, id){
+  const R = rvFor(kind, id); if (!R.length) return '';
+  return `<div class="box" style="border-left:4px solid ${R.some(r=>r.decision==='revise'&&r.status!=='resolved')?'#b42318':'#2e7d6b'};margin-bottom:12px">${R.map(r=>`<div style="margin-bottom:6px"><b>${RV_WHO[r.reviewer_role]}: ${RV[r.decision].l}</b>${r.comment?` — ${esc(r.comment)}`:''}
+    ${r.decision==='revise'?`<div class="hint">${r.status==='open'?'Waiting for the department to fix it.':r.status==='done'?`Fixed by the department: ${esc(r.reply||'')}`:'Accepted.'}</div>`:''}
+    ${r.decision==='revise'&&r.status==='done'&&isLineReviewer()&&r.reviewer_role===myRvRole()?`<div class="actions" style="margin-top:4px"><button class="btn sm primary" onclick="rvAccept('${r.id}',true)">Accept the fix</button><button class="btn sm ghost" onclick="rvAccept('${r.id}',false)">Still needs changes</button></div>`:''}</div>`).join('')}
+    ${canFixLine(kind, id)?`<div class="hint" style="margin-top:4px">You can edit this line while the budget stays with the reviewer. Save it, then mark it fixed. <a style="cursor:pointer;color:var(--teal)" onclick="rvDone('${kind}','${id}')">Mark fixed without changes</a></div>`:''}</div>`;
+}
+// top of the budget: what needs the department's attention / what is waiting for the reviewer
+function rvBanner(b){
+  const R = S.rv||[]; if (!R.length) return '';
+  const nm = r => { const l = (r.line_kind==='opex'?S.opex:S.capex).find(x=>x.id===r.line_id); return l ? (r.line_kind==='opex' ? (l.activity||l.line_item) : (l.asset||l.category)) : '(line removed)'; };
+  const row = r => `<li style="margin:3px 0"><a style="cursor:pointer;color:inherit;text-decoration:underline" onclick="S.tab='${r.line_kind}';editLine('${r.line_kind}','${r.line_id}')"><b>${esc(nm(r))}</b></a> <span class="hint">(${r.line_kind.toUpperCase()})</span> — ${RV_WHO[r.reviewer_role]}: ${esc(r.comment||'')}${r.reply?` <span class="hint">· reply: ${esc(r.reply)}</span>`:''}</li>`;
+  const open = R.filter(r=>r.decision==='revise' && r.status==='open'), done = R.filter(r=>r.decision==='revise' && r.status==='done');
+  const cnt = k => R.filter(r=>r.decision===k).length, sum0 = ['agree','proceed','defer','revise'].filter(k=>cnt(k)).map(k=>`${cnt(k)} ${RV[k].l}`).join(' · ');
+  if (isBudgetDept(b) && open.length) return `<div class="banner red"><b>Needs your attention — ${open.length} line${open.length>1?'s':''} tagged Revise.</b> Open each one, change it and mark it fixed; the budget stays with the reviewer.<ul style="margin:6px 0 0 18px">${open.map(row).join('')}</ul></div>`;
+  if (isLineReviewer() && done.length) return `<div class="banner amber"><b>${done.length} line${done.length>1?'s':''} fixed by the department — check and accept.</b><ul style="margin:6px 0 0 18px">${done.map(row).join('')}</ul></div>`;
+  return `<div class="banner blue"><b>Line review:</b> ${sum0}.${open.length?` ${open.length} waiting for the department.`:''}</div>`;
 }
 
 /* ================= SMART CHECKS ================= */
@@ -1483,7 +1551,7 @@ function lineCommentsHtml(kind, id){
   return c.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)"><b>${esc(userName(x.author_id))}</b> <span style="color:var(--faint);font-size:12px">${fmtDate(x.created_at)}</span><div>${esc(x.body)}</div></div>`).join('') || '<div style="color:var(--faint)">No comments on this line.</div>';
 }
 function editLine(kind, id){
-  const b = budgetById(S.budgetId), ed = canEdit(b), isO = kind==='opex';
+  const b = budgetById(S.budgetId), fixOnly = !canEdit(b) && !!id && canFixLine(kind, id), ed = canEdit(b) || fixOnly, isO = kind==='opex'; S._fixOnly = fixOnly;
   const l = id ? (isO?S.opex:S.capex).find(x=>x.id===id) : {m1:0,m2:0,m3:0,m4:0,m5:0,m6:0,m7:0,m8:0,m9:0,m10:0,m11:0,m12:0, ...(S._prefill||{})}; S._prefill = null;
   if (!l) return;
   const ro = ed ? '' : 'disabled';
@@ -1537,6 +1605,7 @@ function editLine(kind, id){
   <div class="drawer" role="dialog" aria-label="${isO?'OPEX line':'CAPEX item'}">
     <header><div><div class="eyebrow">${isO?'OPEX line':'CAPEX item'} · ${esc(deptById(b.department_id)?.name)}</div><h2>${id?esc(isO?(l.activity||'Untitled activity'):(l.asset||'Untitled asset')):(isO?'New OPEX line':'New CAPEX item')}</h2></div><button class="btn ghost" onclick="closeDrawer()" aria-label="Close">Close</button></header>
     <div class="body">
+      ${id ? rvDrawerHtml(kind, id) : ''}
       ${ed ? aiBoxHtml(kind, id) : ''}
       ${fields}
       <h3 style="font-size:16px;font-stretch:85%;margin:4px 0 8px">${isO?'When will it be incurred?':'When will it be paid?'}</h3>${isO?'<p class="hint" style="margin:-4px 0 8px">Adds up from the items and how often each is needed.</p>':''}
@@ -1550,7 +1619,7 @@ function editLine(kind, id){
       <div class="row-flex" style="margin-top:8px"><input class="inp" id="lineCmt" placeholder="Ask a question or leave a note" style="flex:1"><button class="btn" onclick="addComment('${kind}','${id}','lineCmt')">Post</button></div>`:''}
     </div>
     <footer>
-      <div class="actions">${ed&&id?`<button class="btn danger" onclick="deleteLine('${kind}','${id}')">Delete</button><button class="btn ghost" onclick="duplicateLine('${kind}','${id}')">Duplicate</button>`:''}${!isO?endorseBtn(b,id):''}</div>
+      <div class="actions">${ed&&id&&!fixOnly?`<button class="btn danger" onclick="deleteLine('${kind}','${id}')">Delete</button><button class="btn ghost" onclick="duplicateLine('${kind}','${id}')">Duplicate</button>`:''}${!isO?endorseBtn(b,id):''}</div>
       <div class="actions"><button class="btn ghost" onclick="closeDrawer()">${ed?'Cancel':'Close'}</button>${ed?`<button class="btn primary" onclick="saveLine('${kind}','${id||''}')">Save line</button>`:''}</div>
     </footer>
   </div>`;
@@ -1635,6 +1704,7 @@ async function saveLine(kind, id){
   if (res.error) return fail(res.error);
   if (id) Object.assign(list.find(x=>x.id===id), res.data); else list.push(res.data);
   closeDrawer(); toast('Line saved'); S.tab = kind; renderBudget();
+  if (id && S._fixOnly) { S._fixOnly = false; rvDone(kind, id, true); }
 }
 async function deleteLine(kind, id){
   modal(`<h3>Delete this line?</h3><p>${esc(lineName(kind,id))} will be removed from the budget. This can't be undone.</p><div class="actions" style="justify-content:flex-end"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn danger" id="delGo">Delete line</button></div>`);

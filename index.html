@@ -2819,6 +2819,24 @@ const KPI_DEFS = [
   ['oee_press1_pct','OEE — Press 1','%','pct'],['oee_press2_pct','OEE — Press 2','%','pct'],['reject_pct','Class B ratio (reject rate)','%','pct'],['reject_target_pct','Class B ratio — target','%','pct'],['headcount','Plant headcount','persons','num']
 ];
 const ALL_KPI = () => KPI_DEFS;
+const vN = v => v ? (v.target || v.est || v.run) : null;
+/* Peso per board by department — which boards each department's cost is divided by (agreed with Rommel, 2026-11-22).
+   Each department carries the boards it actually handles; a board is counted each time that department touches it. */
+const PPB_IN = ['volume_imported','volume_local_trade','raw_boards_imported'], PPB_TRADE = ['volume_imported','volume_local_trade'];
+const PPB_DRIVERS = [
+  { codes:['PROD'], short:'produced', label:'boards produced', why:'only boards made in the plant go through production', ms:['production_output'] },
+  { codes:['LOG'], short:'sold', label:'boards sold', why:'Logistics delivers only what is sold', ms:['volume_sold'] },
+  { codes:['WH','QA'], short:'handled', label:'incoming (trade + raw boards) + produced + sold', why:'Warehouse receives, stores and releases every board; QA/QC inspects incoming, produced and outgoing boards', ms:[...PPB_IN,'production_output','volume_sold'] },
+  { codes:['ENG','ADMIN','IT','PPIC'], short:'throughput', label:'produced + trade boards received (each board once)', why:'they serve every department and every board; raw boards are not added since they become produced boards', ms:['production_output',...PPB_TRADE] } ];
+const ppbDriver = code => { const d = PPB_DRIVERS.find(x=>x.codes.includes(code)) || PPB_DRIVERS[3]; return { ...d, boards:get => sum(d.ms.map(get)) }; };
+const PPB_METHOD = Y => [
+  `Each department's OPEX is divided by the boards that department handles:`,
+  ...PPB_DRIVERS.map(d => `• ${d.codes.map(c=>(S.depts.find(x=>x.code===c)||{}).name||c).join(', ')}: ${d.label} — ${d.why}.`),
+  `${Y} budget: ${Y} OPEX budget ÷ ${Y} boards. Boards sold = the ${Y} volume target. Any volume without its own ${Y} plan (produced, trade and raw boards received) is estimated from the sales target in the ${Y-1} mix (each volume as a share of boards sold, over the ${Y-1} months with both figures).`,
+  `${Y-1} plan: ${Y-1} budget ÷ the ${Y-1} volume target, with the other volumes in the ${Y-1} mix.`,
+  `${Y-1} actual: Accounting OPEX ÷ the boards actually handled, over the months that have both the OPEX actuals and the board figures.`,
+  `This is a management figure (full cost per board handled), not Accounting's inventory cost. Under PAS 2 only production costs and production overhead go into a board's inventory cost; admin, warehousing and delivery are period costs. Per-board figures also rise when the plant runs far below capacity.` ];   // budget-year volume: target, else estimated from the sales target, else last year's pace
+const vL = (v, Y) => !v ? '' : v.target ? 'target' : v.est ? 'from the sales target' : `at the ${Y-1} run rate`;
 // who enters which measure — the same rule is enforced in the database (bgt_kpi_can_edit)
 const KPI_EDIT = {
   PROD: k => ['production_output','yield_actual_pct','reject_pct','production_required'].includes(k) || k.startsWith('fi_'),
@@ -2880,6 +2898,8 @@ async function renderPerf(){
       </tbody></table></div>
       ${ed?`<div style="padding:12px 14px;text-align:right"><button class="btn primary" onclick="saveKpis(${Y})">Save figures</button></div>`:''}</div>
     ${kpiRemarksCard(Y, RM)}
+    <details class="card" style="margin-top:16px;padding:12px 14px"><summary style="cursor:pointer;font-weight:600">How board costs are computed</summary>
+      <div style="margin-top:8px;font-size:14px;line-height:1.55">${PPB_METHOD(S.cycle?.year||Y).map(t=>`<p style="margin:6px 0">${esc(t)}</p>`).join('')}</div></details>
     <div id="pfProj"></div>
     <div class="card" style="margin-top:16px"><h3>Yield, reject rate and OEE — year by year</h3>
       <div id="fiYears" style="padding:4px 14px 12px"><span class="hint">Loading…</span></div></div>
@@ -6329,6 +6349,18 @@ async function prsGatherPlant(){
     const tm = m==='volume_sold'?'volume_target':'production_target', ty = K1.find(k=>k.metric===tm && k.month===0), tmo = K1.filter(k=>k.metric===tm && k.month>0 && Number(k.value)>0);
     const tgt = ty && Number(ty.value) > 0 ? Number(ty.value) : tmo.length ? sum(tmo.map(k=>Number(k.value))) : null;
     vol[m] = { fy0:act + R.rate*sum(wd0.slice(R.last)), run:R.rate*sum(wd1), target:tgt, rate:R.rate }; });
+  // last year's mix: each volume as a share of boards sold, over the months that have both (missing receipts count as 0)
+  const VOLS = ['production_output','volume_imported','volume_local_trade','raw_boards_imported','raw_boards_sold'];
+  const kv0 = (m, mo) => { const r = K0.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
+  const mixMs = MONTHS.map((_,i)=>i+1).filter(mo => kv0('volume_sold',mo) > 0 && kv0('production_output',mo) != null), soldMix = sum(mixMs.map(mo=>kv0('volume_sold',mo)));
+  const mix = Object.fromEntries(VOLS.map(m => [m, soldMix ? sum(mixMs.map(mo=>kv0(m,mo)||0))/soldMix : 0]));
+  const sold1 = vol.volume_sold ? (vol.volume_sold.target || vol.volume_sold.run) : null;
+  if (vol.production_output && !vol.production_output.target && vol.volume_sold?.target && mix.production_output) vol.production_output.est = vol.volume_sold.target * mix.production_output;
+  // every volume for the year (for the per-department divisors): own target, else sales target × mix, else last year's pace
+  const vol1 = Object.fromEntries(VOLS.map(m => { const t = K1.filter(k=>k.metric===m); const ty = t.find(k=>k.month===0), tm = t.filter(k=>k.month>0 && Number(k.value)>0);
+    const own = ty && Number(ty.value)>0 ? Number(ty.value) : tm.length===12 ? sum(tm.map(k=>Number(k.value))) : null;
+    const R = projRate(K0, Y-1, m); return [m, own ?? (vol.volume_sold?.target ? vol.volume_sold.target*mix[m] : R ? R.rate*sum(wd1) : 0)]; }));
+  vol1.volume_sold = sold1 || 0;
   vol.trade = vol.volume_sold && vol.production_output ? Math.max(0, 1 - vol.production_output.fy0/vol.volume_sold.fy0) : null;
   // unit cost: OPEX per board, three years of actuals + the budget year at the run rate
   const per = [];
@@ -6338,7 +6370,7 @@ async function prsGatherPlant(){
       const f = m => { const ms = MONTHS.map((_,i)=>i+1).filter(mo=>g(m,mo)>0 && ac.some(a=>a.month===mo)); return ms.length ? sum(ac.filter(a=>ms.includes(a.month)).map(a=>Number(a.amount)))/sum(ms.map(mo=>g(m,mo))) : null; };
       return { y, prod:f('production_output'), sold:f('volume_sold') }; } catch(e){ return null; } }));
   per.push(...perY.filter(Boolean));
-  per.push({ y:Y, prod:vol.production_output?.run ? opexT/(vol.production_output.target || vol.production_output.run) : null, sold:vol.volume_sold?.run ? opexT/(vol.volume_sold.target || vol.volume_sold.run) : null, budget:true });
+  per.push({ y:Y, prod:vol.production_output?.run ? opexT/vN(vol.production_output) : null, sold:vol.volume_sold?.run ? opexT/vN(vol.volume_sold) : null, budget:true });
   // the cost outlook: standard prices and indicators
   const [{ data:std }, { data:asm }, { data:rep }] = await Promise.all([
     sb.from('bgt_price_items').select('item,unit,unit_price,source_type,notes').eq('budget_year', Y).eq('active', true),
@@ -6353,16 +6385,15 @@ async function prsGatherPlant(){
   let cxa = null; try { const C = await cxaContext(); cxa = capex.map(l=>({ l, a:cxaAdvise(l, C) })).sort((x,y)=>CXA[x.a.rec].o-CXA[y.a.rec].o || y.a.amt-x.a.amt); } catch(e){ console.error(e); }
   let ev = null; try { const o = await loadOutlook(Y); if ((o.E||[]).some(e=>e.status!=='closed')) ev = evReserve(o, opex); } catch(e){}
   const pri = {}; [...opex, ...capex].forEach(l => pri[l.priority||'No priority'] = (pri[l.priority||'No priority']||0) + annual(l));
-  // peso per board by department: production-side departments per board produced, the rest per board sold
-  const PPB_PROD = ['PROD','ENG','QA','PPIC'];
+  // peso per board by department — each department ÷ the boards it handles (PPB_DRIVERS, set with Rommel 2026-11-22)
   const kv = (K, m, mo) => { const r = K.find(k=>k.metric===m && k.month===mo); return r ? Number(r.value) : null; };
   const yrTgt = (K, m) => { const a = kv(K, m, 0); if (a) return a; const v = MONTHS.map((_,i)=>kv(K, m, i+1)).filter(x=>x>0); return v.length===12 ? sum(v) : null; };
   const lyActM = {}; (M?.rows||[]).forEach(r => (r.cells||[]).forEach(c => { const a = (lyActM[c.dept] ||= Array(12).fill(0)); c.act.forEach((v,i)=>a[i]+=v); }));
-  const ppb = depts.map(x => { const prod = PPB_PROD.includes(x.d.code), km = prod ? 'production_output' : 'volume_sold', v = prod ? vol.production_output : vol.volume_sold;
-    const b27 = v ? (v.target || v.run) : null, t26 = yrTgt(K0, prod ? 'production_target' : 'volume_target');
-    const ms = MONTHS.map((_,i)=>i+1).filter(mo => mo <= closed && kv(K0, km, mo) > 0), a = lyActM[x.d.id] || Array(12).fill(0);
-    const actB = sum(ms.map(mo=>kv(K0, km, mo))), actO = sum(ms.map(mo=>a[mo-1]));
-    return { d:x.d, basis:prod ? 'produced' : 'sold', cur:b27 ? x.opex/b27 : null, curTgt:!!v?.target, plan:t26 && x.lyBud ? x.lyBud/t26 : null, act:actB && actO ? actO/actB : null, actN:ms.length }; });
+  const t26 = yrTgt(K0, 'volume_target'), vol0 = t26 ? Object.fromEntries([...VOLS.map(m=>[m, t26*mix[m]]), ['volume_sold', t26]]) : null;   // last year's plan: its sales target in its own mix
+  const ppb = depts.map(x => { const dr = ppbDriver(x.d.code), ms = MONTHS.map((_,i)=>i+1).filter(mo => mo <= closed && kv(K0,'volume_sold',mo) > 0 && kv(K0,'production_output',mo) != null);
+    const a = lyActM[x.d.id] || Array(12).fill(0), actB = sum(ms.map(mo => dr.boards(m => kv(K0, m, mo)||0))), actO = sum(ms.map(mo=>a[mo-1]));
+    const b1 = dr.boards(m => vol1[m]||0), b0 = vol0 ? dr.boards(m => vol0[m]||0) : 0;
+    return { d:x.d, basis:dr.short, cur:b1 ? x.opex/b1 : null, b1, plan:b0 && x.lyBud ? x.lyBud/b0 : null, act:actB && actO ? actO/actB : null, actN:ms.length }; });
   return { kind:'plant', at, Y, company:S.company, site:S.site, opex, capex, opexT, capexT, lyBud:M?.budFY||0, lyView:M?.projFY||0, lyAct:M?.actYTD||0, lyBudYTD:M?.budYTD||0, closed,
     depts, lines, over, unb, ev, cxa, vol, wd1, per, ppb, std:std||[], asm:asm||[], rep:rep?.[0]?.content||null, repAt:rep?.[0]?.created_at||null, elec, pri,
     statusN:(st)=>bs.filter(b=>st.includes(b.status)).length, nBud:bs.length };
@@ -6407,13 +6438,13 @@ function prsDeckPlant(D){
   const boards = D.std.filter(p=>isPlantSet?.(p.item)).slice(0,3).map(p=>[p.item, `${peso(p.unit_price,2)}/${p.unit||''}`]);
   const infl = D.asm.filter(x=>/inflation|wage|minimum/i.test(x.key+' '+x.label)).slice(0,3).map(x=>[x.label, `${x.value??''}${x.unit&&x.unit!=='%'?' '+x.unit:x.unit==='%'?'%':''}`]);
   S_.push({ id:'assume', title:'Assumptions', live:()=>go('outlook'), html:() => `<h2>Assumptions behind the numbers</h2><div class="ps-2col">
-      <div><h3>Volume</h3>${kp([[`Boards sold ${Y-1}`, vS?prsNum(vS.fy0):'—', 'actual + projection'], [`Boards sold ${Y}`, vS?prsNum(vS.target||vS.run):'—', vS?.target?'target':'at the run rate'], [`Boards produced ${Y-1}`, vP?prsNum(vP.fy0):'—'], [`Boards produced ${Y}`, vP?prsNum(vP.target||vP.run):'—', vP?.target?'target':'at the run rate']], 'two')}
+      <div><h3>Volume</h3>${kp([[`Boards sold ${Y-1}`, vS?prsNum(vS.fy0):'—', 'actual + projection'], [`Boards sold ${Y}`, vS?prsNum(vN(vS)):'—', vL(vS, Y)], [`Boards produced ${Y-1}`, vP?prsNum(vP.fy0):'—'], [`Boards produced ${Y}`, vP?prsNum(vN(vP)):'—', vL(vP, Y)]], 'two')}
         <p class="ps-foot">${sum(D.wd1)} working days in ${Y} (Mon–${S.cal?.sat===false?'Fri':'Sat'}, closed after ${calTxt((S.cal||CAL_DEF).last)} to ${calTxt((S.cal||CAL_DEF).resume)}${(S.cal?.off||[]).filter(d=>d.startsWith(String(Y))).length?`, less ${(S.cal.off||[]).filter(d=>d.startsWith(String(Y))).length} holiday${(S.cal.off||[]).filter(d=>d.startsWith(String(Y))).length>1?'s':''}`:''})${D.vol.trade!=null?` · trade boards ≈ ${Math.round(100*D.vol.trade)}% of boards sold`:''}.</p></div>
       <div><h3>Cost outlook — standard prices for ${Y}</h3><table class="ps-tbl"><tbody>${[...outl, ...boards, ...infl].map(r=>`<tr><td>${esc(r[0])}</td><td class="r"><b>${esc(r[1])}</b></td></tr>`).join('') || '<tr><td>No standard prices set yet.</td></tr>'}</tbody></table>
         <p class="ps-foot">Fuel, the dollar and electricity are computed from the market outlook and what WCLI actually pays; board prices are set by the Head of Plant Operations.</p></div></div>`,
-    notes:() => `Volume: boards sold ${vS?prsNum(vS.target||vS.run):'n/a'}, produced ${vP?prsNum(vP.target||vP.run):'n/a'}. ${outl.length?'Prices: '+outl.map(r=>r.join(' ')).join('; ')+'.':''}`,
+    notes:() => `Volume: boards sold ${vS?prsNum(vN(vS)):'n/a'}, produced ${vP?prsNum(vN(vP)):'n/a'}. ${outl.length?'Prices: '+outl.map(r=>r.join(' ')).join('; ')+'.':''}`,
     pptx:(s, H) => { H.base(s, 'Assumptions behind the numbers');
-      H.tbl(s, ['Volume', `${Y-1}`, `${Y}`], [['Boards sold', vS?prsNum(vS.fy0):'—', vS?prsNum(vS.target||vS.run)+(vS.target?' (target)':' (run rate)'):'—'], ['Boards produced', vP?prsNum(vP.fy0):'—', vP?prsNum(vP.target||vP.run)+(vP.target?' (target)':' (run rate)'):'—'], ['Working days', '', String(sum(D.wd1))]], 1.5, [3.5,2.5,3.0]);
+      H.tbl(s, ['Volume', `${Y-1}`, `${Y}`], [['Boards sold', vS?prsNum(vS.fy0):'—', vS?prsNum(vN(vS))+' ('+vL(vS, Y)+')':'—'], ['Boards produced', vP?prsNum(vP.fy0):'—', vP?prsNum(vN(vP))+' ('+vL(vP, Y)+')':'—'], ['Working days', '', String(sum(D.wd1))]], 1.5, [3.5,2.5,3.0]);
       H.tbl(s, ['Standard price / indicator', `${Y}`], [...outl, ...boards, ...infl].map(r=>[r[0], r[1]]), 3.6, [6,3]); } });
   S_.push({ id:'pdept', title:'By department', live:()=>go('overview'), html:() => `<h2>By department</h2><table class="ps-tbl"><thead><tr><th>Department</th><th>Status</th><th class="r">OPEX ${Y}</th><th class="r">${Y-1} view</th><th class="r">Change</th><th class="r">CAPEX ${Y}</th><th class="r">Total</th></tr></thead><tbody>
       ${deptsS.map(x=>`<tr><td><b>${esc(x.d.name)}</b></td><td>${esc(STATUS_LABEL[x.status]||'No budget')}</td><td class="r">${short(x.opex)}</td><td class="r">${x.lyView?short(x.lyView):'—'}</td><td class="r ${x.opex>x.lyView?'up':'down'}">${x.lyView?prsPct(x.opex,x.lyView):'new'}</td><td class="r">${x.capex?short(x.capex):'—'}</td><td class="r"><b>${short(x.opex+x.capex)}</b></td></tr>`).join('')}
@@ -6424,7 +6455,7 @@ function prsDeckPlant(D){
   if ((D.ppb||[]).some(x=>x.cur||x.plan||x.act)) { const P = D.ppb.slice().sort((a,b)=>(b.cur||0)-(a.cur||0)), pp = v => v==null ? '—' : peso(v,2), n = D.ppb.find(x=>x.actN)?.actN || 0;
     const ch = x => x.cur!=null && x.act ? prsPct(x.cur, x.act) : '—', up = x => x.cur!=null && x.act && x.cur > x.act;
     const pl = (D.per||[]).find(p=>p.budget), last = (D.per||[]).find(p=>p.y===Y-1);
-    const foot = `${Y}: ${Y} budget ÷ ${Y} boards (sold: ${D.vol.volume_sold?.target?'target':Y-1+' run rate'}; produced: ${D.vol.production_output?.target?'target':Y-1+' run rate'}). ${Y-1} plan: ${Y-1} budget ÷ ${Y-1} target. ${Y-1} actual: Accounting OPEX ÷ boards, ${n?thru(n):'months with both figures'}. Production, Engineering, QA/QC and PPIC per board produced; Warehouse, Logistics, Plant Admin and IT per board sold.`;
+    const foot = `Each department ÷ the boards it handles — produced: Production · sold: Logistics · handled (incoming + produced + sold): Warehouse, QA/QC · throughput (produced + trade received): Engineering, Plant Admin, IT, PPIC. ${Y}: volume target; produced and received estimated from it in the ${Y-1} mix. ${Y-1} actual: ${n?thru(n):'months with both figures'}. Full method: Sales and plant performance → How board costs are computed.`;
     S_.push({ id:'pppb', title:'Peso per board by department', live:()=>go('perf'), html:() => `<h2>Peso per board by department</h2><table class="ps-tbl"><thead><tr><th>Department</th><th>Per board</th><th class="r">${Y} budget</th><th class="r">${Y-1} plan</th><th class="r">${Y-1} actual</th><th class="r">${Y} vs ${Y-1} actual</th></tr></thead><tbody>
         ${P.map(x=>`<tr><td><b>${esc(x.d.name)}</b></td><td>${x.basis}</td><td class="r"><b>${pp(x.cur)}</b></td><td class="r">${pp(x.plan)}</td><td class="r">${pp(x.act)}</td><td class="r ${up(x)?'up':'down'}">${ch(x)}</td></tr>`).join('')}
         ${pl?`<tr style="background:#f2f6f5"><td><b>Plant</b></td><td>produced</td><td class="r"><b>${pp(pl.prod)}</b></td><td class="r">—</td><td class="r">${pp(last?.prod)}</td><td class="r">${pl.prod&&last?.prod?prsPct(pl.prod,last.prod):'—'}</td></tr>
@@ -6440,7 +6471,7 @@ function prsDeckPlant(D){
   if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
       <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}</div>
       <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}</div></div>
-      <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${[['produced',vP],['sold',vS]].map(([k,v])=>`boards ${k} ${v?.target?'('+Math.round(v.target).toLocaleString('en-PH')+' target)':'at the '+(Y-1)+' run rate'}`).join('; ')}.</p>`,
+      <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${[['produced',vP],['sold',vS]].map(([k,v])=>`boards ${k} ${v?`(${prsNum(vN(v))}, ${vL(v, Y)})`:''}`).join('; ')}.</p>`,
     notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),
     pptx:(s, H) => { H.base(s, 'Plant OPEX per board'); const P2 = D.per.filter(p=>p.prod||p.sold);
       s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.5, w:12.3, h:5.3, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });
@@ -6495,12 +6526,12 @@ function prsDeckPlant(D){
   S_.push({ id:'papprove', title:'Approval requested', html:() => `<h2>Approval requested</h2><ol class="ps-dec">
       <li>Approve the ${Y} plant OPEX of <b>${short(D.opexT)}</b> (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).</li>
       <li>Approve <b>${D.capex.length}</b> CAPEX items totalling <b>${short(D.capexT)}</b>${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.</li>
-      <li>Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.</li>
+      <li>Confirm the volume assumption: ${vS?prsNum(vN(vS))+' boards sold':'—'}${vP?`, ${prsNum(vN(vP))} produced`:''}.</li>
       ${D.ev?.reserve?`<li>Approve a contingency reserve of <b>${short(D.ev.reserve)}</b>, held by the MD, for ${esc(D.ev.per.map(p=>p.e.title).join(', '))} — released only if it happens.</li>`:''}
       ${waiting?`<li>Note: ${waiting} department budget${waiting>1?'s are':' is'} still being finalised.</li>`:''}</ol>
       <div class="ps-sum">${Y} plant budget: <b>${short(D.opexT)}</b> OPEX + <b>${short(D.capexT)}</b> CAPEX = <b>${short(tot)}</b></div>`,
     notes:() => `Ask for approval of ${short(tot)}.`,
-    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vS.target||vS.run)+' boards sold':'—'}${vP?`, ${prsNum(vP.target||vP.run)} produced`:''}.`, ...(D.ev?.reserve?[`Approve a contingency reserve of ${short(D.ev.reserve)}, held by the MD, for ${D.ev.per.map(p=>p.e.title).join(', ')}.`]:[])].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
+    pptx:(s, H) => { H.base(s, 'Approval requested'); s.addText([`Approve the ${Y} plant OPEX of ${short(D.opexT)} (${prsPct(D.opexT, D.lyView)} vs the ${Y-1} full-year view).`, `Approve ${D.capex.length} CAPEX items totalling ${short(D.capexT)}${medCT?` — or defer the ${short(medCT)} marked Medium / Low`:''}.`, `Confirm the volume assumption: ${vS?prsNum(vN(vS))+' boards sold':'—'}${vP?`, ${prsNum(vN(vP))} produced`:''}.`, ...(D.ev?.reserve?[`Approve a contingency reserve of ${short(D.ev.reserve)}, held by the MD, for ${D.ev.per.map(p=>p.e.title).join(', ')}.`]:[])].map(t=>({ text:t, options:{ bullet:{ type:'number' }, breakLine:true } })), { x:0.6, y:1.55, w:12.1, h:4.2, fontFace:H.F, fontSize:18, color:H.INK, valign:'top', paraSpaceAfter:10 });
       s.addText(`${Y} plant budget: ${short(D.opexT)} OPEX + ${short(D.capexT)} CAPEX = ${short(tot)}`, { x:0.5, y:5.9, w:12.3, h:0.7, fontFace:H.F, fontSize:20, bold:true, color:'FFFFFF', fill:{ color:H.T }, align:'center' }); } });
   return S_;
 }

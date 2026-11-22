@@ -1339,7 +1339,7 @@ function opexTableHtml(checks){
   </tbody><tfoot><tr><td colspan="5">Total OPEX${S.search?' (filtered)':''}</td><td class="r num">${peso(sum(list.map(annual)))}</td><td></td></tr></tfoot></table></div>
   <div class="line-cards">${list.map(l=>`<button class="lcard" onclick="editLine('opex','${l.id}')">
     <div class="lc-top"><div><div class="item">${esc(l.line_item||'No line item')}</div><div class="act">${esc(l.activity||'Untitled activity')}</div></div><div class="lc-amt num">${peso(annual(l))}</div></div>
-    <div class="lc-meta">${priPill(l.priority)}${l.expense_type?`<span>${esc(l.expense_type)}</span>`:''}${flagFor(checks,'opex',l.id)}</div>${rvCell('opex', l)}
+    <div class="lc-meta">${priPill(l.priority)}${l.expense_type?`<span>${esc(l.expense_type)}</span>`:''}${flagFor(checks,'opex',l.id)}</div>${rvCell('opex', l, true)}
     <div class="lc-items ${(l.items||[]).length?'':'none'}">${(l.items||[]).length ? `${l.items.length} item${l.items.length>1?'s':''}: ${esc(l.items.slice(0,3).map(x=>x.name).join(', '))}${l.items.length>3?'…':''}` : 'No items yet — tap to list what this covers'}</div>
     ${l.calc?.ai?'<span class="chip basis-working" style="font-size:10.5px;padding:1px 7px">Assistant draft — open to confirm</span>':''}
     <div class="lc-ply">${ply(l)}</div></button>`).join('')}
@@ -1378,11 +1378,12 @@ const canFixLine = (kind, id) => S.cycle.status==='open' && isBudgetDept(budgetB
 async function loadRvCounts(){ try { const ids = (S.budgets||[]).map(b=>b.id); if (!ids.length) { S.rvc = []; return; } const { data } = await sb.from('bgt_line_reviews').select('budget_id,decision,status').in('budget_id', ids); S.rvc = data||[]; } catch(e){ S.rvc = []; } }
 // nav badge: the department sees its open Revise lines; reviewers see lines fixed and waiting for them
 function rvBadge(b){ const r = (S.rvc||[]).filter(x=>x.budget_id===b.id && x.decision==='revise'); return isBudgetDept(b) ? r.filter(x=>x.status==='open').length : isLineReviewer() ? r.filter(x=>x.status==='done').length : 0; }
-function rvCell(kind, l){
+function rvCell(kind, l, tagsOnly){
   const R = rvFor(kind, l.id), mine = R.find(r=>r.reviewer_role===myRvRole());
   const chips = R.map(r=>`<span class="chip" style="background:${RV[r.decision].c};color:#fff;font-size:10.5px;padding:1px 7px" title="${esc(r.comment||'')}">${RV_SHORT[r.reviewer_role]}: ${RV[r.decision].l}${r.decision==='revise'?(r.status==='done'?' — fixed, to check':r.status==='resolved'?' — done':''):''}</span>`).join(' ');
   const opts = kind==='opex' ? ['agree','revise'] : ['proceed','defer','revise'];
-  const btns = isLineReviewer() && budgetById(S.budgetId)?.status!=='draft' ? opts.map(k=>`<button class="btn sm ${mine?.decision===k?'primary':'ghost'}" style="padding:1px 8px;font-size:11.5px" onclick="event.stopPropagation();rvSet('${kind}','${l.id}','${k}')">${RV[k].l}</button>`).join('') : '';
+  const btns = !tagsOnly && isLineReviewer() && budgetById(S.budgetId)?.status!=='draft' ? opts.map(k=>`<button class="btn sm ${mine?.decision===k?'primary':'ghost'}" style="padding:1px 8px;font-size:11.5px" onclick="event.stopPropagation();rvSet('${kind}','${l.id}','${k}')">${RV[k].l}</button>`).join('') : '';
+  if (tagsOnly) return chips ? `<span style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${chips}</span>` : '';
   return chips || btns ? `<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:4px" onclick="event.stopPropagation()">${chips}${btns}</div>` : '';
 }
 function rvSet(kind, id, dec){
@@ -1394,7 +1395,7 @@ function rvSet(kind, id, dec){
   $('#rvGo').onclick = async () => { const c = $('#rvC').value.trim(); if (dec==='revise' && !c) { toast('Say what needs to change — the department sees it.', true); return; }
     const row = { budget_id:S.budgetId, line_kind:kind, line_id:id, reviewer_role:myRvRole(), reviewer_id:S.me.id, decision:dec, comment:c||null, status:dec==='revise'?'open':'resolved', updated_at:new Date().toISOString(), reply:null, replied_by:null, replied_at:null, seen_at:null };
     const r = await sb.from('bgt_line_reviews').upsert(row, { onConflict:'line_kind,line_id,reviewer_role' }); if (r.error) return fail(r.error);
-    closeModal2(); await rvReload(); toast(dec==='revise' ? 'Tagged Revise — the department will see it on its budget' : `Tagged ${RV[dec].l}`); };
+    closeModal2(); closeDrawer(); await rvReload(); toast(dec==='revise' ? 'Tagged Revise — the department will see it on its budget' : `Tagged ${RV[dec].l}`); };
 }
 async function rvReload(){ const { data } = await sb.from('bgt_line_reviews').select('*').eq('budget_id', S.budgetId); S.rv = data||[]; await loadRvCounts(); renderNav(); renderBudget(); }
 // department: mark a revised line fixed (with a reply); reviewer: accept it or send it back for more changes
@@ -1412,11 +1413,13 @@ async function rvAccept(rid, ok){
   closeDrawer(); await rvReload(); toast(ok ? 'Accepted' : 'Sent back to the department for more changes');
 }
 function rvDrawerHtml(kind, id){
-  const R = rvFor(kind, id); if (!R.length) return '';
+  const R = rvFor(kind, id), mine = R.find(r=>r.reviewer_role===myRvRole()), opts = kind==='opex' ? ['agree','revise'] : ['proceed','defer','revise'];
+  const tagBtns = isLineReviewer() && budgetById(S.budgetId)?.status!=='draft' ? `<div class="actions" style="margin:${R.length?'8px 0 0':'0'};gap:6px"><span class="hint" style="margin-right:4px">Your call:</span>${opts.map(k=>`<button class="btn sm ${mine?.decision===k?'primary':''}" onclick="rvSet('${kind}','${id}','${k}')">${RV[k].l}</button>`).join('')}</div>` : '';
+  if (!R.length) return tagBtns ? `<div class="box" style="margin-bottom:12px">${tagBtns}</div>` : '';
   return `<div class="box" style="border-left:4px solid ${R.some(r=>r.decision==='revise'&&r.status!=='resolved')?'#b42318':'#2e7d6b'};margin-bottom:12px">${R.map(r=>`<div style="margin-bottom:6px"><b>${RV_WHO[r.reviewer_role]}: ${RV[r.decision].l}</b>${r.comment?` — ${esc(r.comment)}`:''}
     ${r.decision==='revise'?`<div class="hint">${r.status==='open'?'Waiting for the department to fix it.':r.status==='done'?`Fixed by the department: ${esc(r.reply||'')}`:'Accepted.'}</div>`:''}
     ${r.decision==='revise'&&r.status==='done'&&isLineReviewer()&&r.reviewer_role===myRvRole()?`<div class="actions" style="margin-top:4px"><button class="btn sm primary" onclick="rvAccept('${r.id}',true)">Accept the fix</button><button class="btn sm ghost" onclick="rvAccept('${r.id}',false)">Still needs changes</button></div>`:''}</div>`).join('')}
-    ${canFixLine(kind, id)?`<div class="hint" style="margin-top:4px">You can edit this line while the budget stays with the reviewer. Save it, then mark it fixed. <a style="cursor:pointer;color:var(--teal)" onclick="rvDone('${kind}','${id}')">Mark fixed without changes</a></div>`:''}</div>`;
+    ${canFixLine(kind, id)?`<div class="hint" style="margin-top:4px">You can edit this line while the budget stays with the reviewer. Save it, then mark it fixed. <a style="cursor:pointer;color:var(--teal)" onclick="rvDone('${kind}','${id}')">Mark fixed without changes</a></div>`:''}${tagBtns}</div>`;
 }
 // top of the budget: what needs the department's attention / what is waiting for the reviewer
 function rvBanner(b){

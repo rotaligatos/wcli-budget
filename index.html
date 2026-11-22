@@ -3910,7 +3910,7 @@ function projCard(L, PJ, RG){
    CAPEX category, active events (El Niño…) and how full the plant is (boards produced vs capacity). */
 const CXA = {
   push:{ l:'Push — do it early', s:'Push', c:'#c4320a', o:1 }, proceed:{ l:'Proceed as planned', s:'Proceed', c:'#2e7d6b', o:2 },
-  hold:{ l:'Hold until…', s:'Hold', c:'#b88a00', o:3 }, defer:{ l:'Defer to next year', s:'Defer', c:'#667085', o:4 },
+  hold:{ l:'Hold for now', s:'Hold', c:'#b88a00', o:3 }, defer:{ l:'Defer to next year', s:'Defer', c:'#667085', o:4 },
   opex:{ l:'Move to OPEX', s:'OPEX', c:'#3b6fb6', o:5 }, incomplete:{ l:'No amount yet', s:'No amount', c:'#98a2b3', o:6 } };
 // words in an asset that tie it to an expense line an event raises
 const CXA_EV = [
@@ -6328,7 +6328,11 @@ async function prsGatherPlant(){
   const [cur, ly] = await Promise.all([loadYearData(Y, null), loadYearData(Y-1, null).catch(()=>null)]);
   const M = ly ? actModel(ly, 'budget') : null;
   const bs = (S.budgets||[]).filter(b=>b.cycle_id===S.cycle.id);
-  const opex = cur.bud, capex = cur.capBud, opexT = sum(opex.map(annual)), capexT = sum(capex.map(annual));
+  // full lines (asset, priority, justification, items…) — the year data only carries amounts and months
+  const bIds = bs.map(b=>b.id), dOf = Object.fromEntries(bs.map(b=>[b.id, b.department_id]));
+  const [oF, cF] = bIds.length ? await Promise.all([fetchAll(()=>sb.from('bgt_opex_lines').select('*').in('budget_id', bIds).order('sort')), fetchAll(()=>sb.from('bgt_capex_lines').select('*').in('budget_id', bIds).order('sort'))]) : [null, null];
+  const opex = oF ? oF.map(l=>({ ...l, department_id:dOf[l.budget_id] })) : cur.bud, capex = cF ? cF.map(l=>({ ...l, department_id:dOf[l.budget_id] })) : cur.capBud;
+  const opexT = sum(opex.map(annual)), capexT = sum(capex.map(annual));
   // departments: this year vs last year's full-year view
   const lyDept = {}; (M?.rows||[]).forEach(r => Object.entries(r.depts||{}).forEach(([d,v]) => lyDept[d] = (lyDept[d]||0) + v));
   const lyDeptBud = {}; (ly?.bud||[]).forEach(l => lyDeptBud[l.department_id] = (lyDeptBud[l.department_id]||0) + annual(l));

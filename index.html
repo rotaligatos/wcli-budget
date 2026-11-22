@@ -6290,8 +6290,10 @@ async function prsGatherPlant(){
   await loadCal(); const K0 = await loadKpis(Y-1).catch(()=>[]), K1 = await loadKpis(Y).catch(()=>[]);
   const wd0 = MONTHS.map((_,i)=>workDays(Y-1,i+1)), wd1 = MONTHS.map((_,i)=>workDays(Y,i+1));
   const vol = {}; ['volume_sold','production_output'].forEach(m => { const R = projRate(K0, Y-1, m); if (!R) return; const act = sum(K0.filter(k=>k.metric===m && k.month>0).map(k=>Number(k.value)));
-    const tgt = K1.find(k=>k.metric===(m==='volume_sold'?'volume_target':'production_target') && k.month===0);
-    vol[m] = { fy0:act + R.rate*sum(wd0.slice(R.last)), run:R.rate*sum(wd1), target:tgt?Number(tgt.value):null, rate:R.rate }; });
+    // the year's target: the Year column, else the 12 monthly figures added up
+    const tm = m==='volume_sold'?'volume_target':'production_target', ty = K1.find(k=>k.metric===tm && k.month===0), tmo = K1.filter(k=>k.metric===tm && k.month>0 && Number(k.value)>0);
+    const tgt = ty && Number(ty.value) > 0 ? Number(ty.value) : tmo.length ? sum(tmo.map(k=>Number(k.value))) : null;
+    vol[m] = { fy0:act + R.rate*sum(wd0.slice(R.last)), run:R.rate*sum(wd1), target:tgt, rate:R.rate }; });
   vol.trade = vol.volume_sold && vol.production_output ? Math.max(0, 1 - vol.production_output.fy0/vol.volume_sold.fy0) : null;
   // unit cost: OPEX per board, three years of actuals + the budget year at the run rate
   const per = [];
@@ -6380,7 +6382,7 @@ function prsDeckPlant(D){
   if (D.per.some(p=>p.prod||p.sold)) S_.push({ id:'punit', title:'Cost per board', live:()=>go('perf'), html:() => `<h2>Plant OPEX per board</h2><div class="ps-2col">
       <div><h3>Per board produced</h3>${prsBars(D.per.filter(p=>p.prod).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.prod, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.prod||0),1)).replace(/₱([\d.]+)K/g,(m)=>m)}</div>
       <div><h3>Per board sold</h3>${prsBars(D.per.filter(p=>p.sold).map(p=>({ label:p.budget?`${p.y} budget`:String(p.y), v:p.sold, c:p.budget?'#0f5a52':'#98a2b3' })), Math.max(...D.per.map(p=>p.sold||0),1))}</div></div>
-      <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${vS?.target||vP?.target?'target':'boards at the '+(Y-1)+' run rate'}.</p>`,
+      <p class="ps-foot">Past years: Accounting OPEX ÷ boards, months with both figures. ${Y}: budget ÷ ${[['produced',vP],['sold',vS]].map(([k,v])=>`boards ${k} ${v?.target?'('+Math.round(v.target).toLocaleString('en-PH')+' target)':'at the '+(Y-1)+' run rate'}`).join('; ')}.</p>`,
     notes:() => D.per.map(p=>`${p.y}${p.budget?' budget':''}: ${p.prod?peso(p.prod,0)+' per board produced':''}${p.sold?', '+peso(p.sold,0)+' per board sold':''}`).join('; '),
     pptx:(s, H) => { H.base(s, 'Plant OPEX per board'); const P2 = D.per.filter(p=>p.prod||p.sold);
       s.addChart(H.P.ChartType.bar, [{ name:'Per board produced', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.prod||0)) }, { name:'Per board sold', labels:P2.map(p=>p.budget?`${p.y} budget`:String(p.y)), values:P2.map(p=>Math.round(p.sold||0)) }], { x:0.5, y:1.5, w:12.3, h:5.3, barDir:'col', barGrouping:'clustered', chartColors:[H.T,'98A2B3'], showValue:true, dataLabelFormatCode:'"₱"#,##0', dataLabelFontSize:10, valAxisHidden:true, showLegend:true, legendPos:'b' }); } });

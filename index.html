@@ -666,7 +666,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-11-24 00:05</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-11-24 00:10</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1225,7 +1225,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:05</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:10</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -3770,7 +3770,7 @@ async function aiBudgetAdd(){
   const pick = k => [...document.querySelectorAll('.abc')].filter(e=>e.checked && e.dataset.k===k).map(e=>Number(e.dataset.i));
   const base = Math.max(0, ...S.opex.map(x=>x.sort||0), ...S.capex.map(x=>x.sort||0));
   const opex = pick('o').map((i,j)=>{ const l = r.lines[i], row = { budget_id:b.id, line_item:l.line_item, expense_type:l.expense_type, activity:l.activity, description:l.description, purpose:l.purpose, basis:l.basis, priority:l.priority,
-    remarks:`Assistant draft: ${l.rationale||''} — review and confirm.`, calc:{ ai:true, qty:Number(l.qty)||null, unit:l.unit||null, rate:Number(l.rate)||null, times:Number(l.times)||null }, sort:base+j+1 };
+    remarks:`Assistant draft (${l.confidence||'medium'} confidence): ${l.rationale||''} — review and confirm.`, calc:{ ai:true, qty:Number(l.qty)||null, unit:l.unit||null, rate:Number(l.rate)||null, times:Number(l.times)||null }, sort:base+j+1 };
     // the last month gets any rounding difference
     const m = l.months.slice(); const diff = Math.round((Number(l.annual) - sum(m))*100)/100; if (diff) { const k = m.map((v,x)=>v?x:-1).filter(x=>x>=0).pop() ?? 11; m[k] = Math.round((m[k]+diff)*100)/100; }
     m.forEach((v,k)=>row['m'+(k+1)] = v || 0); return row; });

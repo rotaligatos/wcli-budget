@@ -666,7 +666,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-11-23 23:45</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-11-24 00:05</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -722,6 +722,18 @@ function bgtItemsSheet(wb, groups){
 }
 
 // fit rows to their text: wrap text cells and grow each row's height so nothing is cut off (Excel keeps fixed template row heights)
+// remarks for the Excel exports: no assistant confidence tag; CAPEX lines start with the reviewers' calls (or "No approval yet")
+const XL_RV_ORDER = ['plant_head','md','admin'];
+function xlRemarks(l, kind, reviews){
+  const own = String(l.remarks || '').replace(/\s*\((?:high|medium|low)\s+confidence\)/gi, '').trim();
+  if (kind !== 'capex') return own;
+  const R = (reviews || []).filter(r => r.line_kind === 'capex' && r.line_id === l.id).sort((a, b) => XL_RV_ORDER.indexOf(a.reviewer_role) - XL_RV_ORDER.indexOf(b.reviewer_role));
+  const who = { plant_head:'Head of Plant Operations', md:'MD', admin:'Admin' }, lbl = { proceed:'Proceed', defer:'Defer', revise:'Revise', agree:'Agree' };
+  const calls = R.length ? R.map(r => `${who[r.reviewer_role] || r.reviewer_role}: ${lbl[r.decision] || r.decision}${r.comment ? ' — ' + r.comment.trim() : ''}`
+      + (r.decision === 'revise' ? (r.status === 'done' ? ` (department fixed it${r.reply ? ': ' + r.reply.trim() : ''}; waiting for acceptance)` : r.status === 'resolved' ? ' (fix accepted)' : ' (waiting for the department to fix it)') : '')).join('\n')
+    : 'No approval yet';
+  return own ? `${calls}\nDepartment remarks: ${own}` : calls;
+}
 function xlLines(text, width, size){
   const per = Math.max(4, Math.floor((width || 10) * 11 / (size || 11) * 1.15) - 1);
   return String(text).split(/\r?\n/).reduce((n, para) => { let lines = 1, cur = 0;
@@ -809,14 +821,14 @@ async function fillDeptWorkbook(ExcelJS, templateBuf, d){
     row.getCell(1).value = l.line_item || ''; row.getCell(2).value = l.expense_type || '';
     row.getCell(3).value = l.activity || ''; row.getCell(4).value = l.description || '';
     row.getCell(5).value = l.purpose || ''; row.getCell(6).value = l.basis || '';
-    row.getCell(7).value = l.priority || ''; row.getCell(21).value = l.remarks || '';
+    row.getCell(7).value = l.priority || ''; row.getCell(21).value = xlRemarks(l, 'opex', d.reviews);
   }, 'TOTAL OPEX BUDGET');
   fixDetail(capexWs, d.capex, (row, l) => {
     row.getCell(1).value = l.category || ''; row.getCell(2).value = l.asset || '';
     row.getCell(3).value = l.description || ''; row.getCell(4).value = l.justification || '';
     row.getCell(5).value = l.qty == null ? null : Number(l.qty);
     row.getCell(6).value = l.unit_cost == null ? null : Number(l.unit_cost); row.getCell(6).numFmt = BGT_PESO;
-    row.getCell(7).value = l.priority || ''; row.getCell(21).value = l.remarks || '';
+    row.getCell(7).value = l.priority || ''; row.getCell(21).value = xlRemarks(l, 'capex', d.reviews);
   }, 'TOTAL CAPEX BUDGET');
   fixSummary(wb.getWorksheet('OPEX Summary'), 'OPEX - Detailed', 'line_item', d.opex, 66);
   fixSummary(wb.getWorksheet('CAPEX Summary'), 'CAPEX - Detailed', 'category', d.capex, 16);
@@ -886,14 +898,14 @@ async function buildPlantWorkbook(ExcelJS, p){
   // 4) all OPEX lines
   ws = wb.addWorksheet('All OPEX Lines');
   hr = ws.addRow(['Department','Expense Line Item','Type of Expense','Activity / Initiative','Description / Scope','Business Purpose','Basis of Estimate','Priority',...BGT_MONTHS,'Annual Budget','Remarks']); styleHeader(hr);
-  p.depts.forEach(d => d.opex.forEach(l => { const m=bgtMonthsOf(l); ws.addRow([d.name,l.line_item,l.expense_type,l.activity,l.description,l.purpose,l.basis,l.priority,...m,bgtSum(m),l.remarks]); }));
+  p.depts.forEach(d => d.opex.forEach(l => { const m=bgtMonthsOf(l); ws.addRow([d.name,l.line_item,l.expense_type,l.activity,l.description,l.purpose,l.basis,l.priority,...m,bgtSum(m),xlRemarks(l,'opex',p.reviews)]); }));
   money(ws,9,21); ws.autoFilter = {from:'A1', to:{row:1,column:22}}; ws.views=[{state:'frozen',ySplit:1}];
   [16,34,20,30,40,36,22,18].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(22).width=40;
 
   // 5) all CAPEX lines
   ws = wb.addWorksheet('All CAPEX Lines');
   hr = ws.addRow(['Department','CAPEX Category','Asset / Project','Detailed Description','Business Justification','Qty','Unit Cost','Priority',...BGT_MONTHS,'Annual Budget','Remarks']); styleHeader(hr);
-  p.depts.forEach(d => d.capex.forEach(l => { const m=bgtMonthsOf(l); ws.addRow([d.name,l.category,l.asset,l.description,l.justification,l.qty==null?null:Number(l.qty),l.unit_cost==null?null:Number(l.unit_cost),l.priority,...m,bgtSum(m),l.remarks]); }));
+  p.depts.forEach(d => d.capex.forEach(l => { const m=bgtMonthsOf(l); ws.addRow([d.name,l.category,l.asset,l.description,l.justification,l.qty==null?null:Number(l.qty),l.unit_cost==null?null:Number(l.unit_cost),l.priority,...m,bgtSum(m),xlRemarks(l,'capex',p.reviews)]); }));
   money(ws,7,7); money(ws,9,21); ws.autoFilter = {from:'A1', to:{row:1,column:22}}; ws.views=[{state:'frozen',ySplit:1}];
   [16,26,30,40,40,8,14,18].forEach((w,i)=>ws.getColumn(i+1).width=w); ws.getColumn(22).width=40;
   if (p.depts.some(d=>(d.opex||[]).some(l=>(l.items||[]).length))) bgtItemsSheet(wb, p.depts);
@@ -1213,7 +1225,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-23 23:45</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:05</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1796,14 +1808,15 @@ async function duplicateLine(kind, id){
 }
 
 /* ================= EXPORT ================= */
-function deptPayload(b, opex, capex){
+function deptPayload(b, opex, capex, reviews){
   return { company:S.company.name, deptName:deptById(b.department_id)?.name, year:S.cycle.year, preparedBy:b.prepared_by, datePrepared:b.date_prepared,
-    deptHead:b.dept_head, version:'v'+b.version, status:STATUS_LABEL[b.status], opex, capex };
+    deptHead:b.dept_head, version:'v'+b.version, status:STATUS_LABEL[b.status], opex, capex, reviews:(reviews||[]).filter(r=>r.budget_id===b.id) };
 }
+async function loadReviewsFor(ids){ if (!ids.length) return []; const { data, error } = await sb.from('bgt_line_reviews').select('*').in('budget_id', ids); if (error) throw error; return data||[]; }
 async function exportDept(){
   try {
     const b = budgetById(S.budgetId);
-    const buf = await fillDeptWorkbook(ExcelJS, b64ToBuf(TEMPLATE_B64), deptPayload(b, S.opex, S.capex));
+    const buf = await fillDeptWorkbook(ExcelJS, b64ToBuf(TEMPLATE_B64), deptPayload(b, S.opex, S.capex, await loadReviewsFor([b.id])));
     download(buf, `${S.cycle.year} Budget - ${deptById(b.department_id)?.name.replace(/[\/\\]/g,'-')} - ${S.company.code}.xlsx`);
     toast('Excel file downloaded');
   } catch(e){ fail(e); }
@@ -1924,16 +1937,16 @@ function ovDupCard(c){
 function topItems(o){ const m={}; o.forEach(l=>{ const k=l.line_item||'(no line item)'; m[k]=(m[k]||0)+annual(l); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10); }
 async function exportPlant(){
   try {
-    const { o, c } = S._all || await loadAllLines();
-    const buf = await buildPlantWorkbook(ExcelJS, { company:S.company.name, site:S.site?.name||'', year:S.cycle.year, generated:new Date().toLocaleString('en-PH'), opexItems:S.items.opex,
+    const { o, c } = S._all || await loadAllLines(); const reviews = await loadReviewsFor(S.budgets.map(b=>b.id));
+    const buf = await buildPlantWorkbook(ExcelJS, { company:S.company.name, site:S.site?.name||'', year:S.cycle.year, generated:new Date().toLocaleString('en-PH'), opexItems:S.items.opex, reviews,
       depts:S.budgets.map(b=>({ name:deptById(b.department_id)?.name, status:STATUS_LABEL[b.status], opex:o.filter(x=>x.budget_id===b.id), capex:c.filter(x=>x.budget_id===b.id) })) });
     download(buf, `${S.cycle.year} Budget - ${S.site?.name||'Plant'} Summary - ${S.company.code}.xlsx`); toast('Plant summary downloaded');
   } catch(e){ fail(e); }
 }
 async function exportAllDepts(){
   try {
-    const { o, c } = S._all || await loadAllLines(); const zip = new JSZip(); const tpl = b64ToBuf(TEMPLATE_B64);
-    for (const b of S.budgets) { const buf = await fillDeptWorkbook(ExcelJS, tpl, deptPayload(b, o.filter(x=>x.budget_id===b.id), c.filter(x=>x.budget_id===b.id)));
+    const { o, c } = S._all || await loadAllLines(); const zip = new JSZip(); const tpl = b64ToBuf(TEMPLATE_B64); const reviews = await loadReviewsFor(S.budgets.map(b=>b.id));
+    for (const b of S.budgets) { const buf = await fillDeptWorkbook(ExcelJS, tpl, deptPayload(b, o.filter(x=>x.budget_id===b.id), c.filter(x=>x.budget_id===b.id), reviews));
       zip.file(`${S.cycle.year} Budget - ${deptById(b.department_id)?.name.replace(/[\/\\]/g,'-')} - ${S.company.code}.xlsx`, buf); }
     const blob = await zip.generateAsync({type:'blob'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${S.cycle.year} Budget - all departments - ${S.company.code}.zip`; a.click();
     toast('All department files downloaded');
@@ -3757,7 +3770,7 @@ async function aiBudgetAdd(){
   const pick = k => [...document.querySelectorAll('.abc')].filter(e=>e.checked && e.dataset.k===k).map(e=>Number(e.dataset.i));
   const base = Math.max(0, ...S.opex.map(x=>x.sort||0), ...S.capex.map(x=>x.sort||0));
   const opex = pick('o').map((i,j)=>{ const l = r.lines[i], row = { budget_id:b.id, line_item:l.line_item, expense_type:l.expense_type, activity:l.activity, description:l.description, purpose:l.purpose, basis:l.basis, priority:l.priority,
-    remarks:`Assistant draft (${l.confidence||'medium'} confidence): ${l.rationale||''} — review and confirm.`, calc:{ ai:true, qty:Number(l.qty)||null, unit:l.unit||null, rate:Number(l.rate)||null, times:Number(l.times)||null }, sort:base+j+1 };
+    remarks:`Assistant draft: ${l.rationale||''} — review and confirm.`, calc:{ ai:true, qty:Number(l.qty)||null, unit:l.unit||null, rate:Number(l.rate)||null, times:Number(l.times)||null }, sort:base+j+1 };
     // the last month gets any rounding difference
     const m = l.months.slice(); const diff = Math.round((Number(l.annual) - sum(m))*100)/100; if (diff) { const k = m.map((v,x)=>v?x:-1).filter(x=>x>=0).pop() ?? 11; m[k] = Math.round((m[k]+diff)*100)/100; }
     m.forEach((v,k)=>row['m'+(k+1)] = v || 0); return row; });

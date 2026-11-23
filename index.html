@@ -666,7 +666,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-11-24 00:40</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-11-24 01:00</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1229,7 +1229,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:40</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 01:00</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -5586,17 +5586,40 @@ async function lineRecs(){
     spentNoLine.filter(r => !used.has('m|'+r.item)).sort((a,b)=>b.actYTD-a.actYTD).forEach(r => out.push({ type:'missing', to:r.item, unbud:!r.budFY,
       text:`${peso(r.actYTD)} booked in ${Y-1} (${thru(M.closed)}, full-year pace ${peso(r.actYTD/M.closed*12)})${r.budFY?'':' with no budget'} — no line for it in ${Y} yet.` }));
   }
-  return out.filter(o => !(S._recDismiss||new Set()).has(o.type+'|'+(o.from||'')+'|'+o.to));
+  return out;
+}
+/* dismissed recommendations: saved per budget for everyone; kept as a record and can be restored */
+const recKey = o => o.type+'|'+(o.from||'')+'|'+o.to;
+const REC_LABEL = o => o.type==='missing' ? (o.unbud?'Unbudgeted last year':'Missing line') : o.type==='align' ? 'Align with Accounting' : 'Possibly misaligned';
+async function loadRecDismissals(bid){
+  const { data, error } = await sb.from('bgt_rec_dismissals').select('*').eq('budget_id', bid).is('restored_at', null).order('dismissed_at', { ascending:false });
+  if (error) { console.error(error); return S._recDis?.bid===bid ? S._recDis.rows : []; }
+  S._recDis = { bid, rows:data||[] }; return S._recDis.rows;
+}
+async function recDismiss(i, ed){
+  const o = (S._recShown||[])[i]; if (!o) return;
+  const r = await sb.from('bgt_rec_dismissals').insert({ budget_id:S.budgetId, rec_key:recKey(o), rec_label:`${REC_LABEL(o)}: ${o.to}`, rec_text:o.text, dismissed_by:S.me.id });
+  if (r.error && r.error.code !== '23505') return fail(r.error);   // 23505 = already dismissed by someone else
+  toast('Dismissed — use "Show dismissed" to bring it back'); drawLineRecs(ed);
+}
+async function recRestore(id, ed){
+  const r = await sb.from('bgt_rec_dismissals').update({ restored_at:new Date().toISOString(), restored_by:S.me.id }).eq('id', id); if (r.error) return fail(r.error);
+  toast('Restored'); S._recShowDis = true; drawLineRecs(ed);
 }
 async function drawLineRecs(ed){
-  const box = $('#lineRecs'); if (!box) return;
-  let recs = []; try { recs = await lineRecs(); } catch(e){ console.error(e); }
-  if (!recs.length) { box.innerHTML = ''; return; }
-  const key = o => esc(o.type+'|'+(o.from||'')+'|'+o.to);
-  box.innerHTML = `<details class="recs" open><summary><b>Recommended for ${S.cycle.year}</b> — ${recs.length} line item${recs.length>1?'s':''} to add or align with Accounting</summary>
-    ${recs.map(o=>`<div class="rec ${o.type}"><div><span class="pri ${o.type==='missing'?(o.unbud?'pri-crit':'pri-high'):'pri-high'}" style="font-size:10.5px">${o.type==='missing'?(o.unbud?'Unbudgeted last year':'Missing line'):o.type==='align'?'Align with Accounting':'Possibly misaligned'}</span> <b>${esc(o.to)}</b>
+  const box = $('#lineRecs'); if (!box) return; const bid = S.budgetId;
+  let all = [], dis = []; try { [all, dis] = await Promise.all([lineRecs(), loadRecDismissals(bid)]); } catch(e){ console.error(e); }
+  if (S.budgetId !== bid || !$('#lineRecs')) return;
+  const gone = new Set(dis.map(d=>d.rec_key)), recs = all.filter(o => !gone.has(recKey(o))); S._recShown = recs;
+  if (!recs.length && !dis.length) { box.innerHTML = ''; return; }
+  const when = t => new Date(t).toLocaleDateString('en-PH',{ month:'short', day:'numeric', year:'numeric' });
+  const disList = dis.length ? `<div style="margin-top:10px;font-size:12.5px"><a href="#" onclick="event.preventDefault();S._recShowDis=!S._recShowDis;drawLineRecs(${ed})">${S._recShowDis?'Hide':'Show'} dismissed (${dis.length})</a>
+    ${S._recShowDis ? dis.map(d=>`<div class="rec" style="opacity:.8"><div><b>${esc(d.rec_label||d.rec_key)}</b><div style="font-size:12px;color:var(--muted);margin-top:2px">Dismissed by ${esc(userName(d.dismissed_by))} on ${when(d.dismissed_at)}${all.some(o=>recKey(o)===d.rec_key)?'':' · no longer flagged'}</div></div>
+      <div class="actions"><button class="btn sm ghost" onclick="recRestore('${d.id}', ${ed})">Restore</button></div></div>`).join('') : ''}</div>` : '';
+  box.innerHTML = `<details class="recs" ${recs.length?'open':''}><summary><b>Recommended for ${S.cycle.year}</b> — ${recs.length ? `${recs.length} line item${recs.length>1?'s':''} to add or align with Accounting` : 'nothing open'}${dis.length?` · ${dis.length} dismissed`:''}</summary>
+    ${recs.map((o,i)=>`<div class="rec ${o.type}"><div><span class="pri ${o.type==='missing'?(o.unbud?'pri-crit':'pri-high'):'pri-high'}" style="font-size:10.5px">${REC_LABEL(o)}</span> <b>${esc(o.to)}</b>
       <div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(o.text)}${o.note?` <i>"${esc(o.note)}"</i>`:''}</div></div>
-      <div class="actions">${ed ? `${(o.lines||[]).length?`<button class="btn sm" onclick="recMove('${esc(o.to)}', ${JSON.stringify(o.lines).replace(/"/g,'&quot;')})">Move my ${o.lines.length>1?o.lines.length+' lines':'line'} to ${esc(o.to)}</button>`:''}<button class="btn sm primary" onclick="recAdd('${esc(o.to)}')">Add line</button>` : ''}<button class="btn sm ghost" onclick="(S._recDismiss ||= new Set()).add('${key(o)}');drawLineRecs(${ed})">Dismiss</button></div></div>`).join('')}</details>`;
+      <div class="actions">${ed ? `${(o.lines||[]).length?`<button class="btn sm" onclick="recMove('${esc(o.to)}', ${JSON.stringify(o.lines).replace(/"/g,'&quot;')})">Move my ${o.lines.length>1?o.lines.length+' lines':'line'} to ${esc(o.to)}</button>`:''}<button class="btn sm primary" onclick="recAdd('${esc(o.to)}')">Add line</button>` : ''}<button class="btn sm ghost" onclick="recDismiss(${i}, ${ed})">Dismiss</button></div></div>`).join('')}${disList}</details>`;
 }
 function recAdd(item){ S._prefill = { line_item:item, description:`Recommended: ${item} was booked by Accounting last year.` }; editLine('opex'); }
 async function recMove(to, ids){

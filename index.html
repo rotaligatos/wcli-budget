@@ -666,7 +666,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-10-22 01:30</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-11-23 23:45</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -716,10 +716,32 @@ function bgtItemsSheet(wb, groups){
   if (last > 1) { const t = ws.addRow(['Total','','','','','','','','','','','','','',{ formula:`SUM(O2:O${last})` }]); t.font = { bold:true }; }
   [7,11,15].forEach(c => ws.getColumn(c).numFmt = BGT_PESO);
   [16,30,30,34,9,10,12,14,24,10,12,14,24,8,14].forEach((w,i)=>ws.getColumn(i+1).width = w);
+  if (last > 1) xlFitRows(ws, 2, last, Array.from({length:15}, (_, i) => i + 1));
   ws.views = [{ state:'frozen', ySplit:1 }]; ws.autoFilter = { from:'A1', to:{ row:1, column:15 } };
   return ws;
 }
 
+// fit rows to their text: wrap text cells and grow each row's height so nothing is cut off (Excel keeps fixed template row heights)
+function xlLines(text, width, size){
+  const per = Math.max(4, Math.floor((width || 10) * 11 / (size || 11) * 1.15) - 1);
+  return String(text).split(/\r?\n/).reduce((n, para) => { let lines = 1, cur = 0;
+    for (const w of para.split(/\s+/).filter(Boolean)) { const len = w.length * (/[A-Z]/.test(w) && w === w.toUpperCase() ? 1.2 : 1);
+      if (!cur) cur = len; else if (cur + 1 + len <= per) cur += 1 + len; else { lines++; cur = len; }
+      while (cur > per) { lines++; cur -= per; } }
+    return n + lines; }, 0);
+}
+function xlFitRows(ws, fromRow, toRow, cols){
+  for (let r = fromRow; r <= toRow; r++) {
+    const row = ws.getRow(r); let lines = 1, size = 11, any = false;
+    for (const c of cols) { const cell = row.getCell(c), v = cell.value;
+      cell.alignment = { ...(cell.alignment || {}), vertical:'top' };
+      if (typeof v !== 'string' || !v.trim()) continue;
+      any = true; size = Math.max(size, Number(cell.font?.size) || 11);
+      cell.alignment = { ...(cell.alignment || {}), vertical:'top', wrapText:true };
+      lines = Math.max(lines, xlLines(v, ws.getColumn(c).width, cell.font?.size)); }
+    if (any) row.height = Math.max(15, Math.ceil(lines * size * 1.32 + 3));
+  }
+}
 async function fillDeptWorkbook(ExcelJS, templateBuf, d){
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(templateBuf);
@@ -746,6 +768,7 @@ async function fillDeptWorkbook(ExcelJS, templateBuf, d){
       row.getCell(20).value = { formula: `SUM(H${r}:S${r})`, result: bgtSum(m) };
       row.getCell(20).numFmt = BGT_PESO;
     });
+    if (rows.length) xlFitRows(ws, BGT_FIRST, BGT_FIRST + rows.length - 1, Array.from({length:21}, (_, i) => i + 1));
     // totals row: Finance template merges A194:H194 which hides the January total — fix to A:G + H total
     try { ws.unMergeCells(`A${BGT_TOTAL}:H${BGT_TOTAL}`); } catch(e) {}
     try { ws.mergeCells(`A${BGT_TOTAL}:G${BGT_TOTAL}`); } catch(e) {}
@@ -1190,7 +1213,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-10-22 01:30</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-23 23:45</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }

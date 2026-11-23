@@ -666,7 +666,7 @@ table.kpi td{padding:6px 6px}.kpi .kv{max-width:110px;min-width:80px;margin-left
     <div class="nav-scroll" id="navMain"></div>
     <div class="me"><b id="meName"></b><span id="meRole"></span>
       <div class="me-acts"><button onclick="practiceMenu()">🎓 Practice</button><button onclick="pennyCall()">Ask Penny</button><button class="hidden" id="btnPreview" onclick="previewPick()">View as manager</button><button onclick="themePanel(this)" aria-haspopup="dialog">Theme</button><button class="hidden" id="btnInstall" onclick="installApp()">Install app</button><button onclick="signOut()">Sign out</button></div>
-      <div class="build-tag">Build 2026-11-24 00:20</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
+      <div class="build-tag">Build 2026-11-24 00:30</div><div class="by-rtmo">Developed by <span><img data-logo="RTMO" alt="RTmo Digital Solutions"></span></div></div>
   </aside>
   <nav class="botbar" id="botbar" aria-label="Main"></nav>
   <main id="main"><div class="loading">Loading…</div></main>
@@ -1226,7 +1226,7 @@ function openMeSheet(){
     <a onclick="closeSheet();pennyCall()">Ask Penny</a>
     ${S.realRole==='admin'?`<a onclick="closeSheet();${S.preview?'previewSet(null)':'previewPick()'}">${S.preview?'Exit manager preview':'View as manager'}</a>`:''}
     <a onclick="closeSheet();signOut()">Sign out</a>
-    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:20</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:8px">Build 2026-11-24 00:30</div>
     <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);margin-top:12px">Developed by <img src="${LOGOS.RTMO}" alt="RTmo Digital Solutions" style="height:22px;background:#fff;border-radius:4px;padding:2px 4px"></div>`);
 }
 function sheet(html){ closeSheet(); const d = document.createElement('div'); d.id = 'sheetWrap'; d.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.appendChild(d); }
@@ -1811,8 +1811,12 @@ async function duplicateLine(kind, id){
 /* ================= EXPORT ================= */
 function deptPayload(b, opex, capex, reviews){
   return { company:S.company.name, deptName:deptById(b.department_id)?.name, year:S.cycle.year, preparedBy:b.prepared_by, datePrepared:b.date_prepared,
-    deptHead:b.dept_head, version:'v'+b.version, status:STATUS_LABEL[b.status], opex, capex, reviews:(reviews||[]).filter(r=>r.budget_id===b.id) };
+    deptHead:b.dept_head, version:'v'+b.version, status:STATUS_LABEL[b.status], opex, capex:xlCapexForExport(b, capex, (reviews||[]).filter(r=>r.budget_id===b.id)), reviews:(reviews||[]).filter(r=>r.budget_id===b.id) };
 }
+// once a budget is with Finance (MD-approved) or accepted, the Excel carries only the CAPEX going ahead: deferred lines are left out (MD's call wins over the Plant Head's)
+const XL_FINANCE_STAGE = ['md_approved','finance_accepted'];
+function xlCapexCall(l, reviews){ const R = (reviews||[]).filter(r=>r.line_kind==='capex' && r.line_id===l.id); return (R.find(r=>r.reviewer_role==='md') || R.find(r=>r.reviewer_role==='plant_head') || R[0])?.decision || null; }
+function xlCapexForExport(b, capex, reviews){ return XL_FINANCE_STAGE.includes(b.status) ? (capex||[]).filter(l => xlCapexCall(l, reviews) !== 'defer') : (capex||[]); }
 async function loadReviewsFor(ids){ if (!ids.length) return []; const { data, error } = await sb.from('bgt_line_reviews').select('*').in('budget_id', ids); if (error) throw error; return data||[]; }
 async function exportDept(){
   try {
@@ -1940,7 +1944,7 @@ async function exportPlant(){
   try {
     const { o, c } = S._all || await loadAllLines(); const reviews = await loadReviewsFor(S.budgets.map(b=>b.id));
     const buf = await buildPlantWorkbook(ExcelJS, { company:S.company.name, site:S.site?.name||'', year:S.cycle.year, generated:new Date().toLocaleString('en-PH'), opexItems:S.items.opex, reviews,
-      depts:S.budgets.map(b=>({ name:deptById(b.department_id)?.name, status:STATUS_LABEL[b.status], opex:o.filter(x=>x.budget_id===b.id), capex:c.filter(x=>x.budget_id===b.id) })) });
+      depts:S.budgets.map(b=>({ name:deptById(b.department_id)?.name, status:STATUS_LABEL[b.status], opex:o.filter(x=>x.budget_id===b.id), capex:xlCapexForExport(b, c.filter(x=>x.budget_id===b.id), reviews.filter(r=>r.budget_id===b.id)) })) });
     download(buf, `${S.cycle.year} Budget - ${S.site?.name||'Plant'} Summary - ${S.company.code}.xlsx`); toast('Plant summary downloaded');
   } catch(e){ fail(e); }
 }
